@@ -90,6 +90,10 @@ function kj() {
 #   "/snap/bin",
 #   "/usr/bin",
 # ]
+
+# deduplicate paths in PATH
+# while preserving order of first appearance
+> export PATH=$(kj '(env).PATH | split ":" | group [., .key] | join ":" | out')
 ```
 
 Pipes (`|`) are a critical part of the language because they make it possible to iteratively write queries. Consider the changes required to filter an expression:

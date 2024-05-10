@@ -12,7 +12,7 @@ def main():
         query = sys.argv[1].strip()
     result = run_json_query_expr(None, query)
     if isinstance(result, OutputNode):
-        assert isinstance(result, str)
+        assert isinstance(result.value, str)
         sys.stdout.write(result.value)
         return
     print(to_printable_str(result))
