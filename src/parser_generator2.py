@@ -406,70 +406,6 @@ def get_list_tail(lst: list, count: int):
     return []
 
 
-# def eval_lookup_table(
-#     lookup_tbl: list[LookupRow], rules: list[Rule], tokens: list[str]
-# ):
-#     lookup_map: dict[tuple[int, Optional[str]], dict[str, LookupRow]] = {}
-#     for row in lookup_tbl:
-#         lookup_map.setdefault((row.state, row.follow_token), {})[row.token] = row
-
-#     stack: list[Union[int, ElemWrapper]] = [0]
-#     token_idx = 0
-#     while True:
-#         stack_top = stack[-1]
-#         if isinstance(stack_top, int):
-#             state = stack_top
-
-#             if state not in lookup_map:
-#                 break
-
-#             token = tokens[token_idx]
-#             if token == "END":
-#                 assert len(stack) == 3
-#                 return stack[1].value
-#             token_idx += 1
-#             row = lookup_map[state][token]
-
-#             if row.next_state is not None:
-#                 stack.append(ElemWrapper(token, token))
-#                 stack.append(row.next_state)
-#             else:
-#                 assert row.reduce_rule is not None
-#                 elems = [token]
-#                 for _ in range(len(rules[row.reduce_rule].steps) - 1):
-#                     stack.pop()
-#                     elems.append(stack.pop().value)
-#                 elems.reverse()
-#                 wrapper = ElemWrapper(
-#                     rules[row.reduce_rule].name,
-#                     (rules[row.reduce_rule].name, *elems),
-#                 )
-#                 stack.append(wrapper)
-#         else:
-#             assert isinstance(stack_top, ElemWrapper)
-#             state = stack[-2]
-#             token = stack_top.rule_name
-#             if token not in lookup_map[state]:
-#                 break
-#             row = lookup_map[state][token]
-#             if row.next_state is not None:
-#                 stack.append(row.next_state)
-#             else:
-#                 assert row.reduce_rule is not None
-#                 elems = [stack.pop().value]
-#                 for _ in range(len(rules[row.reduce_rule].steps) - 1):
-#                     stack.pop()
-#                     elems.append(stack.pop().value)
-#                 elems.reverse()
-#                 wrapper = ElemWrapper(
-#                     rules[row.reduce_rule].name, (rules[row.reduce_rule].name, *elems)
-#                 )
-#                 stack.append(wrapper)
-
-#     result = stack[1]
-#     return result.value
-
-
 class Parser:
     def __init__(
         self,
@@ -492,19 +428,6 @@ class Parser:
             name: (idx, re.compile(pattern))
             for idx, (name, pattern) in enumerate(tokens)
         }
-
-        # self.token_group_to_regex = {
-        #     group_idx: re.compile(
-        #         "|".join(
-        #             f"(?P<{token}>{token_map[token][1]})"
-        #             for token in sorted(
-        #                 [token for token in tokens if token != "END"],
-        #                 key=lambda token: token_map[token][0],
-        #             )
-        #         )
-        #     )
-        #     for group_idx, tokens in self.token_groups.items()
-        # }
 
     def parse(self, text: str):
         parser_state = ParserState(self.lookup_rows, self.rules)
