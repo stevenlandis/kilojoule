@@ -181,16 +181,16 @@ fn get_reduced_token(token: Token, text: &str) -> AstNode {
 
 fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
-        RuleType::Main__Expr_END => elems[0].clone(),
-        RuleType::Expr__AddExpr => elems[0].clone(),
-        RuleType::AddExpr__AddExpr_PLUS_MulExpr => {
+        RuleType::main__expr_END => elems[0].clone(),
+        RuleType::expr__addExpr => elems[0].clone(),
+        RuleType::addExpr__addExpr_PLUS_mulExpr => {
             Rc::new(AstNode::Add(elems[0].clone(), elems[2].clone()))
         }
-        RuleType::AddExpr__MulExpr => elems[0].clone(),
-        RuleType::MulExpr__MulExpr_ASTERISK_INTEGER => {
+        RuleType::addExpr__mulExpr => elems[0].clone(),
+        RuleType::mulExpr__mulExpr_ASTERISK_INTEGER => {
             Rc::new(AstNode::Mul(elems[0].clone(), elems[2].clone()))
         }
-        RuleType::MulExpr__INTEGER => elems[0].clone(),
+        RuleType::mulExpr__INTEGER => elems[0].clone(),
     };
 }
 

@@ -7,12 +7,12 @@ def main():
     src = Path("kilojoule_rust/src")
 
     rules = [
-        Rule("Main", ["Expr", "END"]),
-        Rule("Expr", ["AddExpr"]),
-        Rule("AddExpr", ["MulExpr"]),
-        Rule("AddExpr", ["AddExpr", "PLUS", "MulExpr"]),
-        Rule("MulExpr", ["INTEGER"]),
-        Rule("MulExpr", ["MulExpr", "ASTERISK", "INTEGER"]),
+        Rule("main", ["expr", "END"]),
+        Rule("expr", ["addExpr"]),
+        Rule("addExpr", ["mulExpr"]),
+        Rule("addExpr", ["addExpr", "PLUS", "mulExpr"]),
+        Rule("mulExpr", ["INTEGER"]),
+        Rule("mulExpr", ["mulExpr", "ASTERISK", "INTEGER"]),
     ]
 
     # generate token.rs
