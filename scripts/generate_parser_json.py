@@ -22,6 +22,7 @@ def main():
         tokens.update(rule.steps)
     tokens = sorted(tokens)
     with open(src / "token.rs", "w") as fid:
+        fid.write("#[allow(non_camel_case_types)]\n")
         fid.write("#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]\n")
         fid.write("pub enum Token {\n")
         for token in tokens:
