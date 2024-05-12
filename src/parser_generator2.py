@@ -203,11 +203,36 @@ def get_next_states(
 @dataclass(frozen=True)
 class LookupRow:
     state: int
-    token: str
     rule_name: Optional[str]
+    token: str
     token_group: int
     next_state: Optional[int]
     reduce_rule: Optional[int]
+
+
+class SortTuple:
+    def __init__(self, values: tuple):
+        self.values = values
+
+    def __lt__(self, other: "SortTuple"):
+        idx = 0
+        while True:
+            if idx < len(self.values) and idx < len(other.values):
+                lv = self.values[idx]
+                rv = other.values[idx]
+                if lv is None:
+                    return rv is not None
+                if rv is None:
+                    return False
+                if lv < rv:
+                    return True
+                if rv < lv:
+                    return False
+                idx += 1
+            elif idx >= len(self.values) and idx >= len(other.values):
+                return False
+            else:
+                return len(self.values) < len(other.values)
 
 
 def get_lookup_row_dedupe_key(row: LookupRow):
@@ -217,14 +242,15 @@ def get_lookup_row_dedupe_key(row: LookupRow):
 def simplify_lookup_rows(rows: list[LookupRow]):
     rule_to_row_group: dict[Optional[str], list[LookupRow]] = {}
     for row in rows:
-        rule_to_row_group.setdefault(row.rule_name, []).append(row)
+        rule_to_row_group.setdefault((row.state, row.rule_name), []).append(row)
 
     result: list[LookupRow] = []
     for row_group in rule_to_row_group.values():
         first_key = get_lookup_row_dedupe_key(row_group[0])
-        if len(row_group) > 0 and all(
+        if len(row_group) > 1 and all(
             get_lookup_row_dedupe_key(row) == first_key for row in row_group[1:]
         ):
+            print(f"Reduced from {len(row_group)} rows")
             result.append(
                 LookupRow(
                     state=row_group[0].state,
@@ -238,7 +264,7 @@ def simplify_lookup_rows(rows: list[LookupRow]):
         else:
             result.extend(row_group)
 
-    result.sort(key=lambda row: row.state)
+    result.sort(key=lambda row: SortTuple((row.state, row.rule_name, row.token)))
 
     return result
 

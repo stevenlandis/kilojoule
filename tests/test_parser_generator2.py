@@ -80,3 +80,22 @@ def test_dot_ambiguity():
 
     assert parser.parse(".") == "."
     assert parser.parse(".stuff") == (".", "stuff")
+
+
+def test_sort_tuple():
+    def assert_lt(left, right):
+        assert_eq(left, left)
+        assert_eq(right, right)
+        assert (SortTuple(left) < SortTuple(right)) is True
+        assert (SortTuple(right) < SortTuple(left)) is False
+
+    def assert_eq(left, right):
+        assert (SortTuple(left) < SortTuple(right)) is False
+        assert (SortTuple(right) < SortTuple(left)) is False
+
+    assert_lt((), (1,))
+    assert_lt((1,), (2,))
+    assert_lt((100, 1), (100, 2))
+    assert_lt((None,), (1,))
+    assert_lt((1, 2, None), (1, 2, 3))
+    assert_lt((1, 100), (2, 0))
