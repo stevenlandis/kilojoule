@@ -62,3 +62,21 @@ def test_token_precedence():
     assert parser.parse("foo") == ("FOO", "foo")
     assert parser.parse("fo") == ("identifier", "fo")
     assert parser.parse("fooo") == ("identifier", "fooo")
+
+
+def test_dot_ambiguity():
+    parser = Parser(
+        [
+            ("DOT", r"\."),
+            ("IDENTIFIER", r"\w+"),
+        ],
+        None,
+        "expr",
+        [
+            Rule("expr", ["DOT"], lambda elems: "."),
+            Rule("expr", ["DOT", "IDENTIFIER"], lambda elems: (".", elems[1])),
+        ],
+    )
+
+    assert parser.parse(".") == "."
+    assert parser.parse(".stuff") == (".", "stuff")

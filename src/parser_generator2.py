@@ -33,8 +33,10 @@ def expand_states(
             return
         reached_states.add(state)
 
-        # none of the states should be finished here
-        assert state.step < len(rules[state.rule].steps)
+        # ignore finished states
+        if state.step >= len(rules[state.rule].steps):
+            return
+
         next_step = rules[state.rule].steps[state.step]
         if next_step in rule_map:
             for new_rule in rule_map[next_step]:
@@ -115,7 +117,7 @@ def get_state_to_following_tokens(
         return following_tokens
 
     for rule_idx, rule in enumerate(rules):
-        for step_idx in range(len(rule.steps)):
+        for step_idx in range(len(rule.steps) + 1):
             helper(RuleState(rule_idx, step_idx))
 
     return state_to_following_tokens
@@ -124,7 +126,7 @@ def get_state_to_following_tokens(
 @dataclass(frozen=True)
 class Edge:
     token: str
-    follow_token: Optional[str]
+    rule_name: Optional[str]
     follow_tokens: Optional[set[str]]
     reduce_rule: Optional[int]
     next_states: Optional[list[RuleState]]
@@ -137,20 +139,28 @@ def get_next_states(
     state_to_following: dict[RuleState, set[str]],
     rule_to_first_tokens: dict[str, set[str]],
 ):
-    next_groups: dict[str, list[RuleState]] = {}
+    next_groups: dict[tuple[Optional[str], str], list[RuleState]] = {}
     for state in states:
-        assert state.step < len(rules[state.rule].steps)
-        next_step = rules[state.rule].steps[state.step]
-        next_groups.setdefault(next_step, []).append(state)
+        following = state_to_following[state]
+        if state.step < len(rules[state.rule].steps):
+            next_step = rules[state.rule].steps[state.step]
+            if next_step in rule_map:
+                for follow_token in following:
+                    next_groups.setdefault((next_step, follow_token), []).append(state)
+            else:
+                next_groups.setdefault((None, next_step), []).append(state)
+        else:
+            for follow_token in following:
+                next_groups.setdefault((None, follow_token), []).append(state)
 
     next_actions: list[Edge] = []
-    for token, next_states in next_groups.items():
+    for (rule_name, token), next_states in next_groups.items():
         reduce_states: list[RuleState] = []
         shift_states: list[RuleState] = []
         is_base_token = token not in rule_map
         for state in next_states:
-            if state.step + 1 < len(rules[state.rule].steps):
-                shift_states.append(state.incr())
+            if state.step < len(rules[state.rule].steps):
+                shift_states.append(state)
             else:
                 reduce_states.append(state)
 
@@ -158,7 +168,7 @@ def get_next_states(
             next_actions.append(
                 Edge(
                     token=token,
-                    follow_token=None,
+                    rule_name=rule_name,
                     follow_tokens=(
                         state_to_following[reduce_states[0]] if is_base_token else None
                     ),
@@ -170,23 +180,22 @@ def get_next_states(
             next_actions.append(
                 Edge(
                     token=token,
-                    follow_token=None,
+                    rule_name=rule_name,
                     follow_tokens=(
                         {
                             token
                             for state in shift_states
-                            for token in rule_to_first_tokens[
-                                rules[state.rule].steps[state.step]
-                            ]
+                            for token in state_to_following[state]
                         }
                         if is_base_token
                         else None
                     ),
                     reduce_rule=None,
-                    next_states=shift_states,
+                    next_states=[state.incr() for state in shift_states],
                 )
             )
         else:
+            assert False
             # only use lookahead when token is a rule
             assert not is_base_token
 
@@ -201,8 +210,8 @@ def get_next_states(
                 reduce_states: list[RuleState] = []
                 shift_states: list[RuleState] = []
                 for state in states_group:
-                    if state.step + 1 < len(rules[state.rule].steps):
-                        shift_states.append(state.incr())
+                    if state.step < len(rules[state.rule].steps):
+                        shift_states.append(state)
                     else:
                         reduce_states.append(state)
                 if len(reduce_states) > 0:
@@ -211,7 +220,7 @@ def get_next_states(
                     next_actions.append(
                         Edge(
                             token=token,
-                            follow_token=follow_token,
+                            rule_name=follow_token,
                             follow_tokens=None,
                             reduce_rule=reduce_states[0].rule,
                             next_states=None,
@@ -222,10 +231,10 @@ def get_next_states(
                     next_actions.append(
                         Edge(
                             token=token,
-                            follow_token=follow_token,
+                            rule_name=follow_token,
                             follow_tokens=None,
                             reduce_rule=None,
-                            next_states=shift_states,
+                            next_states=[state.incr() for state in shift_states],
                         )
                     )
 
@@ -236,7 +245,7 @@ def get_next_states(
 class LookupRow:
     state: int
     token: str
-    follow_token: Optional[str]
+    rule_name: Optional[str]
     token_group: int
     next_state: Optional[int]
     reduce_rule: Optional[int]
@@ -290,7 +299,7 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
                     LookupRow(
                         state=states_idx,
                         token=next_action.token,
-                        follow_token=next_action.follow_token,
+                        rule_name=next_action.rule_name,
                         token_group=token_group,
                         next_state=None,
                         reduce_rule=next_action.reduce_rule,
@@ -302,7 +311,7 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
                     LookupRow(
                         state=states_idx,
                         token=next_action.token,
-                        follow_token=next_action.follow_token,
+                        rule_name=next_action.rule_name,
                         token_group=token_group,
                         next_state=next_states_idx,
                         reduce_rule=None,
@@ -335,13 +344,13 @@ class ParserState:
         self.lookup_tbl: dict[tuple[int, str, Optional[str]], LookupRow] = {}
         self.token_group = 0
         for row in lookup_tbl_rows:
-            key = (row.state, row.token, row.follow_token)
+            key = (row.state, row.token, row.rule_name)
             assert key not in self.lookup_tbl
             self.lookup_tbl[key] = row
 
     def get_value(self):
-        assert len(self.val_stack) == 1
-        return self.val_stack[-1].value
+        assert len(self.val_stack) == 2
+        return self.val_stack[0].value
 
     def step(self, token: str, token_value: str):
         assert (len(self.state_stack) == len(self.val_stack)) or (
@@ -349,15 +358,21 @@ class ParserState:
         )
 
         # reduce until ready to accept next token
-        while len(self.state_stack) == len(self.val_stack):
+        while True:
             state = self.state_stack[-1]
-            prev_rule = self.val_stack[-1].rule_name
-            lookup_row = self.lookup_tbl.get((state, prev_rule, None))
-            if lookup_row is None:
-                lookup_row = self.lookup_tbl[(state, prev_rule, token)]
+            if len(self.state_stack) == len(self.val_stack):
+                rule_name = self.val_stack[-1].rule_name
+            else:
+                rule_name = None
+
+            lookup_row = self.lookup_tbl[(state, token, rule_name)]
 
             if lookup_row.next_state is not None:
                 self.state_stack.append(lookup_row.next_state)
+                if rule_name is None:
+                    self.val_stack.append(ElemWrapper(token, token_value))
+                    self.token_group = lookup_row.token_group
+                    break
             else:
                 reduce_rule = lookup_row.reduce_rule
                 assert reduce_rule is not None
@@ -367,32 +382,54 @@ class ParserState:
                     elem.value for elem in get_list_tail(self.val_stack, n_stack_elems)
                 ]
                 pop_list(self.val_stack, n_stack_elems)
-                pop_list(self.state_stack, n_stack_elems - 1)
+                pop_list(
+                    self.state_stack, n_stack_elems - (0 if rule_name is None else 1)
+                )
                 value = rule.handler(elems)
                 self.val_stack.append(ElemWrapper(rule.name, value))
 
-        assert len(self.state_stack) == len(self.val_stack) + 1
+        # # reduce until ready to accept next token
+        # while len(self.state_stack) == len(self.val_stack):
+        #     state = self.state_stack[-1]
+        #     prev_rule = self.val_stack[-1].rule_name
+        #     lookup_row = self.lookup_tbl[(state, token, prev_rule)]
 
-        state = self.state_stack[-1]
-        lookup_row = self.lookup_tbl[(state, token, None)]
-        self.token_group = lookup_row.token_group
+        #     if lookup_row.next_state is not None:
+        #         self.state_stack.append(lookup_row.next_state)
+        #     else:
+        #         reduce_rule = lookup_row.reduce_rule
+        #         assert reduce_rule is not None
+        #         rule = self.rules[reduce_rule]
+        #         n_stack_elems = len(rule.steps)
+        #         elems = [
+        #             elem.value for elem in get_list_tail(self.val_stack, n_stack_elems)
+        #         ]
+        #         pop_list(self.val_stack, n_stack_elems)
+        #         pop_list(self.state_stack, n_stack_elems - 1)
+        #         value = rule.handler(elems)
+        #         self.val_stack.append(ElemWrapper(rule.name, value))
 
-        if lookup_row.next_state is not None:
-            self.state_stack.append(lookup_row.next_state)
-            self.val_stack.append(ElemWrapper(token, token_value))
-        else:
-            reduce_rule = lookup_row.reduce_rule
-            assert reduce_rule is not None
-            rule = self.rules[reduce_rule]
-            n_stack_elems = len(rule.steps) - 1
-            elems = [
-                *[elem.value for elem in get_list_tail(self.val_stack, n_stack_elems)],
-                token_value,
-            ]
-            pop_list(self.val_stack, n_stack_elems)
-            pop_list(self.state_stack, n_stack_elems)
-            value = rule.handler(elems)
-            self.val_stack.append(ElemWrapper(rule.name, value))
+        # assert len(self.state_stack) == len(self.val_stack) + 1
+
+        # state = self.state_stack[-1]
+        # lookup_row = self.lookup_tbl[(state, token, None)]
+        # self.token_group = lookup_row.token_group
+
+        # if lookup_row.next_state is not None:
+        #     self.state_stack.append(lookup_row.next_state)
+        #     self.val_stack.append(ElemWrapper(token, token_value))
+        # else:
+        #     reduce_rule = lookup_row.reduce_rule
+        #     assert reduce_rule is not None
+        #     rule = self.rules[reduce_rule]
+        #     n_stack_elems = len(rule.steps)
+        #     elems = [
+        #         elem.value for elem in get_list_tail(self.val_stack, n_stack_elems)
+        #     ]
+        #     pop_list(self.val_stack, n_stack_elems)
+        #     pop_list(self.state_stack, n_stack_elems)
+        #     value = rule.handler(elems)
+        #     self.val_stack.append(ElemWrapper(rule.name, value))
 
 
 def pop_list(lst: list, count: int):

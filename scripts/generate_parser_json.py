@@ -8,11 +8,11 @@ def main():
 
     rules = [
         Rule("main", ["expr", "END"]),
-        Rule("expr", ["addExpr"]),
-        Rule("addExpr", ["mulExpr"]),
-        Rule("addExpr", ["addExpr", "PLUS", "mulExpr"]),
-        Rule("mulExpr", ["INTEGER"]),
-        Rule("mulExpr", ["mulExpr", "ASTERISK", "INTEGER"]),
+        Rule("expr", ["op_base_expr"]),
+        Rule("op_base_expr", ["base_dot_expr"]),
+        Rule("op_base_expr", ["base_dot_access"]),
+        Rule("base_dot_expr", ["DOT"]),
+        Rule("base_dot_access", ["DOT", "IDENTIFIER"]),
     ]
 
     # generate token.rs
@@ -92,7 +92,7 @@ pub static LOOKUP_ROWS: &[LookupRow] = &[
             fid.write(f"        state: {row.state},\n")
             fid.write(f"        token: Token::{row.token},\n")
             fid.write(
-                f"        follow_token: {'None' if row.follow_token is None else f'Some(Token::{row.follow_token})'},\n"
+                f"        follow_token: {'None' if row.rule_name is None else f'Some(Token::{row.rule_name})'},\n"
             )
             fid.write(
                 f"        token_group: {'None' if row.token_group is None else f'Some({row.token_group})'},\n"
