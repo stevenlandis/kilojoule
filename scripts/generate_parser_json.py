@@ -8,11 +8,11 @@ def main():
 
     rules = [
         Rule("main", ["expr", "END"]),
-        Rule("expr", ["op_base_expr"]),
-        Rule("op_base_expr", ["base_dot_expr"]),
-        Rule("op_base_expr", ["base_dot_access"]),
-        Rule("base_dot_expr", ["DOT"]),
-        Rule("base_dot_access", ["DOT", "IDENTIFIER"]),
+        Rule("expr", ["opBaseExpr"]),
+        Rule("opBaseExpr", ["baseDotExpr"]),
+        Rule("opBaseExpr", ["baseDotAccess"]),
+        Rule("baseDotExpr", ["DOT"]),
+        Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),
     ]
 
     # generate token.rs
@@ -77,8 +77,8 @@ use super::token::Token;
 #[derive(Clone)]
 pub struct LookupRow {
     pub state: u64,
-    pub token: Token,
-    pub follow_token: Option<Token>,
+    pub token: Option<Token>,
+    pub rule_name: Option<Token>,
     pub token_group: Option<u64>,
     pub next_state: Option<u64>,
     pub reduce_rule: Option<u64>,
@@ -90,9 +90,11 @@ pub static LOOKUP_ROWS: &[LookupRow] = &[
         for row in lookup_rows:
             fid.write("    LookupRow {\n")
             fid.write(f"        state: {row.state},\n")
-            fid.write(f"        token: Token::{row.token},\n")
             fid.write(
-                f"        follow_token: {'None' if row.rule_name is None else f'Some(Token::{row.rule_name})'},\n"
+                f"        rule_name: {'None' if row.rule_name is None else f'Some(Token::{row.rule_name})'},\n"
+            )
+            fid.write(
+                f"        token: {'None' if row.token is None else f'Some(Token::{row.token})'},\n"
             )
             fid.write(
                 f"        token_group: {'None' if row.token_group is None else f'Some({row.token_group})'},\n"

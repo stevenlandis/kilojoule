@@ -1,6 +1,6 @@
 use super::ast_node::AstNode;
 use super::lookup_rows::{LookupRow, LOOKUP_ROWS};
-use super::rule_type::RuleType;
+use super::parser_reducers::{get_reduced_rule, get_reduced_token};
 use super::rules::{Rule, RULES};
 use super::token::Token;
 use super::token_def::TOKEN_DEFS;
@@ -14,7 +14,7 @@ pub struct Parser<'a> {
     token_groups: HashMap<usize, &'a [Token]>,
     token_map: HashMap<Token, (usize, Regex)>,
     rules: &'a [Rule<'a>],
-    lookup_tbl: HashMap<(u64, Token, Option<Token>), LookupRow>,
+    lookup_tbl: HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
 }
 
 impl<'a> Parser<'a> {
@@ -41,12 +41,12 @@ impl<'a> Parser<'a> {
             rules: RULES,
             lookup_tbl: LOOKUP_ROWS
                 .iter()
-                .map(|row| ((row.state, row.token, row.follow_token), row.clone()))
+                .map(|row| ((row.state, row.token, row.rule_name), row.clone()))
                 .collect::<HashMap<_, _>>(),
         };
     }
 
-    pub fn parse(&self, text: &str) -> Rc<AstNode> {
+    pub fn parse(&'a self, text: &'a str) -> Rc<AstNode<'a>> {
         let mut tokenizer = Tokenizer::new(
             text,
             &self.skip_pattern,
@@ -64,23 +64,23 @@ impl<'a> Parser<'a> {
     }
 }
 
-struct ParserStateNode {
+struct ParserStateNode<'a> {
     token: Token,
-    node: Rc<AstNode>,
+    node: Rc<AstNode<'a>>,
 }
 
 struct ParserState<'a> {
     token_group: u64,
     state_stack: Vec<u64>,
-    val_stack: Vec<ParserStateNode>,
-    lookup_tbl: &'a HashMap<(u64, Token, Option<Token>), LookupRow>,
+    val_stack: Vec<ParserStateNode<'a>>,
+    lookup_tbl: &'a HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
     rules: &'a [Rule<'a>],
 }
 
 impl<'a> ParserState<'a> {
     pub fn new(
         rules: &'a [Rule<'a>],
-        lookup_tbl: &'a HashMap<(u64, Token, Option<Token>), LookupRow>,
+        lookup_tbl: &'a HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
     ) -> Self {
         return ParserState {
             token_group: 0,
@@ -91,28 +91,41 @@ impl<'a> ParserState<'a> {
         };
     }
 
-    pub fn get_value(&self) -> Rc<AstNode> {
-        assert!(self.val_stack.len() == 1);
-        return self.val_stack.last().unwrap().node.clone();
+    pub fn get_value(&self) -> Rc<AstNode<'a>> {
+        assert!(self.val_stack.len() == 2);
+        return self.val_stack[0].node.clone();
     }
 
-    pub fn step(&mut self, token: Token, token_value: &str) {
+    pub fn step(&mut self, token: Token, token_value: &'a str) {
         assert!(
             self.state_stack.len() == self.val_stack.len()
                 || self.state_stack.len() == self.val_stack.len() + 1
         );
 
         // reduce until ready to accept next token
-        while self.state_stack.len() == self.val_stack.len() {
+        loop {
             let state = *self.state_stack.last().unwrap();
-            let prev_token = self.val_stack.last().unwrap().token;
-            let lookup_row = match self.lookup_tbl.get(&(state, prev_token, None)) {
+            let rule_name = if self.state_stack.len() == self.val_stack.len() {
+                Some(self.val_stack.last().unwrap().token)
+            } else {
+                None
+            };
+
+            let lookup_row = match self.lookup_tbl.get(&(state, None, rule_name)) {
                 Some(lookup_row) => lookup_row,
-                None => &self.lookup_tbl[&(state, prev_token, Some(token))],
+                None => &self.lookup_tbl[&(state, Some(token), rule_name)],
             };
 
             if lookup_row.next_state.is_some() {
                 self.state_stack.push(lookup_row.next_state.unwrap());
+                if rule_name.is_none() {
+                    self.val_stack.push(ParserStateNode {
+                        token,
+                        node: Rc::new(get_reduced_token(token, token_value)),
+                    });
+                    self.token_group = lookup_row.token_group.unwrap();
+                    break;
+                }
             } else {
                 let reduce_rule = lookup_row.reduce_rule.unwrap();
                 let rule = &self.rules[reduce_rule as usize];
@@ -127,71 +140,17 @@ impl<'a> ParserState<'a> {
                     node: get_reduced_rule(rule.rule_type, elems),
                 });
 
-                pop_vec(&mut self.state_stack, n_stack_elems.saturating_sub(1));
+                pop_vec(
+                    &mut self.state_stack,
+                    n_stack_elems.saturating_sub(if rule_name.is_none() { 0 } else { 1 }),
+                );
             }
-        }
-
-        assert!(self.state_stack.len() == self.val_stack.len() + 1);
-
-        let state = *self.state_stack.last().unwrap();
-        let lookup_row = &self.lookup_tbl[&(state, token, None)];
-        self.token_group = lookup_row.token_group.unwrap();
-
-        if lookup_row.next_state.is_some() {
-            self.state_stack.push(lookup_row.next_state.unwrap());
-            self.val_stack.push(ParserStateNode {
-                token,
-                node: Rc::new(get_reduced_token(token, token_value)),
-            });
-        } else {
-            let reduce_rule = lookup_row.reduce_rule.unwrap();
-            let rule = &self.rules[reduce_rule as usize];
-            let n_stack_elems = rule.steps.len().saturating_sub(1);
-            let mut elems = self
-                .val_stack
-                .drain(self.val_stack.len().saturating_sub(n_stack_elems)..)
-                .map(|elem| elem.node)
-                .collect::<Vec<_>>();
-            elems.push(Rc::new(get_reduced_token(token, token_value)));
-            self.val_stack.push(ParserStateNode {
-                token: rule.token,
-                node: get_reduced_rule(rule.rule_type, elems),
-            });
-
-            pop_vec(&mut self.state_stack, n_stack_elems);
         }
     }
 
     pub fn get_token_group(&self) -> u64 {
         return self.token_group;
     }
-}
-
-fn get_reduced_token(token: Token, text: &str) -> AstNode {
-    return match token {
-        Token::INTEGER => AstNode::Int(text.parse::<u64>().unwrap()),
-        Token::PLUS => AstNode::Plus,
-        Token::ASTERISK => AstNode::Asterisk,
-        Token::END => AstNode::End,
-        _ => {
-            panic!("Unimplemented token reduce {:?}", token);
-        }
-    };
-}
-
-fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
-    return match rule {
-        RuleType::main__expr_END => elems[0].clone(),
-        RuleType::expr__addExpr => elems[0].clone(),
-        RuleType::addExpr__addExpr_PLUS_mulExpr => {
-            Rc::new(AstNode::Add(elems[0].clone(), elems[2].clone()))
-        }
-        RuleType::addExpr__mulExpr => elems[0].clone(),
-        RuleType::mulExpr__mulExpr_ASTERISK_INTEGER => {
-            Rc::new(AstNode::Mul(elems[0].clone(), elems[2].clone()))
-        }
-        RuleType::mulExpr__INTEGER => elems[0].clone(),
-    };
 }
 
 fn pop_vec<T>(vec: &mut Vec<T>, count: usize) {

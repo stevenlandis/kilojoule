@@ -1,20 +1,9 @@
-use kilojoule_rust::{AstNode, Parser};
+use kilojoule_rust::{eval_ast_node, Parser, Val};
 
 fn main() {
     let parser = Parser::new();
-    let ast = parser.parse("2*3 + 30*4 + 1 * 2 + 3");
+    let ast = parser.parse(".");
     println!("Ast: {:?}", ast);
-    let result = eval_ast_node(&ast);
-    println!("Result = {}", result);
-}
-
-fn eval_ast_node(node: &AstNode) -> i64 {
-    match node {
-        AstNode::Int(val) => *val as i64,
-        AstNode::Add(left, right) => eval_ast_node(&left) + eval_ast_node(&right),
-        AstNode::Mul(left, right) => eval_ast_node(&left) * eval_ast_node(&right),
-        _ => {
-            panic!("Unimplemented eval");
-        }
-    }
+    let result = eval_ast_node(&Val::from_json_str(r#"{"a": 1, "b": 2}"#), &ast);
+    println!("Result = {:?}", result);
 }

@@ -204,8 +204,8 @@ def get_next_states(
 class LookupRow:
     state: int
     rule_name: Optional[str]
-    token: str
-    token_group: int
+    token: Optional[str]
+    token_group: Optional[int]
     next_state: Optional[int]
     reduce_rule: Optional[int]
 
@@ -360,7 +360,7 @@ class ParserState:
         self.rules = rules
         self.state_stack = [0]
         self.val_stack: list[ElemWrapper] = []
-        self.lookup_tbl: dict[tuple[int, str, Optional[str]], LookupRow] = {}
+        self.lookup_tbl: dict[tuple[int, Optional[str], Optional[str]], LookupRow] = {}
         self.token_group = 0
         for row in lookup_tbl_rows:
             key = (row.state, row.token, row.rule_name)

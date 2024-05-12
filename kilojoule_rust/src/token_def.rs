@@ -7,15 +7,11 @@ pub struct TokenDef<'a> {
 
 pub static TOKEN_DEFS: &[TokenDef] = &[
     TokenDef {
-        token: Token::INTEGER,
-        pattern: r"\d+",
+        token: Token::IDENTIFIER,
+        pattern: r"\w+",
     },
     TokenDef {
-        token: Token::PLUS,
-        pattern: r"\+",
-    },
-    TokenDef {
-        token: Token::ASTERISK,
-        pattern: r"\*",
+        token: Token::DOT,
+        pattern: r"\.",
     },
 ];
