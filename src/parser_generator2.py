@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Union
 class Rule:
     name: str
     steps: list[str]
-    handler: Callable
+    handler: Optional[Callable] = None
 
 
 @dataclass(frozen=True)
