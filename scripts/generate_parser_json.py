@@ -1,8 +1,11 @@
 import json
 from src.parser_generator2 import get_lookup_tbl_rows, Rule
+from pathlib import Path
 
 
 def main():
+    src = Path("kilojoule_rust/src")
+
     rules = [
         Rule("Main", ["Expr", "END"]),
         Rule("Expr", ["AddExpr"]),
@@ -12,63 +15,117 @@ def main():
         Rule("MulExpr", ["MulExpr", "ASTERISK", "INTEGER"]),
     ]
 
+    # generate token.rs
+    tokens = set()
+    for rule in rules:
+        tokens.add(rule.name)
+        tokens.update(rule.steps)
+    tokens = sorted(tokens)
+    with open(src / "token.rs", "w") as fid:
+        fid.write("#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]\n")
+        fid.write("pub enum Token {\n")
+        for token in tokens:
+            fid.write(f"    {token},\n")
+        fid.write("}\n")
+
     lookup_rows, token_groups = get_lookup_tbl_rows(rules, 0)
 
-    rule_enums = []
+    rule_types = [f"{rule.name}__{'_'.join(rule.steps)}" for rule in rules]
 
-    for rule in rules:
-        rule_enum_name = f"{rule.name}__{'_'.join(rule.steps)}"
-        rule_enums.append(rule_enum_name)
-        txt = ""
-        txt += f"rule_type: RuleType::{rule_enum_name},"
-        txt += f"token: Token::{rule.name},"
-        txt += f"steps: &[{','.join(f'Token::{step}' for step in rule.steps)}],"
-        txt = f"Rule {{{txt}}},"
-        print(txt)
-    print("-----------------------")
+    # generate rule_type.rs
+    with open(src / "rule_type.rs", "w") as fid:
+        fid.write("#[allow(non_camel_case_types)]\n")
+        fid.write("#[derive(Debug, Clone, Copy)]\n")
+        fid.write("pub enum RuleType {\n")
+        for rule_type in rule_types:
+            fid.write(f"    {rule_type},\n")
+        fid.write("}\n")
 
-    print("enum RuleType {")
-    for enum in rule_enums:
-        print(f"    {enum},")
-    print("}")
+    # generate rules.rs
+    with open(src / "rules.rs", "w") as fid:
+        fid.write(
+            """
+use super::rule_type::RuleType;
+use super::token::Token;
 
-    print("-----------------------")
+pub struct Rule<'a> {
+    pub rule_type: RuleType,
+    pub token: Token,
+    pub steps: &'a [Token],
+}
 
-    for row in lookup_rows:
-        txt = ""
-        txt += f"state: {row.state},"
-        txt += f"token: Token::{row.token},"
-        txt += f"follow_token: {'None' if row.follow_token is None else f'Some(Token::{row.follow_token})'},"
-        txt += f"token_group: {'None' if row.token_group is None else f'Some({row.token_group})'},"
-        txt += f"next_state: {'None' if row.next_state is None else f'Some({row.next_state})'},"
-        txt += f"reduce_rule: {'None' if row.reduce_rule is None else f'Some({row.reduce_rule})'},"
-        txt = f"LookupRow{{{txt}}},"
-        print(txt)
+pub static RULES: &[Rule] = &[
+""".lstrip()
+        )
+        for rule, rule_type in zip(rules, rule_types):
+            fid.write("    Rule {\n")
+            fid.write(f"        rule_type: RuleType::{rule_type},\n")
+            fid.write(f"        token: Token::{rule.name},\n")
+            fid.write(
+                f"        steps: &[{','.join(f'Token::{step}' for step in rule.steps)}],\n"
+            )
+            fid.write("    },\n")
+        fid.write("];\n")
 
-    print("-----------------")
-    for token_group, tokens in token_groups.items():
-        print(token_group, tokens)
+    # generate lookup_rows.rs
+    with open(src / "lookup_rows.rs", "w") as fid:
+        fid.write(
+            """
+use super::token::Token;
 
+#[derive(Clone)]
+pub struct LookupRow {
+    pub state: u64,
+    pub token: Token,
+    pub follow_token: Option<Token>,
+    pub token_group: Option<u64>,
+    pub next_state: Option<u64>,
+    pub reduce_rule: Option<u64>,
+}
 
-"""
-LookupRow(state=0, token='INTEGER', follow_token=None, token_group=2, next_state=None, reduce_rule=4)
+pub static LOOKUP_ROWS: &[LookupRow] = &[
+""".lstrip()
+        )
+        for row in lookup_rows:
+            fid.write("    LookupRow {\n")
+            fid.write(f"        state: {row.state},\n")
+            fid.write(f"        token: Token::{row.token},\n")
+            fid.write(
+                f"        follow_token: {'None' if row.follow_token is None else f'Some(Token::{row.follow_token})'},\n"
+            )
+            fid.write(
+                f"        token_group: {'None' if row.token_group is None else f'Some({row.token_group})'},\n"
+            )
+            fid.write(
+                f"        next_state: {'None' if row.next_state is None else f'Some({row.next_state})'},\n"
+            )
+            fid.write(
+                f"        reduce_rule: {'None' if row.reduce_rule is None else f'Some({row.reduce_rule})'},\n"
+            )
+            fid.write("    },\n")
+        fid.write("];\n")
 
-LookupRow(state=0, token='addExpr', follow_token='END', token_group=None, next_state=None, reduce_rule=1)
-LookupRow(state=0, token='addExpr', follow_token='PLUS', token_group=None, next_state=2, reduce_rule=None)
-LookupRow(state=0, token='expr', follow_token=None, token_group=None, next_state=1, reduce_rule=None)
-LookupRow(state=0, token='mulExpr', follow_token='PLUS', token_group=None, next_state=None, reduce_rule=2)
-LookupRow(state=0, token='mulExpr', follow_token='END', token_group=None, next_state=None, reduce_rule=2)
-LookupRow(state=0, token='mulExpr', follow_token='ASTERISK', token_group=None, next_state=4, reduce_rule=None)
-LookupRow(state=1, token='END', follow_token=None, token_group=1, next_state=None, reduce_rule=0)
-LookupRow(state=2, token='PLUS', follow_token=None, token_group=0, next_state=3, reduce_rule=None)
-LookupRow(state=3, token='INTEGER', follow_token=None, token_group=2, next_state=None, reduce_rule=4)
-LookupRow(state=3, token='mulExpr', follow_token='PLUS', token_group=None, next_state=None, reduce_rule=3)
-LookupRow(state=3, token='mulExpr', follow_token='END', token_group=None, next_state=None, reduce_rule=3)
-LookupRow(state=3, token='mulExpr', follow_token='ASTERISK', token_group=None, next_state=4, reduce_rule=None)
-LookupRow(state=4, token='ASTERISK', follow_token=None, token_group=0, next_state=5, reduce_rule=None)
-LookupRow(state=5, token='INTEGER', follow_token=None, token_group=2, next_state=None, reduce_rule=5)
------------------
-0 ('INTEGER',)
-1 ()
-2 ('ASTERISK', 'END', 'PLUS')
-"""
+    # generate token_groups.rs
+    with open(src / "token_groups.rs", "w") as fid:
+        fid.write(
+            """
+use super::token::Token;
+
+pub struct TokenGroup<'a> {
+    pub tokens: &'a [Token],
+}
+
+pub static TOKEN_GROUPS: &[TokenGroup] = &[
+""".lstrip()
+        )
+        sorted_token_groups = [
+            tokens
+            for _, tokens in sorted(token_groups.items(), key=lambda pair: pair[0])
+        ]
+        for tokens in sorted_token_groups:
+            fid.write("    TokenGroup {\n")
+            fid.write(
+                f"        tokens: &[{', '.join(f'Token::{token}' for token in tokens)}],\n"
+            )
+            fid.write("    },\n")
+        fid.write("];\n")

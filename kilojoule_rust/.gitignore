@@ -1,1 +1,6 @@
 /target
+/src/token.rs
+/src/rule_type.rs
+/src/rules.rs
+/src/lookup_rows.rs
+/src/token_groups.rs
