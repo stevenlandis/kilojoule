@@ -250,7 +250,6 @@ def simplify_lookup_rows(rows: list[LookupRow]):
         if len(row_group) > 1 and all(
             get_lookup_row_dedupe_key(row) == first_key for row in row_group[1:]
         ):
-            print(f"Reduced from {len(row_group)} rows")
             result.append(
                 LookupRow(
                     state=row_group[0].state,
