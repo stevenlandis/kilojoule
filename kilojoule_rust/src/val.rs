@@ -90,21 +90,30 @@ impl Val {
     }
 
     pub fn new_map_from_entries_iter(pairs: Vec<(Val, Val)>) -> Self {
-        let mut sorted_pairs = pairs.iter().collect::<Vec<_>>();
-        sorted_pairs.sort_by_key(|(key, _)| key);
+        let map = ValHashMap::from_pairs(&pairs);
 
         let mut hasher = DefaultHasher::new();
         HashTypes::Map.hash(&mut hasher);
-        for (key, val) in sorted_pairs {
-            key.hash(&mut hasher);
-            val.hash(&mut hasher);
-        }
+        map.hash(&mut hasher);
         let hash = hasher.finish();
 
         return Val {
             val: Rc::new(InnerVal {
                 hash,
-                val: ValType::Map(ValHashMap::from_pairs(&pairs)),
+                val: ValType::Map(map),
+            }),
+        };
+    }
+
+    pub fn new_map(map: ValHashMap) -> Self {
+        let mut hasher = DefaultHasher::new();
+        HashTypes::Map.hash(&mut hasher);
+        map.hash(&mut hasher);
+
+        return Val {
+            val: Rc::new(InnerVal {
+                hash: hasher.finish(),
+                val: ValType::Map(map),
             }),
         };
     }
@@ -194,19 +203,19 @@ impl PartialOrd for Val {
 
 #[derive(Debug)]
 pub struct ValHashMap {
-    pairs: Vec<(Val, Val)>,
+    pairs: Vec<Option<(Val, Val)>>,
     key_to_idx: HashMap<Val, usize>,
 }
 
 impl ValHashMap {
-    fn new() -> Self {
+    pub fn new() -> Self {
         return ValHashMap {
             pairs: Vec::new(),
             key_to_idx: HashMap::new(),
         };
     }
 
-    fn from_pairs(pairs: &Vec<(Val, Val)>) -> Self {
+    pub fn from_pairs(pairs: &Vec<(Val, Val)>) -> Self {
         let mut map = Self::new();
 
         for (key, val) in pairs {
@@ -223,16 +232,16 @@ impl ValHashMap {
             .or_insert(self.pairs.len());
 
         if idx >= self.pairs.len() {
-            self.pairs.push((key.clone(), value.clone()));
+            self.pairs.push(Some((key.clone(), value.clone())));
         } else {
-            self.pairs[idx].1 = value.clone();
+            self.pairs[idx].as_mut().unwrap().1 = value.clone();
         }
     }
 
     pub fn get(&self, key: &Val) -> Option<&Val> {
         return match self.key_to_idx.get(key) {
             None => None,
-            Some(idx) => Some(&self.pairs[*idx].1),
+            Some(idx) => Some(&self.pairs[*idx].as_ref().unwrap().1),
         };
     }
 
@@ -253,7 +262,7 @@ impl PartialEq for ValHashMap {
                     return false;
                 }
                 Some(other_val) => {
-                    let self_val = &self.pairs[*idx].1;
+                    let self_val = &self.pairs[*idx].as_ref().unwrap().1;
                     if self_val != other_val {
                         return false;
                     }
@@ -262,5 +271,24 @@ impl PartialEq for ValHashMap {
         }
 
         return true;
+    }
+}
+
+impl Hash for ValHashMap {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let mut sorted_pairs = self
+            .pairs
+            .iter()
+            .filter_map(|pair| match pair {
+                None => None,
+                Some(pair) => Some(pair),
+            })
+            .collect::<Vec<_>>();
+        sorted_pairs.sort_by_key(|(key, _)| key);
+
+        for (key, val) in sorted_pairs {
+            key.hash(state);
+            val.hash(state);
+        }
     }
 }

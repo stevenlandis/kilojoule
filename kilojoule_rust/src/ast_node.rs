@@ -4,9 +4,13 @@ use std::rc::Rc;
 pub enum AstNode<'a> {
     None,
     StringLiteral(&'a str),
+    F64Literal(f64),
     Echo,
     Access(Rc<AstNode<'a>>),
     Pipe(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
+    MapLiteral(Option<Rc<AstNode<'a>>>),
+    MapElemListNode(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
+    MapKeyValPair(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
 
     Int(u64),
     Plus,

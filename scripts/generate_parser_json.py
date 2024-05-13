@@ -13,8 +13,18 @@ def main():
         Rule("opPipeExpr", ["opPipeExpr", "PIPE", "opBaseExpr"]),
         Rule("opBaseExpr", ["baseDotExpr"]),
         Rule("opBaseExpr", ["baseDotAccess"]),
+        Rule("opBaseExpr", ["dictExpr"]),
+        Rule("opBaseExpr", ["LEFT_PAREN", "expr", "RIGHT_PAREN"]),
+        Rule("opBaseExpr", ["INTEGER"]),
+        Rule("opBaseExpr", ["FLOAT"]),
         Rule("baseDotExpr", ["DOT"]),
         Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),
+        Rule("dictExpr", ["LEFT_BRACE", "RIGHT_BRACE"]),
+        Rule("dictExpr", ["LEFT_BRACE", "dictContents", "RIGHT_BRACE"]),
+        Rule("dictExpr", ["LEFT_BRACE", "dictContents", "COMMA", "RIGHT_BRACE"]),
+        Rule("dictContents", ["dictContentsElem"]),
+        Rule("dictContents", ["dictContents", "COMMA", "dictContentsElem"]),
+        Rule("dictContentsElem", ["IDENTIFIER", "COLON", "expr"]),
     ]
 
     # generate token.rs
