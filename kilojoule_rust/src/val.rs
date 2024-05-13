@@ -145,6 +145,106 @@ impl Val {
 
         return helper(&value);
     }
+
+    pub fn write_json_str<W>(&self, writer: &mut W)
+    where
+        W: std::io::Write,
+    {
+        struct Writer<'a, W>
+        where
+            W: std::io::Write,
+        {
+            writer: &'a mut W,
+        }
+
+        impl<W> Writer<'_, W>
+        where
+            W: std::io::Write,
+        {
+            pub fn write(&mut self, val: &Val, indent: u64) -> std::io::Result<usize> {
+                match &val.val.val {
+                    ValType::Null => {
+                        self.str("null")?;
+                    }
+                    ValType::Bool(val) => {
+                        if *val {
+                            self.str("true")?;
+                        } else {
+                            self.str("false")?;
+                        }
+                    }
+                    ValType::Number(val) => {
+                        self.str(val.to_string().as_str())?;
+                    }
+                    ValType::String(val) => {
+                        self.str(
+                            serde_json::to_string(&serde_json::Value::String(val.clone()))?
+                                .as_str(),
+                        )?;
+                    }
+                    ValType::List(val) => {
+                        self.str("[")?;
+                        for (idx, elem) in val.iter().enumerate() {
+                            if idx > 0 {
+                                self.str(", ")?;
+                            }
+                            self.str("\n")?;
+                            self.indent(indent + 1)?;
+                            self.write(elem, indent + 1)?;
+                        }
+                        if val.len() > 0 {
+                            self.str("\n")?;
+                            self.indent(indent)?;
+                        }
+                        self.str("]")?;
+                    }
+                    ValType::Map(val) => {
+                        self.str("{")?;
+                        for (idx, (key, val)) in val
+                            .pairs
+                            .iter()
+                            .filter_map(|pair| match pair {
+                                None => None,
+                                Some(pair) => Some(pair),
+                            })
+                            .enumerate()
+                        {
+                            if idx > 0 {
+                                self.str(", ")?;
+                            }
+                            self.str("\n")?;
+                            self.indent(indent + 1)?;
+                            self.write(key, indent + 1)?;
+                            self.str(": ")?;
+                            self.write(val, indent + 1)?;
+                        }
+                        if val.len() > 0 {
+                            self.str("\n")?;
+                            self.indent(indent)?;
+                        }
+                        self.str("}")?;
+                    }
+                }
+                Ok(0)
+            }
+
+            fn str(&mut self, text: &str) -> std::io::Result<usize> {
+                self.writer.write(text.as_bytes())?;
+                Ok(0)
+            }
+
+            fn indent(&mut self, indent: u64) -> std::io::Result<usize> {
+                for _ in 0..indent {
+                    self.str("  ")?;
+                }
+                Ok(0)
+            }
+        }
+
+        let mut writer = Writer { writer };
+        let _ = writer.write(self, 0);
+        let _ = writer.str("\n");
+    }
 }
 
 #[derive(Hash)]

@@ -9,7 +9,8 @@ fn main() {
     }
     let query = args.nth(1).unwrap();
     let ast = parser.parse(query.as_str());
-    println!("Ast: {:?}", ast);
+    // println!("Ast: {:?}", ast);
     let result = eval_ast_node(&Val::new_null(), &ast);
-    println!("Result = {:?}", result);
+    result.write_json_str(&mut std::io::stdout());
+    // println!("Result = {:?}", result);
 }
