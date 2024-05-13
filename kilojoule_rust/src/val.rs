@@ -4,13 +4,13 @@ use std::{hash::DefaultHasher, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub struct Val {
-    val: Rc<InnerVal>,
+    pub val: Rc<InnerVal>,
 }
 
 #[derive(Debug)]
 pub struct InnerVal {
-    hash: u64,
-    val: ValType,
+    pub hash: u64,
+    pub val: ValType,
 }
 
 #[derive(Debug, PartialEq)]
@@ -216,7 +216,7 @@ impl ValHashMap {
         return map;
     }
 
-    fn insert(&mut self, key: &Val, value: &Val) {
+    pub fn insert(&mut self, key: &Val, value: &Val) {
         let idx = *self
             .key_to_idx
             .entry(key.clone())
@@ -229,14 +229,14 @@ impl ValHashMap {
         }
     }
 
-    fn get(&self, key: &Val) -> Option<&Val> {
+    pub fn get(&self, key: &Val) -> Option<&Val> {
         return match self.key_to_idx.get(key) {
             None => None,
             Some(idx) => Some(&self.pairs[*idx].1),
         };
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         return self.key_to_idx.len();
     }
 }
