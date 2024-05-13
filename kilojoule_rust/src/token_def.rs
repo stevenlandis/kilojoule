@@ -14,4 +14,8 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         token: Token::DOT,
         pattern: r"\.",
     },
+    TokenDef {
+        token: Token::PIPE,
+        pattern: r"\|",
+    },
 ];

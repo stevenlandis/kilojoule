@@ -8,7 +8,9 @@ def main():
 
     rules = [
         Rule("main", ["expr", "END"]),
-        Rule("expr", ["opBaseExpr"]),
+        Rule("expr", ["opPipeExpr"]),
+        Rule("opPipeExpr", ["opBaseExpr"]),
+        Rule("opPipeExpr", ["opPipeExpr", "PIPE", "opBaseExpr"]),
         Rule("opBaseExpr", ["baseDotExpr"]),
         Rule("opBaseExpr", ["baseDotAccess"]),
         Rule("baseDotExpr", ["DOT"]),

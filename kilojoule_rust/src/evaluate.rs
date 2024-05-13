@@ -17,6 +17,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
         },
         AstNode::StringLiteral(val) => Val::new_string(val),
+        AstNode::Pipe(left, right) => eval_ast_node(&eval_ast_node(obj, left), right),
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }

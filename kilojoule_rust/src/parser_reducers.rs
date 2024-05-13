@@ -8,6 +8,7 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode<'a> {
         Token::DOT => AstNode::None,
         Token::IDENTIFIER => AstNode::StringLiteral(text),
         Token::END => AstNode::None,
+        Token::PIPE => AstNode::None,
         _ => {
             panic!("Unimplemented token reduce {:?}", token);
         }
@@ -17,7 +18,11 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode<'a> {
 pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
         RuleType::main__expr_END => elems[0].clone(),
-        RuleType::expr__opBaseExpr => elems[0].clone(),
+        RuleType::expr__opPipeExpr => elems[0].clone(),
+        RuleType::opPipeExpr__opBaseExpr => elems[0].clone(),
+        RuleType::opPipeExpr__opPipeExpr_PIPE_opBaseExpr => {
+            Rc::new(AstNode::Pipe(elems[0].clone(), elems[2].clone()))
+        }
         RuleType::opBaseExpr__baseDotExpr => elems[0].clone(),
         RuleType::opBaseExpr__baseDotAccess => elems[0].clone(),
         RuleType::baseDotExpr__DOT => Rc::new(AstNode::Echo),

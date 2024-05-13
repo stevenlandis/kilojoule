@@ -6,6 +6,7 @@ pub enum AstNode<'a> {
     StringLiteral(&'a str),
     Echo,
     Access(Rc<AstNode<'a>>),
+    Pipe(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
 
     Int(u64),
     Plus,
