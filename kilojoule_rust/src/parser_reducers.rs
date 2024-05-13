@@ -20,17 +20,17 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::opBaseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
         RuleType::baseDotExpr__DOT => Rc::new(AstNode::Echo),
         RuleType::baseDotAccess__DOT_IDENTIFIER => Rc::new(AstNode::Access(elems[1].clone())),
-        RuleType::dictExpr__LEFT_BRACE_RIGHT_BRACE => Rc::new(AstNode::MapLiteral(None)),
-        RuleType::dictExpr__LEFT_BRACE_dictContents_RIGHT_BRACE => {
+        RuleType::mapExpr__LEFT_BRACE_RIGHT_BRACE => Rc::new(AstNode::MapLiteral(None)),
+        RuleType::mapExpr__LEFT_BRACE_mapContents_RIGHT_BRACE => {
             Rc::new(AstNode::MapLiteral(Some(elems[1].clone())))
         }
-        RuleType::dictExpr__LEFT_BRACE_dictContents_COMMA_RIGHT_BRACE => {
+        RuleType::mapExpr__LEFT_BRACE_mapContents_COMMA_RIGHT_BRACE => {
             Rc::new(AstNode::MapLiteral(Some(elems[1].clone())))
         }
-        RuleType::dictContents__dictContents_COMMA_dictContentsElem => {
+        RuleType::mapContents__mapContents_COMMA_mapContentsElem => {
             Rc::new(AstNode::MapElemListNode(elems[0].clone(), elems[2].clone()))
         }
-        RuleType::dictContentsElem__IDENTIFIER_COLON_expr => {
+        RuleType::mapContentsElem__IDENTIFIER_COLON_expr => {
             Rc::new(AstNode::MapKeyValPair(elems[0].clone(), elems[2].clone()))
         }
         _ => elems[0].clone(),
