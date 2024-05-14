@@ -3,11 +3,13 @@ use super::rule_type::RuleType;
 use super::token::Token;
 use std::rc::Rc;
 
-pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode<'a> {
+pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
     return match token {
-        Token::IDENTIFIER => AstNode::StringLiteral(text),
+        Token::IDENTIFIER => AstNode::StringLiteral(text.to_string()),
         Token::INTEGER => AstNode::F64Literal(text.parse::<f64>().unwrap()),
         Token::FLOAT => AstNode::F64Literal(text.parse::<f64>().unwrap()),
+        Token::STRING_SINGLE_QUOTE => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::STRING_DOUBLE_QUOTE => AstNode::StringLiteral(escape_string_literal(text)),
         _ => AstNode::None,
     };
 }
@@ -52,4 +54,12 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         ),
         _ => elems[0].clone(),
     };
+}
+
+fn escape_string_literal(input: &str) -> String {
+    let bytes = input.as_bytes();
+    assert!(bytes.len() >= 2);
+    let trimmed = &bytes[1..bytes.len() - 1];
+    let input = std::str::from_utf8(trimmed).unwrap();
+    return input.to_string();
 }

@@ -19,6 +19,7 @@ def main():
         Rule("baseExpr", ["LEFT_PAREN", "expr", "RIGHT_PAREN"]),
         Rule("baseExpr", ["INTEGER"]),
         Rule("baseExpr", ["FLOAT"]),
+        Rule("baseExpr", ["stringLiteral"]),
         Rule("baseDotExpr", ["DOT"]),
         Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),
         Rule("baseDotBracketAccess", ["DOT", "LEFT_BRACKET", "expr", "RIGHT_BRACKET"]),
@@ -36,6 +37,8 @@ def main():
         Rule("listExprContents", ["listElem"]),
         Rule("listExprContents", ["listExprContents", "COMMA", "listElem"]),
         Rule("listElem", ["expr"]),
+        Rule("stringLiteral", ["STRING_DOUBLE_QUOTE"]),
+        Rule("stringLiteral", ["STRING_SINGLE_QUOTE"]),
     ]
 
     # generate token.rs

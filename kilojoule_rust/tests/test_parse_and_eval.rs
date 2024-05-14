@@ -43,4 +43,15 @@ mod tests {
         );
         assert_json("[100, 200, 300] | .[1]", json!(200));
     }
+
+    #[test]
+    fn string_literals() {
+        assert_json(r#" '' "#, json!(""));
+        assert_json(r#" 'string' "#, json!("string"));
+        assert_json(r#" '"' "#, json!("\""));
+
+        assert_json(r#" "" "#, json!(""));
+        assert_json(r#" "string" "#, json!("string"));
+        assert_json(r#" "'" "#, json!("'"));
+    }
 }

@@ -1,23 +1,23 @@
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub enum AstNode<'a> {
+pub enum AstNode {
     None,
-    StringLiteral(&'a str),
+    StringLiteral(String),
     F64Literal(f64),
     Echo,
-    Access(Rc<AstNode<'a>>),
-    Pipe(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
-    MapLiteral(Option<Rc<AstNode<'a>>>),
-    MapElemListNode(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
-    MapKeyValPair(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
-    ListLiteral(Option<Rc<AstNode<'a>>>),
-    ListElemListNode(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
+    Access(Rc<AstNode>),
+    Pipe(Rc<AstNode>, Rc<AstNode>),
+    MapLiteral(Option<Rc<AstNode>>),
+    MapElemListNode(Rc<AstNode>, Rc<AstNode>),
+    MapKeyValPair(Rc<AstNode>, Rc<AstNode>),
+    ListLiteral(Option<Rc<AstNode>>),
+    ListElemListNode(Rc<AstNode>, Rc<AstNode>),
 
     Int(u64),
     Plus,
     Asterisk,
-    Add(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
-    Mul(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
+    Add(Rc<AstNode>, Rc<AstNode>),
+    Mul(Rc<AstNode>, Rc<AstNode>),
     End,
 }

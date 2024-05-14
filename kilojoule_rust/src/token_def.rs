@@ -58,4 +58,12 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         token: Token::COLON,
         pattern: r"\:",
     },
+    TokenDef {
+        token: Token::STRING_SINGLE_QUOTE,
+        pattern: r#"'(?:[^'\\{}]|\\.)*'"#,
+    },
+    TokenDef {
+        token: Token::STRING_DOUBLE_QUOTE,
+        pattern: r#""(?:[^"\\{}]|\\.)*""#,
+    },
 ];

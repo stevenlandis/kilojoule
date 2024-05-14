@@ -46,7 +46,7 @@ impl<'a> Parser<'a> {
         };
     }
 
-    pub fn parse(&'a self, text: &'a str) -> Rc<AstNode<'a>> {
+    pub fn parse(&'a self, text: &'a str) -> Rc<AstNode> {
         let mut tokenizer = Tokenizer::new(
             text,
             &self.skip_pattern,
@@ -64,15 +64,15 @@ impl<'a> Parser<'a> {
     }
 }
 
-struct ParserStateNode<'a> {
+struct ParserStateNode {
     token: Token,
-    node: Rc<AstNode<'a>>,
+    node: Rc<AstNode>,
 }
 
 struct ParserState<'a> {
     token_group: u64,
     state_stack: Vec<u64>,
-    val_stack: Vec<ParserStateNode<'a>>,
+    val_stack: Vec<ParserStateNode>,
     lookup_tbl: &'a HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
     rules: &'a [Rule<'a>],
 }
@@ -91,7 +91,7 @@ impl<'a> ParserState<'a> {
         };
     }
 
-    pub fn get_value(&self) -> Rc<AstNode<'a>> {
+    pub fn get_value(&self) -> Rc<AstNode> {
         assert!(self.val_stack.len() == 2);
         return self.val_stack[0].node.clone();
     }
