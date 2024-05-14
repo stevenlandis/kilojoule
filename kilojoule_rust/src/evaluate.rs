@@ -12,6 +12,21 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                     Some(val) => val.clone(),
                 }
             }
+            ValType::List(list) => {
+                let key = eval_ast_node(obj, expr);
+                match key.val.val {
+                    ValType::Number(num) => {
+                        if num == num.floor() {
+                            return list[num as usize].clone();
+                        } else {
+                            panic!("Can only access a list with an integer.")
+                        }
+                    }
+                    _ => {
+                        panic!("Can only access a list with an integer.")
+                    }
+                }
+            }
             _ => {
                 panic!("Access on invalid object");
             }
