@@ -14,10 +14,10 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode<'a> {
 
 pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
-        RuleType::opPipeExpr__opPipeExpr_PIPE_opBaseExpr => {
+        RuleType::opPipeExpr__opPipeExpr_PIPE_baseExpr => {
             Rc::new(AstNode::Pipe(elems[0].clone(), elems[2].clone()))
         }
-        RuleType::opBaseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
+        RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
         RuleType::baseDotExpr__DOT => Rc::new(AstNode::Echo),
         RuleType::baseDotAccess__DOT_IDENTIFIER => Rc::new(AstNode::Access(elems[1].clone())),
 
