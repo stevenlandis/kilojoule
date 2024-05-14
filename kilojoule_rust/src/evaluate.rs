@@ -53,6 +53,32 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                 return Val::new_map(map);
             }
         },
+        AstNode::ListLiteral(list_contents) => match list_contents {
+            None => Val::new_list(&[]),
+            Some(list_contents) => {
+                let mut elems = Vec::<&AstNode>::new();
+                let mut node = &**list_contents;
+                loop {
+                    match node {
+                        AstNode::ListElemListNode(more_elems, elem) => {
+                            elems.push(elem);
+                            node = more_elems;
+                        }
+                        _ => {
+                            elems.push(node);
+                            break;
+                        }
+                    }
+                }
+                elems.reverse();
+
+                let mut vals = Vec::<Val>::new();
+                for elem in elems {
+                    vals.push(eval_ast_node(obj, elem));
+                }
+                return Val::new_list(vals.as_slice());
+            }
+        },
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }

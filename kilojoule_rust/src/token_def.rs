@@ -43,6 +43,14 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         pattern: r"\}",
     },
     TokenDef {
+        token: Token::LEFT_BRACKET,
+        pattern: r"\[",
+    },
+    TokenDef {
+        token: Token::RIGHT_BRACKET,
+        pattern: r"\]",
+    },
+    TokenDef {
         token: Token::COMMA,
         pattern: r"\,",
     },

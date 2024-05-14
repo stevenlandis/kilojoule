@@ -20,6 +20,8 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::opBaseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
         RuleType::baseDotExpr__DOT => Rc::new(AstNode::Echo),
         RuleType::baseDotAccess__DOT_IDENTIFIER => Rc::new(AstNode::Access(elems[1].clone())),
+
+        // Map
         RuleType::mapExpr__LEFT_BRACE_RIGHT_BRACE => Rc::new(AstNode::MapLiteral(None)),
         RuleType::mapExpr__LEFT_BRACE_mapContents_RIGHT_BRACE => {
             Rc::new(AstNode::MapLiteral(Some(elems[1].clone())))
@@ -33,6 +35,18 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::mapContentsElem__IDENTIFIER_COLON_expr => {
             Rc::new(AstNode::MapKeyValPair(elems[0].clone(), elems[2].clone()))
         }
+
+        // List
+        RuleType::listExpr__LEFT_BRACKET_RIGHT_BRACKET => Rc::new(AstNode::ListLiteral(None)),
+        RuleType::listExpr__LEFT_BRACKET_listExprContents_RIGHT_BRACKET => {
+            Rc::new(AstNode::ListLiteral(Some(elems[1].clone())))
+        }
+        RuleType::listExpr__LEFT_BRACKET_listExprContents_COMMA_RIGHT_BRACKET => {
+            Rc::new(AstNode::ListLiteral(Some(elems[1].clone())))
+        }
+        RuleType::listExprContents__listExprContents_COMMA_listElem => Rc::new(
+            AstNode::ListElemListNode(elems[0].clone(), elems[2].clone()),
+        ),
         _ => elems[0].clone(),
     };
 }

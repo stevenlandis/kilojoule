@@ -11,6 +11,8 @@ pub enum AstNode<'a> {
     MapLiteral(Option<Rc<AstNode<'a>>>),
     MapElemListNode(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
     MapKeyValPair(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
+    ListLiteral(Option<Rc<AstNode<'a>>>),
+    ListElemListNode(Rc<AstNode<'a>>, Rc<AstNode<'a>>),
 
     Int(u64),
     Plus,

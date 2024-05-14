@@ -14,6 +14,7 @@ def main():
         Rule("opBaseExpr", ["baseDotExpr"]),
         Rule("opBaseExpr", ["baseDotAccess"]),
         Rule("opBaseExpr", ["mapExpr"]),
+        Rule("opBaseExpr", ["listExpr"]),
         Rule("opBaseExpr", ["LEFT_PAREN", "expr", "RIGHT_PAREN"]),
         Rule("opBaseExpr", ["INTEGER"]),
         Rule("opBaseExpr", ["FLOAT"]),
@@ -25,6 +26,14 @@ def main():
         Rule("mapContents", ["mapContentsElem"]),
         Rule("mapContents", ["mapContents", "COMMA", "mapContentsElem"]),
         Rule("mapContentsElem", ["IDENTIFIER", "COLON", "expr"]),
+        Rule("listExpr", ["LEFT_BRACKET", "RIGHT_BRACKET"]),
+        Rule("listExpr", ["LEFT_BRACKET", "listExprContents", "RIGHT_BRACKET"]),
+        Rule(
+            "listExpr", ["LEFT_BRACKET", "listExprContents", "COMMA", "RIGHT_BRACKET"]
+        ),
+        Rule("listExprContents", ["listElem"]),
+        Rule("listExprContents", ["listExprContents", "COMMA", "listElem"]),
+        Rule("listElem", ["expr"]),
     ]
 
     # generate token.rs
