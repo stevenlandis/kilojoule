@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
     use kilojoule_rust::*;
+    use once_cell::sync::Lazy;
     use serde_json::json;
 
+    static PARSER: Lazy<Parser> = Lazy::new(|| Parser::new());
+
     fn base_parse_and_eval(expr: &str) -> Vec<u8> {
-        let parser = Parser::new();
-        let ast = parser.parse(expr);
+        let ast = PARSER.parse(expr);
         // println!("Ast: {:?}", ast);
         let result = eval_ast_node(&Val::new_null(), &ast);
         let mut out = Vec::<u8>::new();
@@ -28,5 +30,7 @@ mod tests {
         assert_json("{a: 1, b: 2}", json!({"a": 1, "b": 2}));
         assert_json("{a: 1, b: 2} | .b", json!(2));
         assert_json("{a: 1, b: 2} | {a: .b, b: .a}", json!({"a": 2, "b": 1}));
+        assert_json("{}", json!({}));
+        assert_json("{a:{b:{c:42}}}", json!({'a': {'b': {'c': 42}}}));
     }
 }
