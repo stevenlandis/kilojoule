@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import re
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
 
 @dataclass(frozen=True)
