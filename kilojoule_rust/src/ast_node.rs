@@ -13,11 +13,4 @@ pub enum AstNode {
     MapKeyValPair(Rc<AstNode>, Rc<AstNode>),
     ListLiteral(Option<Rc<AstNode>>),
     ListElemListNode(Rc<AstNode>, Rc<AstNode>),
-
-    Int(u64),
-    Plus,
-    Asterisk,
-    Add(Rc<AstNode>, Rc<AstNode>),
-    Mul(Rc<AstNode>, Rc<AstNode>),
-    End,
 }
