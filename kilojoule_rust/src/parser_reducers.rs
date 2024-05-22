@@ -9,6 +9,9 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
         Token::INTEGER => AstNode::F64Literal(text.parse::<f64>().unwrap()),
         Token::FLOAT => AstNode::F64Literal(text.parse::<f64>().unwrap()),
         Token::STRING_SINGLE_QUOTE => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::F_STRING_SINGLE_QUOTE_LEFT => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::F_STRING_SINGLE_QUOTE_MIDDLE => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::F_STRING_SINGLE_QUOTE_RIGHT => AstNode::StringLiteral(escape_string_literal(text)),
         Token::STRING_DOUBLE_QUOTE => AstNode::StringLiteral(escape_string_literal(text)),
         _ => AstNode::None,
     };
@@ -52,6 +55,16 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::listExprContents__listExprContents_COMMA_listElem => Rc::new(
             AstNode::ListElemListNode(elems[0].clone(), elems[2].clone()),
         ),
+
+        // Format String
+        RuleType::stringLiteral__F_STRING_SINGLE_QUOTE_LEFT_innerFormatStringSingleQuote_F_STRING_SINGLE_QUOTE_RIGHT=>{
+            Rc::new(AstNode::FormatStringNode(vec![elems[0].clone(), elems[1].clone(), elems[2].clone()]))
+        }
+        RuleType::innerFormatStringSingleQuote__innerFormatStringSingleQuote_F_STRING_SINGLE_QUOTE_MIDDLE_expr=>{
+            Rc::new(AstNode::FormatStringNode(vec![elems[0].clone(), elems[1].clone(), elems[2].clone()]))
+        }
+
+        // Default
         _ => elems[0].clone(),
     };
 }

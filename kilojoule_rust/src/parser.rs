@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 pub struct Parser<'a> {
     skip_pattern: Regex,
-    token_groups: HashMap<usize, &'a [Token]>,
+    token_groups: HashMap<usize, Vec<Token>>,
     token_map: HashMap<Token, (usize, Regex)>,
     rules: &'a [Rule<'a>],
     lookup_tbl: HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
@@ -24,7 +24,18 @@ impl<'a> Parser<'a> {
             token_groups: TOKEN_GROUPS
                 .iter()
                 .enumerate()
-                .map(|(group_idx, group)| (group_idx, group.tokens))
+                .map(|(group_idx, group)| {
+                    let mut tokens = group.tokens.iter().cloned().collect::<Vec<_>>();
+                    tokens.sort_by_key(|token| {
+                        match TOKEN_DEFS.iter().position(|def| *token == def.token) {
+                            None => {
+                                panic!("Unable to find position for token {:?}", token);
+                            }
+                            Some(position) => position,
+                        }
+                    });
+                    (group_idx, tokens)
+                })
                 .collect::<HashMap<_, _>>(),
             token_map: TOKEN_DEFS
                 .iter()
@@ -55,7 +66,8 @@ impl<'a> Parser<'a> {
         );
         let mut parser_state = ParserState::new(self.rules, &self.lookup_tbl);
         loop {
-            let (token, token_value) = tokenizer.next(parser_state.get_token_group());
+            let token_group = parser_state.get_token_group();
+            let (token, token_value) = tokenizer.next(token_group);
             parser_state.step(token, token_value);
             if token == Token::END {
                 return parser_state.get_value();
@@ -161,7 +173,7 @@ struct Tokenizer<'a> {
     text: &'a str,
     text_idx: usize,
     skip_pattern: &'a Regex,
-    token_groups: &'a HashMap<usize, &'a [Token]>,
+    token_groups: &'a HashMap<usize, Vec<Token>>,
     token_map: &'a HashMap<Token, (usize, Regex)>,
 }
 
@@ -169,7 +181,7 @@ impl<'a> Tokenizer<'a> {
     pub fn new(
         text: &'a str,
         skip_pattern: &'a Regex,
-        token_groups: &'a HashMap<usize, &'a [Token]>,
+        token_groups: &'a HashMap<usize, Vec<Token>>,
         token_map: &'a HashMap<Token, (usize, Regex)>,
     ) -> Self {
         return Tokenizer {
@@ -203,11 +215,11 @@ impl<'a> Tokenizer<'a> {
         }
 
         let mut best: Option<BestMatch> = None;
-        for token_name in self.token_groups[&(token_group as usize)] {
+        for token_name in &self.token_groups[&(token_group as usize)] {
             if *token_name == Token::END {
                 continue;
             }
-            let (token_idx, token_pattern) = &self.token_map[token_name];
+            let (token_idx, token_pattern) = &self.token_map[&token_name];
             match token_pattern.captures(&self.text[self.text_idx..]) {
                 Some(cap) => {
                     let match_info = cap.get(0).unwrap();

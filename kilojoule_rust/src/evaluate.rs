@@ -94,6 +94,21 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                 return Val::new_list(vals.as_slice());
             }
         },
+        AstNode::FormatStringNode(parts) => {
+            let mut write_buf = Vec::<u8>::new();
+            for part in parts {
+                let result = eval_ast_node(obj, part);
+                match &result.val.val {
+                    ValType::String(part_text) => {
+                        write_buf.extend(part_text.as_bytes());
+                    }
+                    _ => {
+                        result.write_json_str(&mut write_buf, false);
+                    }
+                }
+            }
+            return Val::new_string(std::str::from_utf8(write_buf.as_slice()).unwrap());
+        }
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }

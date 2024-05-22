@@ -11,6 +11,6 @@ fn main() {
     let ast = parser.parse(query.as_str());
     // println!("Ast: {:?}", ast);
     let result = eval_ast_node(&Val::new_null(), &ast);
-    result.write_json_str(&mut std::io::stdout());
+    result.write_json_str(&mut std::io::stdout(), true);
     // println!("Result = {:?}", result);
 }

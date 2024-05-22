@@ -146,7 +146,7 @@ impl Val {
         return helper(&value);
     }
 
-    pub fn write_json_str<W>(&self, writer: &mut W)
+    pub fn write_json_str<W>(&self, writer: &mut W, use_indent: bool)
     where
         W: std::io::Write,
     {
@@ -161,7 +161,20 @@ impl Val {
         where
             W: std::io::Write,
         {
-            pub fn write(&mut self, val: &Val, indent: u64) -> std::io::Result<usize> {
+            pub fn outer_write(&mut self, val: &Val, use_indent: bool) -> std::io::Result<usize> {
+                self.write(val, 0, use_indent)?;
+                if use_indent {
+                    self.str("\n")?;
+                }
+                Ok(0)
+            }
+
+            pub fn write(
+                &mut self,
+                val: &Val,
+                indent: u64,
+                use_indent: bool,
+            ) -> std::io::Result<usize> {
                 match &val.val.val {
                     ValType::Null => {
                         self.str("null")?;
@@ -186,13 +199,19 @@ impl Val {
                         self.str("[")?;
                         for (idx, elem) in val.iter().enumerate() {
                             if idx > 0 {
-                                self.str(", ")?;
+                                if use_indent {
+                                    self.str(", ")?;
+                                } else {
+                                    self.str(",")?;
+                                }
                             }
-                            self.str("\n")?;
-                            self.indent(indent + 1)?;
-                            self.write(elem, indent + 1)?;
+                            if use_indent {
+                                self.str("\n")?;
+                                self.indent(indent + 1)?;
+                            }
+                            self.write(elem, indent + 1, use_indent)?;
                         }
-                        if val.len() > 0 {
+                        if val.len() > 0 && use_indent {
                             self.str("\n")?;
                             self.indent(indent)?;
                         }
@@ -210,15 +229,25 @@ impl Val {
                             .enumerate()
                         {
                             if idx > 0 {
-                                self.str(", ")?;
+                                if use_indent {
+                                    self.str(", ")?;
+                                } else {
+                                    self.str(",")?;
+                                }
                             }
-                            self.str("\n")?;
-                            self.indent(indent + 1)?;
-                            self.write(key, indent + 1)?;
-                            self.str(": ")?;
-                            self.write(val, indent + 1)?;
+                            if use_indent {
+                                self.str("\n")?;
+                                self.indent(indent + 1)?;
+                            }
+                            self.write(key, indent + 1, use_indent)?;
+                            if use_indent {
+                                self.str(": ")?;
+                            } else {
+                                self.str(":")?;
+                            }
+                            self.write(val, indent + 1, use_indent)?;
                         }
-                        if val.len() > 0 {
+                        if val.len() > 0 && use_indent {
                             self.str("\n")?;
                             self.indent(indent)?;
                         }
@@ -242,8 +271,7 @@ impl Val {
         }
 
         let mut writer = Writer { writer };
-        let _ = writer.write(self, 0);
-        let _ = writer.str("\n");
+        let _ = writer.outer_write(self, use_indent);
     }
 }
 

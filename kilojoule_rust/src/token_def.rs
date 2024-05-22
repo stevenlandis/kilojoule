@@ -7,6 +7,10 @@ pub struct TokenDef<'a> {
 
 pub static TOKEN_DEFS: &[TokenDef] = &[
     TokenDef {
+        token: Token::END,
+        pattern: "",
+    },
+    TokenDef {
         token: Token::IDENTIFIER,
         pattern: r"[_A-Za-z][_A-Za-z0-9]*",
     },
@@ -61,6 +65,18 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
     TokenDef {
         token: Token::STRING_SINGLE_QUOTE,
         pattern: r#"'(?:[^'\\{}]|\\.)*'"#,
+    },
+    TokenDef {
+        token: Token::F_STRING_SINGLE_QUOTE_LEFT,
+        pattern: r#"'(?:[^'\\{}]|\\.)*\{"#,
+    },
+    TokenDef {
+        token: Token::F_STRING_SINGLE_QUOTE_MIDDLE,
+        pattern: r#"}(?:[^'\\{}]|\\.)*\{"#,
+    },
+    TokenDef {
+        token: Token::F_STRING_SINGLE_QUOTE_RIGHT,
+        pattern: r#"}(?:[^'\\{}]|\\.)*'"#,
     },
     TokenDef {
         token: Token::STRING_DOUBLE_QUOTE,

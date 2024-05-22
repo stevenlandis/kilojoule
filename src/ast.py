@@ -88,7 +88,7 @@ class Expr_StringLiteral(Expr):
 
 @dataclass(frozen=True)
 class Expr_FormatString(Expr):
-    parts: Union[Expr, Expr_StringLiteral]
+    parts: list[Union[Expr, Expr_StringLiteral]]
 
 
 @dataclass(frozen=True)

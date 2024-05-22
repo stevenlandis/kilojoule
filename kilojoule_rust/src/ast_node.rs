@@ -13,4 +13,5 @@ pub enum AstNode {
     MapKeyValPair(Rc<AstNode>, Rc<AstNode>),
     ListLiteral(Option<Rc<AstNode>>),
     ListElemListNode(Rc<AstNode>, Rc<AstNode>),
+    FormatStringNode(Vec<Rc<AstNode>>),
 }

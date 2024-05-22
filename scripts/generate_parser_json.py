@@ -39,6 +39,23 @@ def main():
         Rule("listElem", ["expr"]),
         Rule("stringLiteral", ["STRING_DOUBLE_QUOTE"]),
         Rule("stringLiteral", ["STRING_SINGLE_QUOTE"]),
+        Rule(
+            "stringLiteral",
+            [
+                "F_STRING_SINGLE_QUOTE_LEFT",
+                "innerFormatStringSingleQuote",
+                "F_STRING_SINGLE_QUOTE_RIGHT",
+            ],
+        ),
+        Rule("innerFormatStringSingleQuote", ["expr"]),
+        Rule(
+            "innerFormatStringSingleQuote",
+            [
+                "innerFormatStringSingleQuote",
+                "F_STRING_SINGLE_QUOTE_MIDDLE",
+                "expr",
+            ],
+        ),
     ]
 
     # generate token.rs
