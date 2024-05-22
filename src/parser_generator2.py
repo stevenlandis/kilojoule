@@ -3,6 +3,8 @@ import json
 import re
 from typing import Any, Callable, Optional
 
+from src.parser_generator import deep_flatten, normalize_set
+
 
 @dataclass(frozen=True)
 class Rule:
@@ -15,37 +17,65 @@ class Rule:
 class RuleState:
     rule: int
     step: int
+    following: tuple[str, ...]
 
     def incr(self):
-        return RuleState(self.rule, self.step + 1)
+        return RuleState(self.rule, self.step + 1, self.following)
 
     def __lt__(self, other: "RuleState"):
-        return (self.rule, self.step) < (other.rule, other.step)
+        return (self.rule, self.step, self.following) < (
+            other.rule,
+            other.step,
+            self.following,
+        )
 
 
 def expand_states(
-    states: list[RuleState], rules: list[Rule], rule_map: dict[str, list[int]]
+    states: list[RuleState],
+    rules: list[Rule],
+    rule_map: dict[str, list[int]],
+    rule_to_first_tokens: dict[str, set[str]],
 ):
-    reached_states: set[RuleState] = set()
+    reached_states: set[tuple[int, int]] = set()
+    state_to_following = {
+        (state.rule, state.step): list(state.following) for state in states
+    }
 
-    def helper(state: RuleState):
+    def helper(state: tuple[int, int]):
         if state in reached_states:
             return
         reached_states.add(state)
 
+        rule_idx, step_idx = state
+        steps = rules[rule_idx].steps
+
+        if step_idx + 1 < len(steps):
+            following = list(rule_to_first_tokens[steps[step_idx + 1]])
+        else:
+            following = state_to_following[state]
+
         # ignore finished states
-        if state.step >= len(rules[state.rule].steps):
+        if step_idx >= len(steps):
             return
 
-        next_step = rules[state.rule].steps[state.step]
+        next_step = steps[step_idx]
         if next_step in rule_map:
             for new_rule in rule_map[next_step]:
-                helper(RuleState(new_rule, 0))
+                next_state = (new_rule, 0)
+                if next_state not in state_to_following:
+                    state_to_following[next_state] = []
+                state_to_following[next_state].append(following)
+                helper(next_state)
 
     for state in states:
-        helper(state)
+        helper((state.rule, state.step))
 
-    all_states = tuple(sorted(reached_states))
+    all_states = tuple(
+        sorted(
+            RuleState(rule_idx, step_idx, normalize_set(deep_flatten(following)))
+            for (rule_idx, step_idx), following in state_to_following.items()
+        )
+    )
     return all_states
 
 
@@ -74,53 +104,49 @@ def get_first_tokens(rules: list[Rule], rule_map: dict[str, list[int]]):
             helper(token)
 
     return rule_to_first_tokens
-    # return {
-    #     rule_name: tuple(sorted(firsts))
-    #     for rule_name, firsts in rule_to_first_tokens.items()
-    # }
 
 
-def get_state_to_following_tokens(
-    rules: list[Rule],
-    rule_map: dict[str, list[int]],
-    rule_to_first_tokens: dict[str, set[int]],
-):
-    state_to_following_tokens: dict[RuleState, set[str]] = {}
+# def get_state_to_following_tokens(
+#     rules: list[Rule],
+#     rule_map: dict[str, list[int]],
+#     rule_to_first_tokens: dict[str, set[int]],
+# ):
+#     state_to_following_tokens: dict[RuleState, set[str]] = {}
 
-    rule_to_parent_states: dict[str, set[RuleState]] = {
-        rule_name: set() for rule_name in rule_map
-    }
-    for rule_idx, rule in enumerate(rules):
-        for step_idx, token in enumerate(rule.steps):
-            if token in rule_map:
-                rule_to_parent_states[token].add(RuleState(rule_idx, step_idx))
+#     rule_to_parent_states: dict[str, set[RuleState]] = {
+#         rule_name: set() for rule_name in rule_map
+#     }
+#     for rule_idx, rule in enumerate(rules):
+#         for step_idx, token in enumerate(rule.steps):
+#             if token in rule_map:
+#                 rule_to_parent_states[token].add(RuleState(rule_idx, step_idx))
 
-    def helper(state: RuleState):
-        if state in state_to_following_tokens:
-            return state_to_following_tokens[state]
-        following_tokens = set()
-        state_to_following_tokens[state] = following_tokens
+#     def helper(state: RuleState):
+#         if state in state_to_following_tokens:
+#             return state_to_following_tokens[state]
+#         following_tokens = set()
+#         state_to_following_tokens[state] = following_tokens
 
-        rule = rules[state.rule]
-        if state.step + 1 < len(rule.steps):
-            following_token = rule.steps[state.step + 1]
-            if following_token in rule_map:
-                following_tokens.update(
-                    rule_to_first_tokens[rule.steps[state.step + 1]]
-                )
-            else:
-                following_tokens.add(following_token)
-        else:
-            for parent_state in rule_to_parent_states[rule.name]:
-                following_tokens.update(helper(parent_state))
+#         rule = rules[state.rule]
+#         if state.step + 1 < len(rule.steps):
+#             following_token = rule.steps[state.step + 1]
+#             if following_token in rule_map:
+#                 following_tokens.update(
+#                     rule_to_first_tokens[rule.steps[state.step + 1]]
+#                 )
+#             else:
+#                 following_tokens.add(following_token)
+#         else:
+#             for parent_state in rule_to_parent_states[rule.name]:
+#                 following_tokens.update(helper(parent_state))
 
-        return following_tokens
+#         return following_tokens
 
-    for rule_idx, rule in enumerate(rules):
-        for step_idx in range(len(rule.steps) + 1):
-            helper(RuleState(rule_idx, step_idx))
+#     for rule_idx, rule in enumerate(rules):
+#         for step_idx in range(len(rule.steps) + 1):
+#             helper(RuleState(rule_idx, step_idx))
 
-    return state_to_following_tokens
+#     return state_to_following_tokens
 
 
 @dataclass(frozen=True)
@@ -136,12 +162,22 @@ def get_next_states(
     states: list[RuleState],
     rules: list[Rule],
     rule_map: dict[str, list[int]],
-    state_to_following: dict[RuleState, set[str]],
     rule_to_first_tokens: dict[str, set[str]],
 ):
+    state_to_following: dict[tuple[int, int], tuple[str, ...]] = {}
+    for state in states:
+        state_tuple = (state.rule, state.step)
+        assert state_tuple not in state_to_following
+        rule = rules[state.rule]
+        if state.step + 1 < len(rule.steps):
+            following = rule_to_first_tokens[rule.steps[state.step + 1]]
+        else:
+            following = state.following
+        state_to_following[state_tuple] = following
+
     next_groups: dict[tuple[Optional[str], str], list[RuleState]] = {}
     for state in states:
-        following = state_to_following[state]
+        following = state_to_following[(state.rule, state.step)]
         if state.step < len(rules[state.rule].steps):
             next_step = rules[state.rule].steps[state.step]
             if next_step in rule_map:
@@ -165,14 +201,17 @@ def get_next_states(
                 reduce_states.append(state)
 
         if len(reduce_states) == 1 and len(shift_states) == 0:
+            [reduce_state] = reduce_states
             next_actions.append(
                 Edge(
                     token=token,
                     rule_name=rule_name,
                     follow_tokens=(
-                        state_to_following[reduce_states[0]] if is_base_token else None
+                        state_to_following[(reduce_state.rule, reduce_state.step)]
+                        if is_base_token
+                        else None
                     ),
-                    reduce_rule=reduce_states[0].rule,
+                    reduce_rule=reduce_state.rule,
                     next_states=None,
                 )
             )
@@ -185,7 +224,7 @@ def get_next_states(
                         {
                             token
                             for state in shift_states
-                            for token in state_to_following[state]
+                            for token in state_to_following[(state.rule, state.step)]
                         }
                         if is_base_token
                         else None
@@ -274,9 +313,9 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
         rule_map.setdefault(rule.name, []).append(rule_idx)
 
     rule_to_first_tokens = get_first_tokens(rules, rule_map)
-    state_to_following_tokens = get_state_to_following_tokens(
-        rules, rule_map, rule_to_first_tokens
-    )
+    # state_to_following_tokens = get_state_to_following_tokens(
+    #     rules, rule_map, rule_to_first_tokens
+    # )
 
     states_to_idx: dict[tuple[RuleState, ...], int] = {}
     lookup_rows: list[LookupRow] = []
@@ -296,7 +335,7 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
     register_token_group(rule_to_first_tokens[rules[start_rule].name])
 
     def helper(states: tuple[RuleState, ...]):
-        states = expand_states(states, rules, rule_map)
+        states = expand_states(states, rules, rule_map, rule_to_first_tokens)
         states_idx = states_to_idx.get(states)
         if states_idx is not None:
             return states_idx
@@ -304,7 +343,7 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
         states_to_idx[states] = states_idx
 
         for next_action in get_next_states(
-            states, rules, rule_map, state_to_following_tokens, rule_to_first_tokens
+            states, rules, rule_map, rule_to_first_tokens
         ):
             if next_action.follow_tokens is None:
                 token_group = None
@@ -339,9 +378,9 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
 
         return states_idx
 
-    helper([RuleState(start_rule, 0)])
-    # lookup_rows.sort(key=lambda row: (row.state, row.token))
-    lookup_rows = simplify_lookup_rows(lookup_rows)
+    helper([RuleState(start_rule, 0, tuple())])
+    lookup_rows.sort(key=lambda row: SortTuple((row.state, row.rule_name, row.token)))
+    # lookup_rows = simplify_lookup_rows(lookup_rows)
 
     token_groups = {group_idx: tokens for tokens, group_idx in tokens_to_group.items()}
 
