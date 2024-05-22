@@ -20,6 +20,8 @@ def main():
         Rule("baseExpr", ["INTEGER"]),
         Rule("baseExpr", ["FLOAT"]),
         Rule("baseExpr", ["stringLiteral"]),
+        Rule("baseExpr", ["TRUE"]),
+        Rule("baseExpr", ["FALSE"]),
         Rule("baseDotExpr", ["DOT"]),
         Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),
         Rule("baseDotBracketAccess", ["DOT", "LEFT_BRACKET", "expr", "RIGHT_BRACKET"]),

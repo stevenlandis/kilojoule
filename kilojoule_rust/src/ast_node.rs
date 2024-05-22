@@ -5,6 +5,7 @@ pub enum AstNode {
     None,
     StringLiteral(String),
     F64Literal(f64),
+    Bool(bool),
     Echo,
     Access(Rc<AstNode>),
     Pipe(Rc<AstNode>, Rc<AstNode>),

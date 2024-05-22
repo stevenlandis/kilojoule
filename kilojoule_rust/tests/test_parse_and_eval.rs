@@ -81,7 +81,7 @@ mod tests {
             json!(r#"before{"a":1,"b":2}after"#),
         );
 
-        // // boolean
-        // assert_json(r#"[false, true] | '{.[0]}||{.[1]}'"#, json!("false||true"));
+        // boolean
+        assert_json(r#"[false, true] | '{.[0]}||{.[1]}'"#, json!("false||true"));
     }
 }
