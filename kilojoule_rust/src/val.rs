@@ -21,6 +21,7 @@ pub enum ValType {
     String(String),
     List(Vec<Val>),
     Map(ValHashMap),
+    Error(String),
 }
 
 impl Val {
@@ -69,6 +70,19 @@ impl Val {
             val: Rc::new(InnerVal {
                 hash,
                 val: ValType::String(text.to_string()),
+            }),
+        };
+    }
+
+    pub fn new_err(text: &str) -> Self {
+        let mut hasher = DefaultHasher::new();
+        HashTypes::String.hash(&mut hasher);
+        text.hash(&mut hasher);
+        let hash = hasher.finish();
+        return Val {
+            val: Rc::new(InnerVal {
+                hash,
+                val: ValType::Error(text.to_string()),
             }),
         };
     }
@@ -169,7 +183,7 @@ impl Val {
                 Ok(0)
             }
 
-            pub fn write(
+            fn write(
                 &mut self,
                 val: &Val,
                 indent: u64,
@@ -251,6 +265,11 @@ impl Val {
                             self.str("\n")?;
                             self.indent(indent)?;
                         }
+                        self.str("}")?;
+                    }
+                    ValType::Error(message) => {
+                        self.str("{\"ERROR\":")?;
+                        self.write(&Val::new_string(message.as_str()), 0, false)?;
                         self.str("}")?;
                     }
                 }

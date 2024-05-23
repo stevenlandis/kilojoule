@@ -110,8 +110,50 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
             return Val::new_string(std::str::from_utf8(write_buf.as_slice()).unwrap());
         }
+        AstNode::FcnCall(fcn_name, args) => {
+            let mut args_vec = Vec::<&AstNode>::new();
+            match args {
+                None => {}
+                Some(args) => {
+                    let mut node = &**args;
+                    loop {
+                        match node {
+                            AstNode::FcnCallArgNode(more_elems, elem) => {
+                                args_vec.push(elem);
+                                node = more_elems;
+                            }
+                            _ => {
+                                args_vec.push(node);
+                                break;
+                            }
+                        }
+                    }
+                    args_vec.reverse();
+                }
+            }
+
+            let fcn_name = match &**fcn_name {
+                AstNode::StringLiteral(val) => val.clone(),
+                _ => {
+                    panic!("unreachable");
+                }
+            };
+
+            return evaluate_fcn(fcn_name.as_str(), &args_vec, obj);
+        }
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }
+    }
+}
+
+fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
+    match fcn_name {
+        "len" => match &obj.val.val {
+            ValType::List(list) => Val::new_number(list.len() as f64),
+            ValType::Map(map) => Val::new_number(map.len() as f64),
+            _ => Val::new_err("Len has to be called on a list or map."),
+        },
+        _ => Val::new_err("Function does not exist."),
     }
 }

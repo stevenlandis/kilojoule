@@ -15,4 +15,6 @@ pub enum AstNode {
     ListLiteral(Option<Rc<AstNode>>),
     ListElemListNode(Rc<AstNode>, Rc<AstNode>),
     FormatStringNode(Vec<Rc<AstNode>>),
+    FcnCall(Rc<AstNode>, Option<Rc<AstNode>>),
+    FcnCallArgNode(Rc<AstNode>, Rc<AstNode>),
 }

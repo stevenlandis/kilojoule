@@ -22,6 +22,7 @@ def main():
         Rule("baseExpr", ["stringLiteral"]),
         Rule("baseExpr", ["TRUE"]),
         Rule("baseExpr", ["FALSE"]),
+        Rule("baseExpr", ["fcnCallExpr"]),
         Rule("baseDotExpr", ["DOT"]),
         Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),
         Rule("baseDotBracketAccess", ["DOT", "LEFT_BRACKET", "expr", "RIGHT_BRACKET"]),
@@ -58,6 +59,14 @@ def main():
                 "expr",
             ],
         ),
+        Rule("fcnCallExpr", ["IDENTIFIER", "LEFT_PAREN", "RIGHT_PAREN"]),
+        Rule("fcnCallExpr", ["IDENTIFIER", "LEFT_PAREN", "fcnCallArgs", "RIGHT_PAREN"]),
+        Rule(
+            "fcnCallExpr",
+            ["IDENTIFIER", "LEFT_PAREN", "fcnCallArgs", "COMMA", "RIGHT_PAREN"],
+        ),
+        Rule("fcnCallArgs", ["expr"]),
+        Rule("fcnCallArgs", ["fcnCallArgs", "COMMA", "expr"]),
     ]
 
     # generate token.rs

@@ -84,4 +84,10 @@ mod tests {
         // boolean
         assert_json(r#"[false, true] | '{.[0]}||{.[1]}'"#, json!("false||true"));
     }
+
+    #[test]
+    fn test_len() {
+        assert_json("[1,2,3] | len()", json!(3));
+        assert_json("{a: 1, b: 2, c: 3, d: 4} | len()", json!(4));
+    }
 }
