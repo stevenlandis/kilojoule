@@ -154,6 +154,21 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
             ValType::Map(map) => Val::new_number(map.len() as f64),
             _ => Val::new_err("Len has to be called on a list or map."),
         },
+        "map" => {
+            if args.len() != 1 {
+                return Val::new_err("map() must be called with one argument");
+            }
+            match &obj.val.val {
+                ValType::List(list) => {
+                    let mut result = Vec::<Val>::with_capacity(list.len());
+                    for elem in list {
+                        result.push(eval_ast_node(elem, args[0]));
+                    }
+                    Val::new_list(result.as_slice())
+                }
+                _ => Val::new_err("map() must be called on a list"),
+            }
+        }
         _ => Val::new_err("Function does not exist."),
     }
 }
