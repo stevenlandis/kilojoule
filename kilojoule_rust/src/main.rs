@@ -1,11 +1,11 @@
-use kilojoule_rust::{eval_ast_node, Parser, Val};
+use kilojoule_rust::{eval_ast_node, run_repl, Parser, Val};
 
 fn main() {
     let parser = Parser::new();
     let mut args = std::env::args();
     if args.len() != 2 {
-        println!("Please call with a single argument.");
-        std::process::exit(1);
+        let _ = run_repl(&parser);
+        return;
     }
     let query = args.nth(1).unwrap();
     let ast = parser.parse(query.as_str());
