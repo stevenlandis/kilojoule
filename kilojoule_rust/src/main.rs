@@ -8,9 +8,10 @@ fn main() {
         return;
     }
     let query = args.nth(1).unwrap();
-    let ast = parser.parse(query.as_str());
-    // println!("Ast: {:?}", ast);
-    let result = eval_ast_node(&Val::new_null(), &ast);
+
+    let result = match parser.parse(query.as_str()) {
+        Ok(ast) => eval_ast_node(&Val::new_null(), &ast),
+        Err(err) => Val::new_err(err.message.as_str()),
+    };
     result.write_json_str(&mut std::io::stdout(), true);
-    // println!("Result = {:?}", result);
 }

@@ -7,7 +7,7 @@ mod tests {
     static PARSER: Lazy<Parser> = Lazy::new(|| Parser::new());
 
     fn base_parse_and_eval(expr: &str) -> Vec<u8> {
-        let ast = PARSER.parse(expr);
+        let ast = PARSER.parse(expr).unwrap();
         // println!("Ast: {:?}", ast);
         let result = eval_ast_node(&Val::new_null(), &ast);
         let mut out = Vec::<u8>::new();

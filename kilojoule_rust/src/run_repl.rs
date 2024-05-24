@@ -12,8 +12,10 @@ pub fn run_repl(parser: &Parser) -> Result<(), rustyline::error::ReadlineError> 
                     return Ok(());
                 }
                 rl.add_history_entry(&line)?;
-                let ast = parser.parse(line.as_str());
-                let result = eval_ast_node(&Val::new_null(), &ast);
+                let result = match parser.parse(line.as_str()) {
+                    Ok(ast) => eval_ast_node(&Val::new_null(), &ast),
+                    Err(err) => Val::new_err(err.message.as_str()),
+                };
                 result.write_json_str(&mut std::io::stdout(), true);
             }
             Err(_) => {

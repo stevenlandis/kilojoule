@@ -57,7 +57,7 @@ impl<'a> Parser<'a> {
         };
     }
 
-    pub fn parse(&'a self, text: &'a str) -> Rc<AstNode> {
+    pub fn parse(&'a self, text: &'a str) -> Result<Rc<AstNode>, ParseError> {
         let mut tokenizer = Tokenizer::new(
             text,
             &self.skip_pattern,
@@ -67,10 +67,10 @@ impl<'a> Parser<'a> {
         let mut parser_state = ParserState::new(self.rules, &self.lookup_tbl);
         loop {
             let token_group = parser_state.get_token_group();
-            let (token, token_value) = tokenizer.next(token_group);
-            parser_state.step(token, token_value);
+            let (token, token_value) = tokenizer.next(token_group)?;
+            parser_state.step(token, token_value)?;
             if token == Token::END {
-                return parser_state.get_value();
+                return Ok(parser_state.get_value());
             }
         }
     }
@@ -87,6 +87,11 @@ struct ParserState<'a> {
     val_stack: Vec<ParserStateNode>,
     lookup_tbl: &'a HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
     rules: &'a [Rule<'a>],
+}
+
+#[derive(Debug)]
+pub struct ParseError {
+    pub message: String,
 }
 
 impl<'a> ParserState<'a> {
@@ -108,7 +113,7 @@ impl<'a> ParserState<'a> {
         return self.val_stack[0].node.clone();
     }
 
-    pub fn step(&mut self, token: Token, token_value: &'a str) {
+    pub fn step(&mut self, token: Token, token_value: &'a str) -> Result<(), ParseError> {
         assert!(
             self.state_stack.len() == self.val_stack.len()
                 || self.state_stack.len() == self.val_stack.len() + 1
@@ -125,7 +130,14 @@ impl<'a> ParserState<'a> {
 
             let lookup_row = match self.lookup_tbl.get(&(state, None, rule_name)) {
                 Some(lookup_row) => lookup_row,
-                None => &self.lookup_tbl[&(state, Some(token), rule_name)],
+                None => match self.lookup_tbl.get(&(state, Some(token), rule_name)) {
+                    Some(lookup_row) => lookup_row,
+                    None => {
+                        return Err(ParseError {
+                            message: "Unable to parse token".to_string(),
+                        });
+                    }
+                },
             };
 
             if lookup_row.next_state.is_some() {
@@ -158,6 +170,7 @@ impl<'a> ParserState<'a> {
                 );
             }
         }
+        Ok(())
     }
 
     pub fn get_token_group(&self) -> u64 {
@@ -193,7 +206,7 @@ impl<'a> Tokenizer<'a> {
         };
     }
 
-    pub fn next(&mut self, token_group: u64) -> (Token, &'a str) {
+    pub fn next(&mut self, token_group: u64) -> Result<(Token, &'a str), ParseError> {
         match self.skip_pattern.captures(&self.text[self.text_idx..]) {
             Some(cap) => {
                 let match_info = cap.get(0).unwrap();
@@ -203,7 +216,7 @@ impl<'a> Tokenizer<'a> {
         }
 
         if self.text_idx >= self.text.len() {
-            return (Token::END, "");
+            return Ok((Token::END, ""));
         }
 
         #[derive(Clone, Copy)]
@@ -251,11 +264,19 @@ impl<'a> Tokenizer<'a> {
             }
         }
 
-        let best = best.unwrap();
-        assert!(best.len > 0);
-        let best_text =
-            &self.text[self.text_idx + best.start_idx..self.text_idx + best.start_idx + best.len];
-        self.text_idx += best.len;
-        return (best.token, best_text);
+        match best {
+            None => {
+                return Err(ParseError {
+                    message: "Unable to parse token".to_string(),
+                });
+            }
+            Some(best) => {
+                assert!(best.len > 0);
+                let best_text = &self.text
+                    [self.text_idx + best.start_idx..self.text_idx + best.start_idx + best.len];
+                self.text_idx += best.len;
+                return Ok((best.token, best_text));
+            }
+        }
     }
 }
