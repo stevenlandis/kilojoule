@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::ast_node::AstNode;
 use super::val::{Val, ValHashMap, ValType};
 
@@ -167,6 +169,40 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
                     Val::new_list(result.as_slice())
                 }
                 _ => Val::new_err("map() must be called on a list"),
+            }
+        }
+        "group" => {
+            if args.len() != 1 {
+                return Val::new_err("group() must be called with 1 argument");
+            }
+            match &obj.val.val {
+                ValType::List(list) => {
+                    let mut groups = Vec::<(Val, Vec<Val>)>::new();
+                    let mut val_to_idx = HashMap::<Val, usize>::new();
+                    for elem in list {
+                        let group_key = eval_ast_node(elem, args[0]);
+                        let group_idx =
+                            *val_to_idx.entry(group_key.clone()).or_insert(groups.len());
+                        if group_idx == groups.len() {
+                            groups.push((group_key, vec![]));
+                        }
+                        groups[group_idx].1.push(elem.clone());
+                    }
+
+                    let mut results = Vec::<Val>::with_capacity(groups.len());
+
+                    for (group_key, vals) in groups {
+                        let pairs: Vec<(Val, Val)> = vec![
+                            (Val::new_string("key"), group_key),
+                            (Val::new_string("rows"), Val::new_list(vals.as_slice())),
+                        ];
+                        let map = ValHashMap::from_pairs(&pairs);
+                        results.push(Val::new_map(map));
+                    }
+
+                    Val::new_list(results.as_slice())
+                }
+                _ => Val::new_err("group() must be called on a list"),
             }
         }
         _ => Val::new_err("Function does not exist."),
