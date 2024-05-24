@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use super::ast_node::AstNode;
 use super::val::{Val, ValHashMap, ValType};
@@ -205,6 +206,21 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
                 _ => Val::new_err("group() must be called on a list"),
             }
         }
+        "unique" => eval_ast_node(
+            obj,
+            &AstNode::Pipe(
+                Rc::new(AstNode::FcnCall(
+                    Rc::new(AstNode::StringLiteral("group".to_string())),
+                    Some(Rc::new(AstNode::Echo)),
+                )),
+                Rc::new(AstNode::FcnCall(
+                    Rc::new(AstNode::StringLiteral("map".to_string())),
+                    Some(Rc::new(AstNode::Access(Rc::new(AstNode::StringLiteral(
+                        "key".to_string(),
+                    ))))),
+                )),
+            ),
+        ),
         _ => Val::new_err("Function does not exist."),
     }
 }
