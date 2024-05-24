@@ -22,6 +22,7 @@ def main():
         Rule("baseExpr", ["stringLiteral"]),
         Rule("baseExpr", ["TRUE"]),
         Rule("baseExpr", ["FALSE"]),
+        Rule("baseExpr", ["NULL"]),
         Rule("baseExpr", ["fcnCallExpr"]),
         Rule("baseDotExpr", ["DOT"]),
         Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),

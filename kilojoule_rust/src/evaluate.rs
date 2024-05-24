@@ -37,6 +37,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
         AstNode::StringLiteral(val) => Val::new_string(val),
         AstNode::F64Literal(val) => Val::new_number(*val),
         AstNode::Bool(val) => Val::new_bool(*val),
+        AstNode::Null => Val::new_null(),
         AstNode::Pipe(left, right) => eval_ast_node(&eval_ast_node(obj, left), right),
         AstNode::MapLiteral(elems_opt) => match elems_opt {
             None => Val::new_map_from_entries_iter(Vec::new()),

@@ -19,6 +19,10 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         pattern: r"false",
     },
     TokenDef {
+        token: Token::NULL,
+        pattern: r"null",
+    },
+    TokenDef {
         token: Token::IDENTIFIER,
         pattern: r"[_A-Za-z][_A-Za-z0-9]*",
     },

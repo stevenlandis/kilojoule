@@ -15,7 +15,8 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
         Token::STRING_DOUBLE_QUOTE => AstNode::StringLiteral(escape_string_literal(text)),
         Token::TRUE => AstNode::Bool(true),
         Token::FALSE => AstNode::Bool(false),
-        _ => AstNode::None,
+        Token::NULL => AstNode::Null,
+        _ => AstNode::Null,
     };
 }
 

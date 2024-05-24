@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 #[derive(Debug)]
 pub enum AstNode {
-    None,
+    Null,
     StringLiteral(String),
     F64Literal(f64),
     Bool(bool),
