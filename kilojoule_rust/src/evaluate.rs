@@ -221,6 +221,14 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
                 )),
             ),
         ),
+        "sort" => match &obj.val.val {
+            ValType::List(list) => {
+                let mut result = list.iter().cloned().collect::<Vec<_>>();
+                result.sort();
+                Val::new_list(result.as_slice())
+            }
+            _ => Val::new_err("sort() has to be called on a list."),
+        },
         _ => Val::new_err("Function does not exist."),
     }
 }

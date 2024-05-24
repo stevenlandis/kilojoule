@@ -15,13 +15,13 @@ pub struct InnerVal {
 
 #[derive(Debug, PartialEq)]
 pub enum ValType {
+    Error(String),
     Null,
     Bool(bool),
     Number(f64),
     String(String),
     List(Vec<Val>),
     Map(ValHashMap),
-    Error(String),
 }
 
 impl Val {
@@ -322,22 +322,81 @@ impl Hash for Val {
 }
 
 impl Ord for Val {
+    /*
+    Order
+    - Error
+    - Null
+    - Bool
+    - Number
+    - String
+    - List
+    - Map
+    */
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match &self.val.val {
-            ValType::Null => match other.val.val {
-                ValType::Null => std::cmp::Ordering::Equal,
-                _ => std::cmp::Ordering::Less,
+            ValType::Error(err0) => match &other.val.val {
+                ValType::Error(err1) => err0.cmp(&err1),
+                ValType::Null => std::cmp::Ordering::Less,
+                ValType::Bool(_) => std::cmp::Ordering::Less,
+                ValType::Number(_) => std::cmp::Ordering::Less,
+                ValType::String(_) => std::cmp::Ordering::Less,
+                ValType::List(_) => std::cmp::Ordering::Less,
+                ValType::Map(_) => std::cmp::Ordering::Less,
             },
-            ValType::String(val) => match &other.val.val {
+            ValType::Null => match other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
+                ValType::Null => std::cmp::Ordering::Equal,
+                ValType::Bool(_) => std::cmp::Ordering::Less,
+                ValType::Number(_) => std::cmp::Ordering::Less,
+                ValType::String(_) => std::cmp::Ordering::Less,
+                ValType::List(_) => std::cmp::Ordering::Less,
+                ValType::Map(_) => std::cmp::Ordering::Less,
+            },
+            ValType::Bool(val0) => match &other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
+                ValType::Null => std::cmp::Ordering::Greater,
+                ValType::Bool(val1) => val0.cmp(val1),
+                ValType::Number(_) => std::cmp::Ordering::Less,
+                ValType::String(_) => std::cmp::Ordering::Less,
+                ValType::List(_) => std::cmp::Ordering::Less,
+                ValType::Map(_) => std::cmp::Ordering::Less,
+            },
+            ValType::Number(val0) => match &other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
+                ValType::Null => std::cmp::Ordering::Greater,
+                ValType::Bool(_) => std::cmp::Ordering::Greater,
+                ValType::Number(val1) => val0.total_cmp(val1),
+                ValType::String(_) => std::cmp::Ordering::Less,
+                ValType::List(_) => std::cmp::Ordering::Less,
+                ValType::Map(_) => std::cmp::Ordering::Less,
+            },
+            ValType::String(val0) => match &other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
                 ValType::Null => std::cmp::Ordering::Greater,
                 ValType::Bool(_) => std::cmp::Ordering::Greater,
                 ValType::Number(_) => std::cmp::Ordering::Greater,
-                ValType::String(other_val) => val.cmp(&other_val),
-                _ => std::cmp::Ordering::Less,
+                ValType::String(val1) => val0.cmp(val1),
+                ValType::List(_) => std::cmp::Ordering::Less,
+                ValType::Map(_) => std::cmp::Ordering::Less,
             },
-            _ => {
-                panic!("Unimplemented sort");
-            }
+            ValType::List(val0) => match &other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
+                ValType::Null => std::cmp::Ordering::Greater,
+                ValType::Bool(_) => std::cmp::Ordering::Greater,
+                ValType::Number(_) => std::cmp::Ordering::Greater,
+                ValType::String(_) => std::cmp::Ordering::Greater,
+                ValType::List(val1) => list_cmp(val0, val1),
+                ValType::Map(_) => std::cmp::Ordering::Less,
+            },
+            ValType::Map(_) => match &other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
+                ValType::Null => std::cmp::Ordering::Greater,
+                ValType::Bool(_) => std::cmp::Ordering::Greater,
+                ValType::Number(_) => std::cmp::Ordering::Greater,
+                ValType::String(_) => std::cmp::Ordering::Greater,
+                ValType::List(_) => std::cmp::Ordering::Greater,
+                ValType::Map(_) => panic!("map comparison is unimplemented"),
+            },
         }
     }
 }
@@ -346,6 +405,17 @@ impl PartialOrd for Val {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
+}
+
+fn list_cmp(left: &Vec<Val>, right: &Vec<Val>) -> std::cmp::Ordering {
+    for idx in 0..std::cmp::min(left.len(), right.len()) {
+        let result = left[idx].cmp(&right[idx]);
+        if result != std::cmp::Ordering::Equal {
+            return result;
+        }
+    }
+
+    return left.len().cmp(&right.len());
 }
 
 #[derive(Debug)]
