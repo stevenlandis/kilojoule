@@ -16,13 +16,15 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
         Token::TRUE => AstNode::Bool(true),
         Token::FALSE => AstNode::Bool(false),
         Token::NULL => AstNode::Null,
+        Token::PLUS => AstNode::Plus,
+        Token::MINUS => AstNode::Minus,
         _ => AstNode::Null,
     };
 }
 
 pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
-        RuleType::opPipeExpr__opPipeExpr_PIPE_baseExpr => {
+        RuleType::opPipeExpr__opPipeExpr_PIPE_opAddExpr => {
             Rc::new(AstNode::Pipe(elems[0].clone(), elems[2].clone()))
         }
         RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
@@ -74,6 +76,15 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::fcnCallExpr__IDENTIFIER_LEFT_PAREN_fcnCallArgs_RIGHT_PAREN => {Rc::new(AstNode::FcnCall(elems[0].clone(), Some(elems[2].clone())))}
         RuleType::fcnCallArgs__fcnCallArgs_COMMA_expr => {
             Rc::new(AstNode::FcnCallArgNode(elems[1].clone(), elems[3].clone()))
+        }
+
+        // Add and Subtract
+        RuleType::opAddExpr__opAddExpr_opAddOperator_baseExpr => {
+            Rc::new(match *elems[1] {
+                AstNode::Plus => AstNode::Add(elems[0].clone(), elems[2].clone()),
+                AstNode::Minus => AstNode::Subtract(elems[0].clone(), elems[2].clone()),
+                _ => panic!("invalid add operator")
+            })
         }
 
         // Default

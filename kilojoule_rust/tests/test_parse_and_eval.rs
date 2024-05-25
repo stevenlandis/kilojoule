@@ -130,4 +130,12 @@ mod tests {
     fn test_null() {
         assert_json("null", json!(null));
     }
+
+    #[test]
+    fn test_add_and_subtract() {
+        assert_json("2 + 3", json!(5));
+        assert_json("10 - 3", json!(7));
+        assert_json("1 + 2 - 10", json!(-7));
+        assert_json("1 - 2 + 10", json!(9));
+    }
 }

@@ -17,4 +17,8 @@ pub enum AstNode {
     FormatStringNode(Vec<Rc<AstNode>>),
     FcnCall(Rc<AstNode>, Option<Rc<AstNode>>),
     FcnCallArgNode(Rc<AstNode>, Rc<AstNode>),
+    Add(Rc<AstNode>, Rc<AstNode>),
+    Subtract(Rc<AstNode>, Rc<AstNode>),
+    Plus,
+    Minus,
 }

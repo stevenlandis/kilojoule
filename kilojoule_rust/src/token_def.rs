@@ -94,4 +94,12 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         token: Token::STRING_DOUBLE_QUOTE,
         pattern: r#""(?:[^"\\{}]|\\.)*""#,
     },
+    TokenDef {
+        token: Token::PLUS,
+        pattern: r"\+",
+    },
+    TokenDef {
+        token: Token::MINUS,
+        pattern: r"\-",
+    },
 ];

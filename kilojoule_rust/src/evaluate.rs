@@ -145,6 +145,32 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
 
             return evaluate_fcn(fcn_name.as_str(), &args_vec, obj);
         }
+        AstNode::Add(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            match &left.val.val {
+                ValType::Number(left) => match &right.val.val {
+                    ValType::Number(right) => Val::new_number(left + right),
+                    ValType::Error(_) => right,
+                    _ => Val::new_err("Right side of add has to be a number"),
+                },
+                ValType::Error(_) => left,
+                _ => Val::new_err("Left side of add has to be a number"),
+            }
+        }
+        AstNode::Subtract(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            match &left.val.val {
+                ValType::Number(left) => match &right.val.val {
+                    ValType::Number(right) => Val::new_number(left - right),
+                    ValType::Error(_) => right,
+                    _ => Val::new_err("Right side of subtraction has to be a number"),
+                },
+                ValType::Error(_) => left,
+                _ => Val::new_err("Left side of subtraction has to be a number"),
+            }
+        }
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }
