@@ -245,7 +245,13 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             let right = eval_ast_node(obj, right);
             match &left.val.val {
                 ValType::Number(left) => match &right.val.val {
-                    ValType::Number(right) => Val::new_number(left / right),
+                    ValType::Number(right) => {
+                        if *right == 0.0 {
+                            Val::new_null()
+                        } else {
+                            Val::new_number(left / right)
+                        }
+                    }
                     ValType::Error(_) => right,
                     _ => Val::new_err("Right side of divide has to be a number"),
                 },
