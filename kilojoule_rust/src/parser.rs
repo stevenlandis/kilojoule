@@ -58,16 +58,11 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&'a self, text: &'a str) -> Result<Rc<AstNode>, ParseError> {
-        let mut tokenizer = Tokenizer::new(
-            text,
-            &self.skip_pattern,
-            &self.token_groups,
-            &self.token_map,
-        );
-        let mut parser_state = ParserState::new(self.rules, &self.lookup_tbl);
+        let mut tokenizer = Tokenizer::new(text, &self.skip_pattern, &self.token_map);
+        let mut parser_state = ParserState::new(self.rules, &self.lookup_tbl, &self.token_groups);
         loop {
-            let token_group = parser_state.get_token_group();
-            let (token, token_value) = tokenizer.next(token_group)?;
+            let next_tokens = parser_state.get_next_tokens();
+            let (token, token_value) = tokenizer.next(next_tokens)?;
             parser_state.step(token, token_value)?;
             if token == Token::END {
                 return Ok(parser_state.get_value());
@@ -87,6 +82,7 @@ struct ParserState<'a> {
     val_stack: Vec<ParserStateNode>,
     lookup_tbl: &'a HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
     rules: &'a [Rule<'a>],
+    token_groups: &'a HashMap<usize, Vec<Token>>,
 }
 
 #[derive(Debug)]
@@ -98,6 +94,7 @@ impl<'a> ParserState<'a> {
     pub fn new(
         rules: &'a [Rule<'a>],
         lookup_tbl: &'a HashMap<(u64, Option<Token>, Option<Token>), LookupRow>,
+        token_groups: &'a HashMap<usize, Vec<Token>>,
     ) -> Self {
         return ParserState {
             token_group: 0,
@@ -105,6 +102,7 @@ impl<'a> ParserState<'a> {
             val_stack: Vec::new(),
             lookup_tbl,
             rules,
+            token_groups,
         };
     }
 
@@ -173,8 +171,8 @@ impl<'a> ParserState<'a> {
         Ok(())
     }
 
-    pub fn get_token_group(&self) -> u64 {
-        return self.token_group;
+    pub fn get_next_tokens(&self) -> &[Token] {
+        return &self.token_groups[&(self.token_group as usize)];
     }
 }
 
@@ -186,7 +184,6 @@ struct Tokenizer<'a> {
     text: &'a str,
     text_idx: usize,
     skip_pattern: &'a Regex,
-    token_groups: &'a HashMap<usize, Vec<Token>>,
     token_map: &'a HashMap<Token, (usize, Regex)>,
 }
 
@@ -194,19 +191,17 @@ impl<'a> Tokenizer<'a> {
     pub fn new(
         text: &'a str,
         skip_pattern: &'a Regex,
-        token_groups: &'a HashMap<usize, Vec<Token>>,
         token_map: &'a HashMap<Token, (usize, Regex)>,
     ) -> Self {
         return Tokenizer {
             text,
             text_idx: 0,
             skip_pattern,
-            token_groups,
             token_map,
         };
     }
 
-    pub fn next(&mut self, token_group: u64) -> Result<(Token, &'a str), ParseError> {
+    pub fn next(&mut self, tokens: &[Token]) -> Result<(Token, &'a str), ParseError> {
         match self.skip_pattern.captures(&self.text[self.text_idx..]) {
             Some(cap) => {
                 let match_info = cap.get(0).unwrap();
@@ -228,7 +223,7 @@ impl<'a> Tokenizer<'a> {
         }
 
         let mut best: Option<BestMatch> = None;
-        for token_name in &self.token_groups[&(token_group as usize)] {
+        for token_name in tokens {
             if *token_name == Token::END {
                 continue;
             }
