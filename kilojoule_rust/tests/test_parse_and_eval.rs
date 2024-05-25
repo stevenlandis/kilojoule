@@ -171,4 +171,12 @@ mod tests {
             json!([false, false, false, true]),
         );
     }
+
+    #[test]
+    fn test_filter() {
+        assert_json(
+            "[1, 2, 3, 4, 5, 6] | filter(. < 3 or . > 4)",
+            json!([1, 2, 5, 6]),
+        );
+    }
 }

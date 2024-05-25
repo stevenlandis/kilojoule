@@ -312,6 +312,21 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
             }
             _ => Val::new_err("sort() has to be called on a list."),
         },
+        "filter" => match &obj.val.val {
+            ValType::List(list) => {
+                let mut result = Vec::<Val>::new();
+                for elem in list {
+                    if match eval_ast_node(elem, args[0]).val.val {
+                        ValType::Bool(val) => val,
+                        _ => false,
+                    } {
+                        result.push(elem.clone());
+                    }
+                }
+                return Val::new_list(result.as_slice());
+            }
+            _ => Val::new_err("filter() has to be called on a list."),
+        },
         _ => Val::new_err("Function does not exist."),
     }
 }
