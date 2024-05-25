@@ -359,6 +359,21 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
             }
             _ => Val::new_err("filter() has to be called on a list."),
         },
+        "sum" => match &obj.val.val {
+            ValType::List(list) => {
+                let mut total: f64 = 0.0;
+                for elem in list {
+                    match elem.val.val {
+                        ValType::Number(val) => {
+                            total += val;
+                        }
+                        _ => {}
+                    }
+                }
+                Val::new_number(total)
+            }
+            _ => Val::new_err("sum() has to be called on a list"),
+        },
         _ => Val::new_err("Function does not exist."),
     }
 }

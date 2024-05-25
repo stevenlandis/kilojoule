@@ -188,4 +188,11 @@ mod tests {
         assert_json("3 * 4 + 100*2", json!(3 * 4 + 100 * 2));
         assert_json("1/0", json!({"ERROR": "divide by zero"}));
     }
+
+    #[test]
+    fn test_sum() {
+        assert_json("[1,2,3,4] | sum()", json!(10));
+        assert_json("[] | sum()", json!(0));
+        assert_json("[1, null, 2, [], 3, {}, 4] | sum()", json!(10));
+    }
 }
