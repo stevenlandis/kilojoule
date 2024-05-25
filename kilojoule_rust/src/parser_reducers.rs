@@ -83,7 +83,7 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         }
         RuleType::fcnCallExpr__IDENTIFIER_LEFT_PAREN_fcnCallArgs_RIGHT_PAREN => {Rc::new(AstNode::FcnCall(elems[0].clone(), Some(elems[2].clone())))}
         RuleType::fcnCallArgs__fcnCallArgs_COMMA_expr => {
-            Rc::new(AstNode::FcnCallArgNode(elems[1].clone(), elems[3].clone()))
+            Rc::new(AstNode::FcnCallArgNode(elems[0].clone(), elems[2].clone()))
         }
 
         // Add and Subtract

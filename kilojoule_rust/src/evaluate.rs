@@ -374,6 +374,69 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
             }
             _ => Val::new_err("sum() has to be called on a list"),
         },
+        "first" => match &obj.val.val {
+            ValType::List(list) => {
+                let count = eval_ast_node(obj, args[0]);
+                match &count.val.val {
+                    ValType::Number(val) => {
+                        if val.floor() == *val && *val >= 0.0 {
+                            Val::new_list(&list[..(*val as usize).min(list.len())])
+                        } else {
+                            Val::new_err("first() must be called with a positive integer")
+                        }
+                    }
+                    _ => Val::new_err("first() must be called with an integer"),
+                }
+            }
+            _ => Val::new_err("first() must be called on a list"),
+        },
+        "last" => match &obj.val.val {
+            ValType::List(list) => {
+                let count = eval_ast_node(obj, args[0]);
+                match &count.val.val {
+                    ValType::Number(val) => {
+                        if val.floor() == *val && *val >= 0.0 {
+                            Val::new_list(&list[list.len().saturating_sub(*val as usize)..])
+                        } else {
+                            Val::new_err("last() must be called with a positive integer")
+                        }
+                    }
+                    _ => Val::new_err("last() must be called with an integer"),
+                }
+            }
+            _ => Val::new_err("last() must be called on a list"),
+        },
+        "slice" => match &obj.val.val {
+            ValType::List(list) => {
+                let start = eval_ast_node(obj, args[0]);
+                match &start.val.val {
+                    ValType::Number(val) => {
+                        if val.floor() == *val && *val >= 0.0 {
+                            let end = eval_ast_node(obj, args[1]);
+                            match &end.val.val {
+                                ValType::Number(end) => {
+                                    if end.floor() == *end && *end >= 0.0 {
+                                        let start =
+                                            (*val as usize).min(list.len()).min(*end as usize);
+                                        let end = (*end as usize).min(list.len()).max(start);
+                                        Val::new_list(&list[start..end])
+                                    } else {
+                                        Val::new_err(
+                                            "slice() must be called with positive integers",
+                                        )
+                                    }
+                                }
+                                _ => Val::new_err("slice() must be called with positive integers"),
+                            }
+                        } else {
+                            Val::new_err("slice() must be called with positive integers")
+                        }
+                    }
+                    _ => Val::new_err("slice() must be called with positive integers"),
+                }
+            }
+            _ => Val::new_err("slice() must be called on a list"),
+        },
         _ => Val::new_err("Function does not exist."),
     }
 }

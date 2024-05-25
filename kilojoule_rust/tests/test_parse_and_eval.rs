@@ -195,4 +195,18 @@ mod tests {
         assert_json("[] | sum()", json!(0));
         assert_json("[1, null, 2, [], 3, {}, 4] | sum()", json!(10));
     }
+
+    #[test]
+    fn test_first_last_slice() {
+        assert_json("[1,2,3,4,5] | first(3)", json!([1, 2, 3]));
+        assert_json("[1,2] | first(3)", json!([1, 2]));
+        assert_json("[1,2,3,4,5] | last(3)", json!([3, 4, 5]));
+        assert_json("[1,2] | last(3)", json!([1, 2]));
+
+        assert_json("[1,2,3,4,5] | slice(1, 4)", json!([2, 3, 4]));
+        assert_json("[1,2,3,4,5] | slice(0, 0)", json!([]));
+        assert_json("[1,2,3,4,5] | slice(100, 100)", json!([]));
+        assert_json("[1,2,3,4,5] | slice(0, 100)", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | slice(100, 0)", json!([]));
+    }
 }
