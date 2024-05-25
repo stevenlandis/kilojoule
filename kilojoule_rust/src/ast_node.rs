@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+#[allow(non_camel_case_types)]
 #[derive(Debug)]
 pub enum AstNode {
     Null,
@@ -19,6 +20,18 @@ pub enum AstNode {
     FcnCallArgNode(Rc<AstNode>, Rc<AstNode>),
     Add(Rc<AstNode>, Rc<AstNode>),
     Subtract(Rc<AstNode>, Rc<AstNode>),
-    Plus,
-    Minus,
+    PLUS,
+    MINUS,
+    DOUBLE_EQUALS,
+    NOT_EQUAL,
+    LESS_THAN,
+    LESS_THAN_OR_EQUAL,
+    GREATER_THAN,
+    GREATER_THAN_OR_EQUAL,
+    Equals(Rc<AstNode>, Rc<AstNode>),
+    NotEqual(Rc<AstNode>, Rc<AstNode>),
+    LessThan(Rc<AstNode>, Rc<AstNode>),
+    LessThanOrEqual(Rc<AstNode>, Rc<AstNode>),
+    GreaterThan(Rc<AstNode>, Rc<AstNode>),
+    GreaterThanOrEqual(Rc<AstNode>, Rc<AstNode>),
 }

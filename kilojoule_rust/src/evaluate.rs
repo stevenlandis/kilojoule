@@ -171,6 +171,36 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                 _ => Val::new_err("Left side of subtraction has to be a number"),
             }
         }
+        AstNode::Equals(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            Val::new_bool(left == right)
+        }
+        AstNode::NotEqual(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            Val::new_bool(left != right)
+        }
+        AstNode::LessThan(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            Val::new_bool(left < right)
+        }
+        AstNode::LessThanOrEqual(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            Val::new_bool(left <= right)
+        }
+        AstNode::GreaterThan(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            Val::new_bool(left > right)
+        }
+        AstNode::GreaterThanOrEqual(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            Val::new_bool(left >= right)
+        }
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }

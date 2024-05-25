@@ -102,4 +102,28 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         token: Token::MINUS,
         pattern: r"\-",
     },
+    TokenDef {
+        token: Token::DOUBLE_EQUALS,
+        pattern: r"\=\=",
+    },
+    TokenDef {
+        token: Token::NOT_EQUALS,
+        pattern: r"\!\=",
+    },
+    TokenDef {
+        token: Token::LESS_THAN,
+        pattern: r"<",
+    },
+    TokenDef {
+        token: Token::LESS_THAN_OR_EQUAL,
+        pattern: r"<=",
+    },
+    TokenDef {
+        token: Token::GREATER_THAN,
+        pattern: r">",
+    },
+    TokenDef {
+        token: Token::GREATER_THAN_OR_EQUAL,
+        pattern: r">=",
+    },
 ];

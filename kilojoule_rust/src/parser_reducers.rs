@@ -16,15 +16,21 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
         Token::TRUE => AstNode::Bool(true),
         Token::FALSE => AstNode::Bool(false),
         Token::NULL => AstNode::Null,
-        Token::PLUS => AstNode::Plus,
-        Token::MINUS => AstNode::Minus,
+        Token::PLUS => AstNode::PLUS,
+        Token::MINUS => AstNode::MINUS,
+        Token::DOUBLE_EQUALS => AstNode::DOUBLE_EQUALS,
+        Token::NOT_EQUALS => AstNode::NOT_EQUAL,
+        Token::LESS_THAN => AstNode::LESS_THAN,
+        Token::LESS_THAN_OR_EQUAL => AstNode::LESS_THAN_OR_EQUAL,
+        Token::GREATER_THAN => AstNode::GREATER_THAN,
+        Token::GREATER_THAN_OR_EQUAL => AstNode::GREATER_THAN_OR_EQUAL,
         _ => AstNode::Null,
     };
 }
 
 pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
-        RuleType::opPipeExpr__opPipeExpr_PIPE_opAddExpr => {
+        RuleType::opPipeExpr__opPipeExpr_PIPE_opEqualityExpr => {
             Rc::new(AstNode::Pipe(elems[0].clone(), elems[2].clone()))
         }
         RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
@@ -81,9 +87,22 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         // Add and Subtract
         RuleType::opAddExpr__opAddExpr_opAddOperator_baseExpr => {
             Rc::new(match *elems[1] {
-                AstNode::Plus => AstNode::Add(elems[0].clone(), elems[2].clone()),
-                AstNode::Minus => AstNode::Subtract(elems[0].clone(), elems[2].clone()),
+                AstNode::PLUS => AstNode::Add(elems[0].clone(), elems[2].clone()),
+                AstNode::MINUS => AstNode::Subtract(elems[0].clone(), elems[2].clone()),
                 _ => panic!("invalid add operator")
+            })
+        }
+
+        // equality operators
+        RuleType::opEqualityExpr__opAddExpr_equalityOperator_opAddExpr => {
+            Rc::new(match *elems[1] {
+                AstNode::DOUBLE_EQUALS => AstNode::Equals(elems[0].clone(), elems[2].clone()),
+                AstNode::NOT_EQUAL => AstNode::NotEqual(elems[0].clone(), elems[2].clone()),
+                AstNode::LESS_THAN => AstNode::LessThan(elems[0].clone(), elems[2].clone()),
+                AstNode::LESS_THAN_OR_EQUAL => AstNode::LessThanOrEqual(elems[0].clone(), elems[2].clone()),
+                AstNode::GREATER_THAN => AstNode::GreaterThan(elems[0].clone(), elems[2].clone()),
+                AstNode::GREATER_THAN_OR_EQUAL => AstNode::GreaterThanOrEqual(elems[0].clone(), elems[2].clone()),
+                _ => panic!("invalid equality operator")
             })
         }
 
