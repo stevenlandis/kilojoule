@@ -134,7 +134,7 @@ impl<'a> ParserState<'a> {
                     Some(lookup_row) => lookup_row,
                     None => {
                         return Err(ParseError {
-                            message: "Unable to parse token".to_string(),
+                            message: "Unable to accept token".to_string(),
                         });
                     }
                 },
