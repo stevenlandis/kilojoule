@@ -247,7 +247,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                 ValType::Number(left) => match &right.val.val {
                     ValType::Number(right) => {
                         if *right == 0.0 {
-                            Val::new_null()
+                            Val::new_err("divide by zero")
                         } else {
                             Val::new_number(left / right)
                         }
