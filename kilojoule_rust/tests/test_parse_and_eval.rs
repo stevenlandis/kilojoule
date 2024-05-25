@@ -179,4 +179,12 @@ mod tests {
             json!([1, 2, 5, 6]),
         );
     }
+
+    #[test]
+    fn test_multiply_and_divide() {
+        assert_json("3*4", json!(12));
+        assert_json("8/2", json!(4));
+        assert_json("3*5/3", json!(5));
+        assert_json("3 * 4 + 100*2", json!(3 * 4 + 100 * 2));
+    }
 }

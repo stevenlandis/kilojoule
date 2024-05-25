@@ -36,4 +36,8 @@ pub enum AstNode {
     GreaterThanOrEqual(Rc<AstNode>, Rc<AstNode>),
     Or(Rc<AstNode>, Rc<AstNode>),
     And(Rc<AstNode>, Rc<AstNode>),
+    ASTERISK,
+    FORWARD_SLASH,
+    Multiply(Rc<AstNode>, Rc<AstNode>),
+    Divide(Rc<AstNode>, Rc<AstNode>),
 }

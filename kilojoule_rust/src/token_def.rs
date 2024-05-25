@@ -134,4 +134,12 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         token: Token::GREATER_THAN_OR_EQUAL,
         pattern: r">=",
     },
+    TokenDef {
+        token: Token::ASTERISK,
+        pattern: r"\*",
+    },
+    TokenDef {
+        token: Token::FORWARD_SLASH,
+        pattern: r"\/",
+    },
 ];

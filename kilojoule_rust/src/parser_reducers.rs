@@ -24,6 +24,8 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
         Token::LESS_THAN_OR_EQUAL => AstNode::LESS_THAN_OR_EQUAL,
         Token::GREATER_THAN => AstNode::GREATER_THAN,
         Token::GREATER_THAN_OR_EQUAL => AstNode::GREATER_THAN_OR_EQUAL,
+        Token::ASTERISK => AstNode::ASTERISK,
+        Token::FORWARD_SLASH => AstNode::FORWARD_SLASH,
         _ => AstNode::Null,
     };
 }
@@ -85,7 +87,7 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         }
 
         // Add and Subtract
-        RuleType::opAddExpr__opAddExpr_opAddOperator_baseExpr => {
+        RuleType::opAddExpr__opAddExpr_opAddOperator_opMulExpr => {
             Rc::new(match *elems[1] {
                 AstNode::PLUS => AstNode::Add(elems[0].clone(), elems[2].clone()),
                 AstNode::MINUS => AstNode::Subtract(elems[0].clone(), elems[2].clone()),
@@ -114,6 +116,15 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         // and
         RuleType::opAndExpr__opAndExpr_AND_opEqualityExpr => {
             Rc::new(AstNode::And(elems[0].clone(), elems[2].clone()))
+        }
+
+        // Multiply and Divide
+        RuleType::opMulExpr__opMulExpr_opMulOperator_baseExpr => {
+            Rc::new(match *elems[1] {
+                AstNode::ASTERISK => AstNode::Multiply(elems[0].clone(), elems[2].clone()),
+                AstNode::FORWARD_SLASH => AstNode::Divide(elems[0].clone(), elems[2].clone()),
+                _ => panic!("invalid add operator")
+            })
         }
 
         // Default
