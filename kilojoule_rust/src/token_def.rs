@@ -23,6 +23,14 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         pattern: r"null",
     },
     TokenDef {
+        token: Token::OR,
+        pattern: r"or",
+    },
+    TokenDef {
+        token: Token::AND,
+        pattern: r"and",
+    },
+    TokenDef {
         token: Token::IDENTIFIER,
         pattern: r"[_A-Za-z][_A-Za-z0-9]*",
     },

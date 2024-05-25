@@ -201,6 +201,32 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             let right = eval_ast_node(obj, right);
             Val::new_bool(left >= right)
         }
+        AstNode::Or(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            match &left.val.val {
+                ValType::Bool(left) => match &right.val.val {
+                    ValType::Bool(right) => Val::new_bool(*left || *right),
+                    ValType::Error(_) => right,
+                    _ => Val::new_err("Right side of OR has to be a boolean"),
+                },
+                ValType::Error(_) => left,
+                _ => Val::new_err("Left side of OR has to be a boolean"),
+            }
+        }
+        AstNode::And(left, right) => {
+            let left = eval_ast_node(obj, left);
+            let right = eval_ast_node(obj, right);
+            match &left.val.val {
+                ValType::Bool(left) => match &right.val.val {
+                    ValType::Bool(right) => Val::new_bool(*left && *right),
+                    ValType::Error(_) => right,
+                    _ => Val::new_err("Right side of AND has to be a boolean"),
+                },
+                ValType::Error(_) => left,
+                _ => Val::new_err("Left side of AND has to be a boolean"),
+            }
+        }
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }

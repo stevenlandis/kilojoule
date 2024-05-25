@@ -34,4 +34,6 @@ pub enum AstNode {
     LessThanOrEqual(Rc<AstNode>, Rc<AstNode>),
     GreaterThan(Rc<AstNode>, Rc<AstNode>),
     GreaterThanOrEqual(Rc<AstNode>, Rc<AstNode>),
+    Or(Rc<AstNode>, Rc<AstNode>),
+    And(Rc<AstNode>, Rc<AstNode>),
 }

@@ -148,4 +148,27 @@ mod tests {
         assert_json("[4, 5, 6] | map(. > 5)", json!([false, false, true]));
         assert_json("[4, 5, 6] | map(. >= 5)", json!([false, true, true]));
     }
+
+    #[test]
+    fn test_or_and_and() {
+        assert_json(
+            "[
+                [false, false],
+                [false, true],
+                [true, false],
+                [true, true],
+            ] | map(.[0] or .[1])",
+            json!([false, true, true, true]),
+        );
+
+        assert_json(
+            "[
+                [false, false],
+                [false, true],
+                [true, false],
+                [true, true],
+            ] | map(.[0] and .[1])",
+            json!([false, false, false, true]),
+        );
+    }
 }

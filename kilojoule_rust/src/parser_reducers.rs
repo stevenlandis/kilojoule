@@ -30,7 +30,7 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
 
 pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
-        RuleType::opPipeExpr__opPipeExpr_PIPE_opEqualityExpr => {
+        RuleType::opPipeExpr__opPipeExpr_PIPE_opOrExpr => {
             Rc::new(AstNode::Pipe(elems[0].clone(), elems[2].clone()))
         }
         RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
@@ -104,6 +104,16 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
                 AstNode::GREATER_THAN_OR_EQUAL => AstNode::GreaterThanOrEqual(elems[0].clone(), elems[2].clone()),
                 _ => panic!("invalid equality operator")
             })
+        }
+
+        // or
+        RuleType::opOrExpr__opOrExpr_OR_opAndExpr => {
+            Rc::new(AstNode::Or(elems[0].clone(), elems[2].clone()))
+        }
+
+        // and
+        RuleType::opAndExpr__opAndExpr_AND_opEqualityExpr => {
+            Rc::new(AstNode::And(elems[0].clone(), elems[2].clone()))
         }
 
         // Default
