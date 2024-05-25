@@ -379,6 +379,8 @@ def get_lookup_tbl_rows(rules: list[Rule], start_rule: int):
         return states_idx
 
     helper([RuleState(start_rule, 0, tuple())])
+    print(f"n_states={len(states_to_idx)}, n_rows={len(lookup_rows)}")
+
     lookup_rows.sort(key=lambda row: SortTuple((row.state, row.rule_name, row.token)))
     # lookup_rows = simplify_lookup_rows(lookup_rows)
 
