@@ -31,6 +31,10 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         pattern: r"and",
     },
     TokenDef {
+        token: Token::LET,
+        pattern: r"let",
+    },
+    TokenDef {
         token: Token::IDENTIFIER,
         pattern: r"[_A-Za-z][_A-Za-z0-9]*",
     },
@@ -141,5 +145,9 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
     TokenDef {
         token: Token::FORWARD_SLASH,
         pattern: r"\/",
+    },
+    TokenDef {
+        token: Token::EQUAL,
+        pattern: r"\=",
     },
 ];

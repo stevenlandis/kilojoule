@@ -8,7 +8,25 @@ def main():
 
     rules = [
         Rule("main", ["expr", "END"]),
-        Rule("expr", ["opPipeExpr"]),
+        Rule("expr", ["assignExpr"]),
+        Rule("assignExpr", ["opPipeExpr"]),
+        Rule(
+            "assignExpr",
+            ["LET", "IDENTIFIER", "EQUAL", "opOrExpr", "PIPE", "assignExpr"],
+        ),
+        Rule(
+            "assignExpr",
+            [
+                "opPipeExpr",
+                "PIPE",
+                "LET",
+                "IDENTIFIER",
+                "EQUAL",
+                "opOrExpr",
+                "PIPE",
+                "assignExpr",
+            ],
+        ),
         Rule("opPipeExpr", ["opOrExpr"]),
         Rule("opPipeExpr", ["opPipeExpr", "PIPE", "opOrExpr"]),
         Rule("opOrExpr", ["opAndExpr"]),
@@ -44,6 +62,7 @@ def main():
         Rule("baseExpr", ["FALSE"]),
         Rule("baseExpr", ["NULL"]),
         Rule("baseExpr", ["fcnCallExpr"]),
+        Rule("baseExpr", ["IDENTIFIER"]),
         Rule("baseDotExpr", ["DOT"]),
         Rule("baseDotAccess", ["DOT", "IDENTIFIER"]),
         Rule(

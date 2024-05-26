@@ -42,4 +42,6 @@ pub enum AstNode {
     Divide(Rc<AstNode>, Rc<AstNode>),
     ReverseIdx(Rc<AstNode>),
     SliceAccess(Option<Rc<AstNode>>, Option<Rc<AstNode>>),
+    Assign(String, Rc<AstNode>, Rc<AstNode>),
+    VarAccess(String),
 }

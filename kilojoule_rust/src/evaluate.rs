@@ -4,12 +4,14 @@ use std::rc::Rc;
 use super::ast_node::AstNode;
 use super::val::{Val, ValHashMap, ValType};
 
-pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
+type Variables = HashMap<String, Val>;
+
+pub fn eval_ast_node(obj: &Val, node: &AstNode, vars: &Variables) -> Val {
     match node {
         AstNode::Echo => obj.clone(),
         AstNode::Access(expr) => match &obj.val.val {
             ValType::Map(map) => {
-                let key = eval_ast_node(obj, expr);
+                let key = eval_ast_node(obj, expr, vars);
                 match map.get(&key) {
                     None => Val::new_null(),
                     Some(val) => val.clone(),
@@ -20,7 +22,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                     ValType::List(list) => {
                         let start_idx = match start {
                             None => 0,
-                            Some(start_expr) => match eval_list_access(obj, &start_expr) {
+                            Some(start_expr) => match eval_list_access(obj, &start_expr, vars) {
                                 Err(err) => {
                                     return err;
                                 }
@@ -35,7 +37,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                         };
                         let end_idx = match end {
                             None => list.len(),
-                            Some(end_expr) => match eval_list_access(obj, &end_expr) {
+                            Some(end_expr) => match eval_list_access(obj, &end_expr, vars) {
                                 Err(err) => {
                                     return err;
                                 }
@@ -53,7 +55,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                     }
                     _ => Val::new_err("Access on invalid object"),
                 },
-                _ => match eval_list_access(obj, expr) {
+                _ => match eval_list_access(obj, expr, vars) {
                     Err(err) => err,
                     Ok((idx, is_rev)) => {
                         if idx < list.len() {
@@ -71,7 +73,17 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
         AstNode::F64Literal(val) => Val::new_number(*val),
         AstNode::Bool(val) => Val::new_bool(*val),
         AstNode::Null => Val::new_null(),
-        AstNode::Pipe(left, right) => eval_ast_node(&eval_ast_node(obj, left), right),
+        AstNode::Pipe(left, right) => eval_ast_node(&eval_ast_node(obj, left, vars), right, vars),
+        AstNode::Assign(var_name, val_expr, right) => {
+            let value = eval_ast_node(obj, val_expr, vars);
+            let mut next_vars = vars.clone();
+            next_vars.insert(var_name.clone(), value.clone());
+            eval_ast_node(obj, right, &next_vars)
+        }
+        AstNode::VarAccess(var_name) => match vars.get(var_name) {
+            None => Val::new_err("Undefined variable access"),
+            Some(val) => val.clone(),
+        },
         AstNode::MapLiteral(elems_opt) => match elems_opt {
             None => Val::new_map_from_entries_iter(Vec::new()),
             Some(elems_node) => {
@@ -95,7 +107,10 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                 for elem in elems {
                     match elem {
                         AstNode::MapKeyValPair(key, value) => {
-                            map.insert(&eval_ast_node(obj, key), &eval_ast_node(obj, value));
+                            map.insert(
+                                &eval_ast_node(obj, key, vars),
+                                &eval_ast_node(obj, value, vars),
+                            );
                         }
                         _ => {
                             panic!("Unimplemented map elem {:?}", elem)
@@ -127,7 +142,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
 
                 let mut vals = Vec::<Val>::new();
                 for elem in elems {
-                    vals.push(eval_ast_node(obj, elem));
+                    vals.push(eval_ast_node(obj, elem, vars));
                 }
                 return Val::new_list(vals.as_slice());
             }
@@ -135,7 +150,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
         AstNode::FormatStringNode(parts) => {
             let mut write_buf = Vec::<u8>::new();
             for part in parts {
-                let result = eval_ast_node(obj, part);
+                let result = eval_ast_node(obj, part, vars);
                 match &result.val.val {
                     ValType::String(part_text) => {
                         write_buf.extend(part_text.as_bytes());
@@ -176,11 +191,11 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                 }
             };
 
-            return evaluate_fcn(fcn_name.as_str(), &args_vec, obj);
+            return evaluate_fcn(fcn_name.as_str(), &args_vec, obj, vars);
         }
         AstNode::Add(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             match &left.val.val {
                 ValType::Number(left) => match &right.val.val {
                     ValType::Number(right) => Val::new_number(left + right),
@@ -192,8 +207,8 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
         }
         AstNode::Subtract(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             match &left.val.val {
                 ValType::Number(left) => match &right.val.val {
                     ValType::Number(right) => Val::new_number(left - right),
@@ -205,38 +220,38 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
         }
         AstNode::Equals(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             Val::new_bool(left == right)
         }
         AstNode::NotEqual(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             Val::new_bool(left != right)
         }
         AstNode::LessThan(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             Val::new_bool(left < right)
         }
         AstNode::LessThanOrEqual(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             Val::new_bool(left <= right)
         }
         AstNode::GreaterThan(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             Val::new_bool(left > right)
         }
         AstNode::GreaterThanOrEqual(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             Val::new_bool(left >= right)
         }
         AstNode::Or(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             match &left.val.val {
                 ValType::Bool(left) => match &right.val.val {
                     ValType::Bool(right) => Val::new_bool(*left || *right),
@@ -248,8 +263,8 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
         }
         AstNode::And(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             match &left.val.val {
                 ValType::Bool(left) => match &right.val.val {
                     ValType::Bool(right) => Val::new_bool(*left && *right),
@@ -261,8 +276,8 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
         }
         AstNode::Multiply(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             match &left.val.val {
                 ValType::Number(left) => match &right.val.val {
                     ValType::Number(right) => Val::new_number(left * right),
@@ -274,8 +289,8 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
             }
         }
         AstNode::Divide(left, right) => {
-            let left = eval_ast_node(obj, left);
-            let right = eval_ast_node(obj, right);
+            let left = eval_ast_node(obj, left, vars);
+            let right = eval_ast_node(obj, right, vars);
             match &left.val.val {
                 ValType::Number(left) => match &right.val.val {
                     ValType::Number(right) => {
@@ -298,7 +313,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
     }
 }
 
-fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
+fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variables) -> Val {
     match fcn_name {
         "len" => match &obj.val.val {
             ValType::List(list) => Val::new_number(list.len() as f64),
@@ -313,7 +328,7 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
                 ValType::List(list) => {
                     let mut result = Vec::<Val>::with_capacity(list.len());
                     for elem in list {
-                        result.push(eval_ast_node(elem, args[0]));
+                        result.push(eval_ast_node(elem, args[0], vars));
                     }
                     Val::new_list(result.as_slice())
                 }
@@ -329,7 +344,7 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
                     let mut groups = Vec::<(Val, Vec<Val>)>::new();
                     let mut val_to_idx = HashMap::<Val, usize>::new();
                     for elem in list {
-                        let group_key = eval_ast_node(elem, args[0]);
+                        let group_key = eval_ast_node(elem, args[0], vars);
                         let group_idx =
                             *val_to_idx.entry(group_key.clone()).or_insert(groups.len());
                         if group_idx == groups.len() {
@@ -368,6 +383,7 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
                     ))))),
                 )),
             ),
+            vars,
         ),
         "sort" => match &obj.val.val {
             ValType::List(list) => {
@@ -381,7 +397,7 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
             ValType::List(list) => {
                 let mut result = Vec::<Val>::new();
                 for elem in list {
-                    if match eval_ast_node(elem, args[0]).val.val {
+                    if match eval_ast_node(elem, args[0], vars).val.val {
                         ValType::Bool(val) => val,
                         _ => false,
                     } {
@@ -411,12 +427,12 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
     }
 }
 
-fn eval_list_access(obj: &Val, expr: &Rc<AstNode>) -> Result<(usize, bool), Val> {
+fn eval_list_access(obj: &Val, expr: &Rc<AstNode>, vars: &Variables) -> Result<(usize, bool), Val> {
     let (is_rev, idx_expr) = match &**expr {
         AstNode::ReverseIdx(rev_expr) => (true, rev_expr),
         _ => (false, expr),
     };
-    let idx = eval_ast_node(obj, idx_expr);
+    let idx = eval_ast_node(obj, idx_expr, vars);
     match idx.val.val {
         ValType::Number(num) => {
             if num == num.floor() && num >= 0.0 {

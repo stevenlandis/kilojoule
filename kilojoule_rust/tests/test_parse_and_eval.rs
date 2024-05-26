@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use kilojoule_rust::*;
     use once_cell::sync::Lazy;
     use serde_json::json;
@@ -9,7 +11,7 @@ mod tests {
     fn base_parse_and_eval(expr: &str) -> Vec<u8> {
         let ast = PARSER.parse(expr).unwrap();
         // println!("Ast: {:?}", ast);
-        let result = eval_ast_node(&Val::new_null(), &ast);
+        let result = eval_ast_node(&Val::new_null(), &ast, &HashMap::new());
         let mut out = Vec::<u8>::new();
         result.write_json_str(&mut out, true);
         return out;
@@ -246,5 +248,12 @@ mod tests {
         assert_json("[1,2,3,4,5] | .[/0:/1]", json!([]));
 
         assert_json("[1,2,3,4,5] | .[0:/0]", json!([1, 2, 3, 4, 5]));
+    }
+
+    #[test]
+    fn test_variable() {
+        assert_json("1 | let a = . + 5 | a + .", json!(7));
+        assert_json("1 | . | let a = . + 5 | a + .", json!(7));
+        assert_json("let a = 5 | a + 2", json!(7));
     }
 }

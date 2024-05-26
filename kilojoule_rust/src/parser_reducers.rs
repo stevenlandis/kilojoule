@@ -42,6 +42,17 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
             Rc::new(AstNode::Access(elems[2].clone()))
         }
 
+        // Assign
+        RuleType::assignExpr__LET_IDENTIFIER_EQUAL_opOrExpr_PIPE_assignExpr => Rc::new(AstNode::Assign(match &*elems[1] {
+            AstNode::StringLiteral(var_name) => var_name.clone(),
+            _ => {panic!("unreachable");}
+        }, elems[3].clone(), elems[5].clone())),
+        RuleType::assignExpr__opPipeExpr_PIPE_LET_IDENTIFIER_EQUAL_opOrExpr_PIPE_assignExpr => Rc::new(AstNode::Pipe(elems[0].clone(), Rc::new(AstNode::Assign(match &*elems[3] {
+            AstNode::StringLiteral(var_name) => var_name.clone(),
+            _ => {panic!("unreachable");}
+        }, elems[5].clone(), elems[7].clone())))),
+        RuleType::baseExpr__IDENTIFIER => Rc::new(AstNode::VarAccess(match &*elems[0] {AstNode::StringLiteral(var_name) => var_name.clone(), _ => {panic!("unreachable");}})),
+
         // List Access
         RuleType::listAccessIdx__FORWARD_SLASH_expr => Rc::new(AstNode::ReverseIdx(elems[1].clone())),
         RuleType::listAccessExpr__COLON => Rc::new(AstNode::SliceAccess(None, None)),
