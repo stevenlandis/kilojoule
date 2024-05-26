@@ -91,7 +91,7 @@ def main():
         Rule("listExprContents", ["listElem"]),
         Rule("listExprContents", ["listExprContents", "COMMA", "listElem"]),
         Rule("listElem", ["expr"]),
-        Rule("stringLiteral", ["STRING_DOUBLE_QUOTE"]),
+        # double quotes
         Rule("stringLiteral", ["STRING_SINGLE_QUOTE"]),
         Rule(
             "stringLiteral",
@@ -107,6 +107,25 @@ def main():
             [
                 "innerFormatStringSingleQuote",
                 "F_STRING_SINGLE_QUOTE_MIDDLE",
+                "expr",
+            ],
+        ),
+        # single quotes
+        Rule("stringLiteral", ["STRING_DOUBLE_QUOTE"]),
+        Rule(
+            "stringLiteral",
+            [
+                "F_STRING_DOUBLE_QUOTE_LEFT",
+                "innerFormatStringDoubleQuote",
+                "F_STRING_DOUBLE_QUOTE_RIGHT",
+            ],
+        ),
+        Rule("innerFormatStringDoubleQuote", ["expr"]),
+        Rule(
+            "innerFormatStringDoubleQuote",
+            [
+                "innerFormatStringDoubleQuote",
+                "F_STRING_DOUBLE_QUOTE_MIDDLE",
                 "expr",
             ],
         ),

@@ -107,6 +107,18 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         pattern: r#""(?:[^"\\{}]|\\.)*""#,
     },
     TokenDef {
+        token: Token::F_STRING_DOUBLE_QUOTE_LEFT,
+        pattern: r#""(?:[^"\\{}]|\\.)*\{"#,
+    },
+    TokenDef {
+        token: Token::F_STRING_DOUBLE_QUOTE_MIDDLE,
+        pattern: r#"}(?:[^"\\{}]|\\.)*\{"#,
+    },
+    TokenDef {
+        token: Token::F_STRING_DOUBLE_QUOTE_RIGHT,
+        pattern: r#"}(?:[^"\\{}]|\\.)*""#,
+    },
+    TokenDef {
         token: Token::PLUS,
         pattern: r"\+",
     },

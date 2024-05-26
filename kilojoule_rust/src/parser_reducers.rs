@@ -13,6 +13,9 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
         Token::F_STRING_SINGLE_QUOTE_MIDDLE => AstNode::StringLiteral(escape_string_literal(text)),
         Token::F_STRING_SINGLE_QUOTE_RIGHT => AstNode::StringLiteral(escape_string_literal(text)),
         Token::STRING_DOUBLE_QUOTE => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::F_STRING_DOUBLE_QUOTE_LEFT => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::F_STRING_DOUBLE_QUOTE_MIDDLE => AstNode::StringLiteral(escape_string_literal(text)),
+        Token::F_STRING_DOUBLE_QUOTE_RIGHT => AstNode::StringLiteral(escape_string_literal(text)),
         Token::TRUE => AstNode::Bool(true),
         Token::FALSE => AstNode::Bool(false),
         Token::NULL => AstNode::Null,
@@ -89,11 +92,19 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
             AstNode::ListElemListNode(elems[0].clone(), elems[2].clone()),
         ),
 
-        // Format String
+        // Format String Single Quote
         RuleType::stringLiteral__F_STRING_SINGLE_QUOTE_LEFT_innerFormatStringSingleQuote_F_STRING_SINGLE_QUOTE_RIGHT=>{
             Rc::new(AstNode::FormatStringNode(vec![elems[0].clone(), elems[1].clone(), elems[2].clone()]))
         }
         RuleType::innerFormatStringSingleQuote__innerFormatStringSingleQuote_F_STRING_SINGLE_QUOTE_MIDDLE_expr=>{
+            Rc::new(AstNode::FormatStringNode(vec![elems[0].clone(), elems[1].clone(), elems[2].clone()]))
+        },
+
+        // Format String Double Quote
+        RuleType::stringLiteral__F_STRING_DOUBLE_QUOTE_LEFT_innerFormatStringDoubleQuote_F_STRING_DOUBLE_QUOTE_RIGHT=>{
+            Rc::new(AstNode::FormatStringNode(vec![elems[0].clone(), elems[1].clone(), elems[2].clone()]))
+        }
+        RuleType::innerFormatStringDoubleQuote__innerFormatStringDoubleQuote_F_STRING_DOUBLE_QUOTE_MIDDLE_expr=>{
             Rc::new(AstNode::FormatStringNode(vec![elems[0].clone(), elems[1].clone(), elems[2].clone()]))
         },
 

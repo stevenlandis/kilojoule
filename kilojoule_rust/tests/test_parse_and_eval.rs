@@ -99,6 +99,39 @@ mod tests {
     }
 
     #[test]
+    fn test_format_string_double_quote() {
+        assert_json(r#""a {1}""#, json!("a 1"));
+        assert_json(r#""{1} a""#, json!("1 a"));
+        assert_json(r#""a {1} b""#, json!("a 1 b"));
+        assert_json(r#""a {1} b {2} c""#, json!("a 1 b 2 c"));
+        assert_json(r#""a {1}{2} c""#, json!("a 12 c"));
+        assert_json(r#""{1}{2}{3}""#, json!("123"));
+        assert_json(r#"" \{\}\n\t\r\"\'\\ ""#, json!(" {}\n\t\r\"'\\ "));
+        assert_json(r#"" ' ""#, json!(" ' "));
+        assert_json(r#""Name: \"{1}\"""#, json!(r#"Name: "1""#));
+
+        // nested
+        assert_json(r#""a {"b c"}""#, json!("a b c"));
+        assert_json(r#""a {"b {42} c"}""#, json!("a b 42 c"));
+        assert_json(r#""a {"b {"c {42}"} d"}""#, json!("a b c 42 d"));
+
+        // array
+        assert_json(
+            r#"[1,2,3] | "before{.}after" "#,
+            json!("before[1,2,3]after"),
+        );
+
+        // dict
+        assert_json(
+            r#"{a: 1, b: 2} | "before{.}after""#,
+            json!(r#"before{"a":1,"b":2}after"#),
+        );
+
+        // boolean
+        assert_json(r#"[false, true] | "{.[0]}||{.[1]}""#, json!("false||true"));
+    }
+
+    #[test]
     fn test_len() {
         assert_json("[1,2,3] | len()", json!(3));
         assert_json("{a: 1, b: 2, c: 3, d: 4} | len()", json!(4));
