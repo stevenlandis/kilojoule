@@ -37,10 +37,11 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         }
         RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
         RuleType::baseDotExpr__DOT => Rc::new(AstNode::Echo),
+
+        // Access
         RuleType::baseDotAccess__DOT_IDENTIFIER => Rc::new(AstNode::Access(elems[1].clone())),
-        RuleType::baseDotBracketAccess__DOT_LEFT_BRACKET_listAccessExpr_RIGHT_BRACKET => {
-            Rc::new(AstNode::Access(elems[2].clone()))
-        }
+        RuleType::opAccessExpr__opAccessExpr_DOT_IDENTIFIER => Rc::new(AstNode::Pipe(elems[0].clone(), Rc::new(AstNode::Access(elems[2].clone())))),
+        RuleType::opAccessExpr__opAccessExpr_LEFT_BRACKET_listAccessExpr_RIGHT_BRACKET => Rc::new(AstNode::Pipe(elems[0].clone(), Rc::new(AstNode::Access(elems[2].clone())))),
 
         // Assign
         RuleType::assignExpr__LET_IDENTIFIER_EQUAL_opOrExpr_PIPE_assignExpr => Rc::new(AstNode::Assign(match &*elems[1] {
@@ -138,7 +139,7 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         }
 
         // Multiply and Divide
-        RuleType::opMulExpr__opMulExpr_opMulOperator_baseExpr => {
+        RuleType::opMulExpr__opMulExpr_opMulOperator_opAccessExpr => {
             Rc::new(match *elems[1] {
                 AstNode::ASTERISK => AstNode::Multiply(elems[0].clone(), elems[2].clone()),
                 AstNode::FORWARD_SLASH => AstNode::Divide(elems[0].clone(), elems[2].clone()),
