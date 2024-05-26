@@ -38,9 +38,17 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
         RuleType::baseDotExpr__DOT => Rc::new(AstNode::Echo),
         RuleType::baseDotAccess__DOT_IDENTIFIER => Rc::new(AstNode::Access(elems[1].clone())),
-        RuleType::baseDotBracketAccess__DOT_LEFT_BRACKET_expr_RIGHT_BRACKET => {
+        RuleType::baseDotBracketAccess__DOT_LEFT_BRACKET_listAccessExpr_RIGHT_BRACKET => {
             Rc::new(AstNode::Access(elems[2].clone()))
         }
+
+        // List Access
+        RuleType::listAccessIdx__FORWARD_SLASH_expr => Rc::new(AstNode::ReverseIdx(elems[1].clone())),
+        RuleType::listAccessExpr__COLON => Rc::new(AstNode::SliceAccess(None, None)),
+        RuleType::listAccessExpr__COLON_listAccessIdx => Rc::new(AstNode::SliceAccess(None, Some(elems[1].clone()))),
+        RuleType::listAccessExpr__listAccessIdx_COLON => Rc::new(AstNode::SliceAccess(Some(elems[0].clone()), None)),
+        RuleType::listAccessExpr__listAccessIdx_COLON_listAccessIdx => Rc::new(AstNode::SliceAccess(Some(elems[0].clone()), Some(elems[2].clone()))),
+
 
         // Map
         RuleType::mapExpr__LEFT_BRACE_RIGHT_BRACE => Rc::new(AstNode::MapLiteral(None)),

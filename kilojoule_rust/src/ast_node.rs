@@ -40,4 +40,6 @@ pub enum AstNode {
     FORWARD_SLASH,
     Multiply(Rc<AstNode>, Rc<AstNode>),
     Divide(Rc<AstNode>, Rc<AstNode>),
+    ReverseIdx(Rc<AstNode>),
+    SliceAccess(Option<Rc<AstNode>>, Option<Rc<AstNode>>),
 }

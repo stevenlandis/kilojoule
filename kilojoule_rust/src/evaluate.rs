@@ -15,24 +15,57 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode) -> Val {
                     Some(val) => val.clone(),
                 }
             }
-            ValType::List(list) => {
-                let key = eval_ast_node(obj, expr);
-                match key.val.val {
-                    ValType::Number(num) => {
-                        if num == num.floor() {
-                            return list[num as usize].clone();
+            ValType::List(list) => match &**expr {
+                AstNode::SliceAccess(start, end) => match &obj.val.val {
+                    ValType::List(list) => {
+                        let start_idx = match start {
+                            None => 0,
+                            Some(start_expr) => match eval_list_access(obj, &start_expr) {
+                                Err(err) => {
+                                    return err;
+                                }
+                                Ok((start_idx, is_rev)) => {
+                                    if is_rev {
+                                        list.len().saturating_sub(start_idx)
+                                    } else {
+                                        start_idx.min(list.len())
+                                    }
+                                }
+                            },
+                        };
+                        let end_idx = match end {
+                            None => list.len(),
+                            Some(end_expr) => match eval_list_access(obj, &end_expr) {
+                                Err(err) => {
+                                    return err;
+                                }
+                                Ok((end_idx, is_rev)) => {
+                                    if is_rev {
+                                        list.len().saturating_sub(end_idx)
+                                    } else {
+                                        end_idx.min(list.len())
+                                    }
+                                }
+                            },
+                        };
+                        let end_idx = end_idx.max(start_idx);
+                        Val::new_list(&list[start_idx..end_idx])
+                    }
+                    _ => Val::new_err("Access on invalid object"),
+                },
+                _ => match eval_list_access(obj, expr) {
+                    Err(err) => err,
+                    Ok((idx, is_rev)) => {
+                        if idx < list.len() {
+                            let idx = if is_rev { list.len() - idx - 1 } else { idx };
+                            list[idx].clone()
                         } else {
-                            panic!("Can only access a list with an integer.")
+                            Val::new_err("List access out of bounds")
                         }
                     }
-                    _ => {
-                        panic!("Can only access a list with an integer.")
-                    }
-                }
-            }
-            _ => {
-                panic!("Access on invalid object");
-            }
+                },
+            },
+            _ => Val::new_err("Access on invalid object"),
         },
         AstNode::StringLiteral(val) => Val::new_string(val),
         AstNode::F64Literal(val) => Val::new_number(*val),
@@ -374,69 +407,29 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val) -> Val {
             }
             _ => Val::new_err("sum() has to be called on a list"),
         },
-        "first" => match &obj.val.val {
-            ValType::List(list) => {
-                let count = eval_ast_node(obj, args[0]);
-                match &count.val.val {
-                    ValType::Number(val) => {
-                        if val.floor() == *val && *val >= 0.0 {
-                            Val::new_list(&list[..(*val as usize).min(list.len())])
-                        } else {
-                            Val::new_err("first() must be called with a positive integer")
-                        }
-                    }
-                    _ => Val::new_err("first() must be called with an integer"),
-                }
-            }
-            _ => Val::new_err("first() must be called on a list"),
-        },
-        "last" => match &obj.val.val {
-            ValType::List(list) => {
-                let count = eval_ast_node(obj, args[0]);
-                match &count.val.val {
-                    ValType::Number(val) => {
-                        if val.floor() == *val && *val >= 0.0 {
-                            Val::new_list(&list[list.len().saturating_sub(*val as usize)..])
-                        } else {
-                            Val::new_err("last() must be called with a positive integer")
-                        }
-                    }
-                    _ => Val::new_err("last() must be called with an integer"),
-                }
-            }
-            _ => Val::new_err("last() must be called on a list"),
-        },
-        "slice" => match &obj.val.val {
-            ValType::List(list) => {
-                let start = eval_ast_node(obj, args[0]);
-                match &start.val.val {
-                    ValType::Number(val) => {
-                        if val.floor() == *val && *val >= 0.0 {
-                            let end = eval_ast_node(obj, args[1]);
-                            match &end.val.val {
-                                ValType::Number(end) => {
-                                    if end.floor() == *end && *end >= 0.0 {
-                                        let start =
-                                            (*val as usize).min(list.len()).min(*end as usize);
-                                        let end = (*end as usize).min(list.len()).max(start);
-                                        Val::new_list(&list[start..end])
-                                    } else {
-                                        Val::new_err(
-                                            "slice() must be called with positive integers",
-                                        )
-                                    }
-                                }
-                                _ => Val::new_err("slice() must be called with positive integers"),
-                            }
-                        } else {
-                            Val::new_err("slice() must be called with positive integers")
-                        }
-                    }
-                    _ => Val::new_err("slice() must be called with positive integers"),
-                }
-            }
-            _ => Val::new_err("slice() must be called on a list"),
-        },
         _ => Val::new_err("Function does not exist."),
+    }
+}
+
+fn eval_list_access(obj: &Val, expr: &Rc<AstNode>) -> Result<(usize, bool), Val> {
+    let (is_rev, idx_expr) = match &**expr {
+        AstNode::ReverseIdx(rev_expr) => (true, rev_expr),
+        _ => (false, expr),
+    };
+    let idx = eval_ast_node(obj, idx_expr);
+    match idx.val.val {
+        ValType::Number(num) => {
+            if num == num.floor() && num >= 0.0 {
+                let num = num as usize;
+                if is_rev {
+                    Ok((num, is_rev))
+                } else {
+                    Ok((num, is_rev))
+                }
+            } else {
+                Err(Val::new_err("Can only access a list with an integer."))
+            }
+        }
+        _ => Err(Val::new_err("Can only access a list with an integer.")),
     }
 }

@@ -197,16 +197,54 @@ mod tests {
     }
 
     #[test]
-    fn test_first_last_slice() {
-        assert_json("[1,2,3,4,5] | first(3)", json!([1, 2, 3]));
-        assert_json("[1,2] | first(3)", json!([1, 2]));
-        assert_json("[1,2,3,4,5] | last(3)", json!([3, 4, 5]));
-        assert_json("[1,2] | last(3)", json!([1, 2]));
+    fn test_list_access() {
+        assert_json("[1,2,3,4,5] | .[1]", json!(2));
+        assert_json("[1,2,3,4,5] | [.[/0], .[/1], .[/4]]", json!([5, 4, 1]));
 
-        assert_json("[1,2,3,4,5] | slice(1, 4)", json!([2, 3, 4]));
-        assert_json("[1,2,3,4,5] | slice(0, 0)", json!([]));
-        assert_json("[1,2,3,4,5] | slice(100, 100)", json!([]));
-        assert_json("[1,2,3,4,5] | slice(0, 100)", json!([1, 2, 3, 4, 5]));
-        assert_json("[1,2,3,4,5] | slice(100, 0)", json!([]));
+        assert_json("[1,2,3,4,5] | .[0:]", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[1:]", json!([2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[2:]", json!([3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[3:]", json!([4, 5]));
+        assert_json("[1,2,3,4,5] | .[4:]", json!([5]));
+        assert_json("[1,2,3,4,5] | .[5:]", json!([]));
+        assert_json("[1,2,3,4,5] | .[6:]", json!([]));
+
+        assert_json("[1,2,3,4,5] | .[:/0]", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[:/1]", json!([1, 2, 3, 4]));
+        assert_json("[1,2,3,4,5] | .[:/2]", json!([1, 2, 3]));
+        assert_json("[1,2,3,4,5] | .[:/3]", json!([1, 2]));
+        assert_json("[1,2,3,4,5] | .[:/4]", json!([1]));
+        assert_json("[1,2,3,4,5] | .[:/5]", json!([]));
+        assert_json("[1,2,3,4,5] | .[:/6]", json!([]));
+
+        assert_json("[1,2,3,4,5] | .[:0]", json!([]));
+        assert_json("[1,2,3,4,5] | .[:1]", json!([1]));
+        assert_json("[1,2,3,4,5] | .[:2]", json!([1, 2]));
+        assert_json("[1,2,3,4,5] | .[:3]", json!([1, 2, 3]));
+        assert_json("[1,2,3,4,5] | .[:4]", json!([1, 2, 3, 4]));
+        assert_json("[1,2,3,4,5] | .[:5]", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[:6]", json!([1, 2, 3, 4, 5]));
+
+        assert_json("[1,2,3,4,5] | .[/0:]", json!([]));
+        assert_json("[1,2,3,4,5] | .[/1:]", json!([5]));
+        assert_json("[1,2,3,4,5] | .[/2:]", json!([4, 5]));
+        assert_json("[1,2,3,4,5] | .[/3:]", json!([3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[/4:]", json!([2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[/5:]", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[/6:]", json!([1, 2, 3, 4, 5]));
+
+        assert_json("[1,2,3,4,5] | .[0:5]", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[1:4]", json!([2, 3, 4]));
+        assert_json("[1,2,3,4,5] | .[0:0]", json!([]));
+        assert_json("[1,2,3,4,5] | .[5:5]", json!([]));
+        assert_json("[1,2,3,4,5] | .[1:0]", json!([]));
+
+        assert_json("[1,2,3,4,5] | .[/5:/0]", json!([1, 2, 3, 4, 5]));
+        assert_json("[1,2,3,4,5] | .[/4:/1]", json!([2, 3, 4]));
+        assert_json("[1,2,3,4,5] | .[/0:/0]", json!([]));
+        assert_json("[1,2,3,4,5] | .[/5:/5]", json!([]));
+        assert_json("[1,2,3,4,5] | .[/0:/1]", json!([]));
+
+        assert_json("[1,2,3,4,5] | .[0:/0]", json!([1, 2, 3, 4, 5]));
     }
 }
