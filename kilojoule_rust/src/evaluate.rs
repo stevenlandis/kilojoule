@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::Read;
 use std::rc::Rc;
 
 use super::ast_node::AstNode;
@@ -318,7 +319,9 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
         "len" => match &obj.val.val {
             ValType::List(list) => Val::new_number(list.len() as f64),
             ValType::Map(map) => Val::new_number(map.len() as f64),
-            _ => Val::new_err("Len has to be called on a list or map."),
+            ValType::String(string) => Val::new_number(string.as_bytes().len() as f64),
+            ValType::Bytes(bytes) => Val::new_number(bytes.len() as f64),
+            _ => Val::new_err("len() called on unsupported object"),
         },
         "map" => {
             if args.len() != 1 {
@@ -423,6 +426,109 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
             }
             _ => Val::new_err("sum() has to be called on a list"),
         },
+        "lines" => match &obj.val.val {
+            ValType::String(val) => {
+                let mut lines = val
+                    .split("\n")
+                    .map(|line| Val::new_string(line))
+                    .collect::<Vec<_>>();
+                if lines.len() > 0
+                    && match &lines[lines.len() - 1].val.val {
+                        ValType::String(text) => text == "",
+                        _ => panic!(),
+                    }
+                {
+                    lines.pop();
+                }
+                Val::new_list(lines.as_slice())
+            }
+            ValType::Bytes(_) => eval_ast_node(
+                obj,
+                &AstNode::Pipe(
+                    Rc::new(AstNode::FcnCall(
+                        Rc::new(AstNode::StringLiteral("str".to_string())),
+                        None,
+                    )),
+                    Rc::new(AstNode::FcnCall(
+                        Rc::new(AstNode::StringLiteral("lines".to_string())),
+                        None,
+                    )),
+                ),
+                vars,
+            ),
+            _ => Val::new_err("lines() must be called on a string"),
+        },
+        "in" => {
+            let mut buffer = Vec::<u8>::new();
+            std::io::stdin().read_to_end(&mut buffer).unwrap();
+            return Val::new_bytes(buffer);
+        }
+        "str" => match &obj.val.val {
+            ValType::Bytes(bytes) => match std::str::from_utf8(bytes) {
+                Ok(str) => Val::new_string(str),
+                Err(_) => Val::new_err("Unable to decode bytes as utf8 string."),
+            },
+            _ => Val::new_err("str() must be called on bytes"),
+        },
+        "bytes" => match &obj.val.val {
+            ValType::String(text) => {
+                Val::new_bytes(text.as_bytes().iter().cloned().collect::<Vec<_>>())
+            }
+            _ => Val::new_err("bytes() must be called on str"),
+        },
+        "split" => match &obj.val.val {
+            ValType::String(text) => match &eval_ast_node(obj, args[0], vars).val.val {
+                ValType::String(split_pattern) => Val::new_list(
+                    text.split(split_pattern)
+                        .map(|elem| Val::new_string(elem))
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                ),
+                _ => Val::new_err("split() pattern must be a string"),
+            },
+            ValType::Bytes(_) => evaluate_fcn(
+                fcn_name,
+                args,
+                &eval_ast_node(
+                    obj,
+                    &AstNode::FcnCall(Rc::new(AstNode::StringLiteral("str".to_string())), None),
+                    vars,
+                ),
+                vars,
+            ),
+            _ => Val::new_err("split() must be called on a string"),
+        },
+        "join" => match &obj.val.val {
+            ValType::List(elems) => {
+                let joiner = eval_ast_node(obj, args[0], vars);
+                let joiner = match &joiner.val.val {
+                    ValType::String(joiner) => joiner.as_str(),
+                    _ => return Val::new_err("join() pattern must be a string"),
+                };
+
+                let mut strings_to_join = Vec::<&str>::with_capacity(elems.len());
+                for elem in elems {
+                    match &elem.val.val {
+                        ValType::String(elem_str) => {
+                            strings_to_join.push(elem_str.as_str());
+                        }
+                        _ => {
+                            return Val::new_err("All elements passed to join() must be strings");
+                        }
+                    }
+                }
+
+                let result = strings_to_join.join(joiner);
+                Val::new_string(result.as_str())
+            }
+            _ => Val::new_err("join() must be called on a list"),
+        },
+        "env" => {
+            let kv_pairs = std::env::vars()
+                .map(|(key, val)| (Val::new_string(key.as_str()), Val::new_string(val.as_str())))
+                .collect::<Vec<_>>();
+            Val::new_map_from_entries_iter(kv_pairs)
+        }
         _ => Val::new_err("Function does not exist."),
     }
 }

@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::{hash::DefaultHasher, rc::Rc};
@@ -22,6 +23,7 @@ pub enum ValType {
     String(String),
     List(Vec<Val>),
     Map(ValHashMap),
+    Bytes(Vec<u8>),
 }
 
 impl Val {
@@ -132,6 +134,19 @@ impl Val {
         };
     }
 
+    pub fn new_bytes(bytes: Vec<u8>) -> Self {
+        let mut hasher = DefaultHasher::new();
+        HashTypes::Bytes.hash(&mut hasher);
+        bytes.hash(&mut hasher);
+
+        Val {
+            val: Rc::new(InnerVal {
+                hash: hasher.finish(),
+                val: ValType::Bytes(bytes),
+            }),
+        }
+    }
+
     pub fn from_json_str(json_str: &str) -> Self {
         let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
 
@@ -176,6 +191,10 @@ impl Val {
             W: std::io::Write,
         {
             pub fn outer_write(&mut self, val: &Val, use_indent: bool) -> std::io::Result<usize> {
+                if let ValType::Bytes(bytes) = &val.val.val {
+                    self.writer.write(bytes.as_slice())?;
+                    return Ok(0);
+                }
                 self.write(val, 0, use_indent)?;
                 if use_indent {
                     self.str("\n")?;
@@ -272,6 +291,11 @@ impl Val {
                         self.write(&Val::new_string(message.as_str()), 0, false)?;
                         self.str("}")?;
                     }
+                    ValType::Bytes(bytes) => {
+                        self.str("\"")?;
+                        self.writer.write(STANDARD.encode(bytes).as_bytes())?;
+                        self.str("\"")?;
+                    }
                 }
                 Ok(0)
             }
@@ -302,6 +326,7 @@ enum HashTypes {
     String,
     List,
     Map,
+    Bytes,
 }
 
 impl PartialEq for Val {
@@ -342,6 +367,7 @@ impl Ord for Val {
                 ValType::String(_) => std::cmp::Ordering::Less,
                 ValType::List(_) => std::cmp::Ordering::Less,
                 ValType::Map(_) => std::cmp::Ordering::Less,
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
             },
             ValType::Null => match other.val.val {
                 ValType::Error(_) => std::cmp::Ordering::Greater,
@@ -351,6 +377,7 @@ impl Ord for Val {
                 ValType::String(_) => std::cmp::Ordering::Less,
                 ValType::List(_) => std::cmp::Ordering::Less,
                 ValType::Map(_) => std::cmp::Ordering::Less,
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
             },
             ValType::Bool(val0) => match &other.val.val {
                 ValType::Error(_) => std::cmp::Ordering::Greater,
@@ -360,6 +387,7 @@ impl Ord for Val {
                 ValType::String(_) => std::cmp::Ordering::Less,
                 ValType::List(_) => std::cmp::Ordering::Less,
                 ValType::Map(_) => std::cmp::Ordering::Less,
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
             },
             ValType::Number(val0) => match &other.val.val {
                 ValType::Error(_) => std::cmp::Ordering::Greater,
@@ -369,6 +397,7 @@ impl Ord for Val {
                 ValType::String(_) => std::cmp::Ordering::Less,
                 ValType::List(_) => std::cmp::Ordering::Less,
                 ValType::Map(_) => std::cmp::Ordering::Less,
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
             },
             ValType::String(val0) => match &other.val.val {
                 ValType::Error(_) => std::cmp::Ordering::Greater,
@@ -378,6 +407,7 @@ impl Ord for Val {
                 ValType::String(val1) => val0.cmp(val1),
                 ValType::List(_) => std::cmp::Ordering::Less,
                 ValType::Map(_) => std::cmp::Ordering::Less,
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
             },
             ValType::List(val0) => match &other.val.val {
                 ValType::Error(_) => std::cmp::Ordering::Greater,
@@ -387,6 +417,7 @@ impl Ord for Val {
                 ValType::String(_) => std::cmp::Ordering::Greater,
                 ValType::List(val1) => list_cmp(val0, val1),
                 ValType::Map(_) => std::cmp::Ordering::Less,
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
             },
             ValType::Map(_) => match &other.val.val {
                 ValType::Error(_) => std::cmp::Ordering::Greater,
@@ -396,6 +427,17 @@ impl Ord for Val {
                 ValType::String(_) => std::cmp::Ordering::Greater,
                 ValType::List(_) => std::cmp::Ordering::Greater,
                 ValType::Map(_) => panic!("map comparison is unimplemented"),
+                ValType::Bytes(_) => std::cmp::Ordering::Less,
+            },
+            ValType::Bytes(_) => match &other.val.val {
+                ValType::Error(_) => std::cmp::Ordering::Greater,
+                ValType::Null => std::cmp::Ordering::Greater,
+                ValType::Bool(_) => std::cmp::Ordering::Greater,
+                ValType::Number(_) => std::cmp::Ordering::Greater,
+                ValType::String(_) => std::cmp::Ordering::Greater,
+                ValType::List(_) => std::cmp::Ordering::Greater,
+                ValType::Map(_) => std::cmp::Ordering::Greater,
+                ValType::Bytes(_) => panic!("bytes comparison is unimplemented"),
             },
         }
     }

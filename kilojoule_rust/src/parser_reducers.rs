@@ -155,6 +155,33 @@ fn escape_string_literal(input: &str) -> String {
     let bytes = input.as_bytes();
     assert!(bytes.len() >= 2);
     let trimmed = &bytes[1..bytes.len() - 1];
-    let input = std::str::from_utf8(trimmed).unwrap();
+
+    let mut escaped_bytes = Vec::<u8>::new();
+    let mut idx = 0;
+    while idx < trimmed.len() {
+        if trimmed[idx] == '\\' as u8 {
+            if idx + 1 >= trimmed.len() {
+                escaped_bytes.push(trimmed[idx]);
+            } else {
+                let next_char = trimmed[idx + 1] as char;
+                match next_char {
+                    'n' => escaped_bytes.push('\n' as u8),
+                    'r' => escaped_bytes.push('\r' as u8),
+                    't' => escaped_bytes.push('\t' as u8),
+                    '{' => escaped_bytes.push('{' as u8),
+                    '}' => escaped_bytes.push('}' as u8),
+                    '"' => escaped_bytes.push('"' as u8),
+                    '\'' => escaped_bytes.push('\'' as u8),
+                    _ => escaped_bytes.push(next_char as u8),
+                };
+            }
+            idx += 2;
+        } else {
+            escaped_bytes.push(trimmed[idx]);
+            idx += 1;
+        }
+    }
+
+    let input = std::str::from_utf8(escaped_bytes.as_slice()).unwrap();
     return input.to_string();
 }
