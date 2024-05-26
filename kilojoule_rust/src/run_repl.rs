@@ -1,11 +1,13 @@
 use std::collections::HashMap;
+use std::io::Write;
 
 use super::evaluate::eval_ast_node;
 use super::parser::Parser;
-use super::val::Val;
+use super::val::{Val, ValType};
 
 pub fn run_repl(parser: &Parser) -> Result<(), rustyline::error::ReadlineError> {
     let mut rl = rustyline::DefaultEditor::new()?;
+    let mut stdout = std::io::stdout();
     loop {
         let readline = rl.readline("> ");
         match readline {
@@ -18,7 +20,10 @@ pub fn run_repl(parser: &Parser) -> Result<(), rustyline::error::ReadlineError> 
                     Ok(ast) => eval_ast_node(&Val::new_null(), &ast, &HashMap::new()),
                     Err(err) => Val::new_err(err.message.as_str()),
                 };
-                result.write_json_str(&mut std::io::stdout(), true);
+                result.write_json_str(&mut stdout, true);
+                if let ValType::Bytes(_) = result.val.val {
+                    let _ = stdout.write(&['\n' as u8]);
+                }
             }
             Err(_) => {
                 return Ok(());
