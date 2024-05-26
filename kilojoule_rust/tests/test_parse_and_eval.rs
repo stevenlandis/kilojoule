@@ -73,6 +73,9 @@ mod tests {
         assert_json(r#"'a {1} b {2} c'"#, json!("a 1 b 2 c"));
         assert_json(r#"'a {1}{2} c'"#, json!("a 12 c"));
         assert_json(r#"'{1}{2}{3}'"#, json!("123"));
+        assert_json(r#"' \{\}\n\t\r\"\'\\ '"#, json!(" {}\n\t\r\"'\\ "));
+        assert_json(r#"' " '"#, json!(" \" "));
+        assert_json(r#"'Name: \'{1}\''"#, json!(r#"Name: '1'"#));
 
         // nested
         assert_json(r#"'a {'b c'}'"#, json!("a b c"));
