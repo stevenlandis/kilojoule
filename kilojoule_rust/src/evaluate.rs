@@ -529,6 +529,19 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
                 .collect::<Vec<_>>();
             Val::new_map_from_entries_iter(kv_pairs)
         }
+        "read" => match &obj.val.val {
+            ValType::String(file_path) => {
+                let mut buffer = Vec::<u8>::new();
+                match std::fs::File::open(file_path) {
+                    Err(_) => Val::new_err("Unable to open file"),
+                    Ok(mut fp) => match fp.read_to_end(&mut buffer) {
+                        Err(_) => Val::new_err("Unable to read file"),
+                        Ok(_) => Val::new_bytes(buffer),
+                    },
+                }
+            }
+            _ => Val::new_err("read() must be called on a string"),
+        },
         _ => Val::new_err("Function does not exist."),
     }
 }
