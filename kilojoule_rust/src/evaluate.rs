@@ -68,6 +68,7 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode, vars: &Variables) -> Val {
                     }
                 },
             },
+            ValType::Null => Val::new_null(),
             _ => Val::new_err("Access on invalid object"),
         },
         AstNode::StringLiteral(val) => Val::new_string(val),
