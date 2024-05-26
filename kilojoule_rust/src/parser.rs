@@ -261,7 +261,6 @@ impl<'a> Tokenizer<'a> {
 
         match best {
             None => {
-                println!("idx = {}, tokens: {:?}", self.text_idx, tokens);
                 return Err(ParseError {
                     message: "Unable to parse token".to_string(),
                 });
