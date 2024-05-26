@@ -35,7 +35,7 @@ pub fn get_reduced_token<'a>(token: Token, text: &'a str) -> AstNode {
 
 pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> {
     return match rule {
-        RuleType::opPipeExpr__opPipeExpr_PIPE_opOrExpr => {
+        RuleType::opPipeExpr__opPipeExpr_PIPE_opCoalesceExpr => {
             Rc::new(AstNode::Pipe(elems[0].clone(), elems[2].clone()))
         }
         RuleType::baseExpr__LEFT_PAREN_expr_RIGHT_PAREN => elems[1].clone(),
@@ -47,11 +47,11 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::opAccessExpr__opAccessExpr_LEFT_BRACKET_listAccessExpr_RIGHT_BRACKET => Rc::new(AstNode::Pipe(elems[0].clone(), Rc::new(AstNode::Access(elems[2].clone())))),
 
         // Assign
-        RuleType::assignExpr__LET_IDENTIFIER_EQUAL_opOrExpr_PIPE_assignExpr => Rc::new(AstNode::Assign(match &*elems[1] {
+        RuleType::assignExpr__LET_IDENTIFIER_EQUAL_opCoalesceExpr_PIPE_assignExpr => Rc::new(AstNode::Assign(match &*elems[1] {
             AstNode::StringLiteral(var_name) => var_name.clone(),
             _ => {panic!("unreachable");}
         }, elems[3].clone(), elems[5].clone())),
-        RuleType::assignExpr__opPipeExpr_PIPE_LET_IDENTIFIER_EQUAL_opOrExpr_PIPE_assignExpr => Rc::new(AstNode::Pipe(elems[0].clone(), Rc::new(AstNode::Assign(match &*elems[3] {
+        RuleType::assignExpr__opPipeExpr_PIPE_LET_IDENTIFIER_EQUAL_opCoalesceExpr_PIPE_assignExpr => Rc::new(AstNode::Pipe(elems[0].clone(), Rc::new(AstNode::Assign(match &*elems[3] {
             AstNode::StringLiteral(var_name) => var_name.clone(),
             _ => {panic!("unreachable");}
         }, elems[5].clone(), elems[7].clone())))),
@@ -63,7 +63,6 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
         RuleType::listAccessExpr__COLON_listAccessIdx => Rc::new(AstNode::SliceAccess(None, Some(elems[1].clone()))),
         RuleType::listAccessExpr__listAccessIdx_COLON => Rc::new(AstNode::SliceAccess(Some(elems[0].clone()), None)),
         RuleType::listAccessExpr__listAccessIdx_COLON_listAccessIdx => Rc::new(AstNode::SliceAccess(Some(elems[0].clone()), Some(elems[2].clone()))),
-
 
         // Map
         RuleType::mapExpr__LEFT_BRACE_RIGHT_BRACE => Rc::new(AstNode::MapLiteral(None)),
@@ -157,6 +156,9 @@ pub fn get_reduced_rule(rule: RuleType, elems: Vec<Rc<AstNode>>) -> Rc<AstNode> 
                 _ => panic!("invalid add operator")
             })
         }
+
+        // Coalesce
+        RuleType::opCoalesceExpr__opCoalesceExpr_DOUBLE_QUESTION_opOrExpr => Rc::new(AstNode::Coalesce(elems[0].clone(), elems[2].clone())),
 
         // Default
         _ => elems[0].clone(),

@@ -309,6 +309,13 @@ pub fn eval_ast_node(obj: &Val, node: &AstNode, vars: &Variables) -> Val {
                 _ => Val::new_err("Left side of divide has to be a number"),
             }
         }
+        AstNode::Coalesce(left, right) => {
+            let left = eval_ast_node(obj, left, vars);
+            match &left.val.val {
+                ValType::Null => eval_ast_node(obj, right, vars),
+                _ => left,
+            }
+        }
         _ => {
             panic!("Unimplemented eval for node={:?}", node);
         }

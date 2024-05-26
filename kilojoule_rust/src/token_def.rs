@@ -162,4 +162,8 @@ pub static TOKEN_DEFS: &[TokenDef] = &[
         token: Token::EQUAL,
         pattern: r"\=",
     },
+    TokenDef {
+        token: Token::DOUBLE_QUESTION,
+        pattern: r"\?\?",
+    },
 ];

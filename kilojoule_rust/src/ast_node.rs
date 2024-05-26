@@ -44,4 +44,5 @@ pub enum AstNode {
     SliceAccess(Option<Rc<AstNode>>, Option<Rc<AstNode>>),
     Assign(String, Rc<AstNode>, Rc<AstNode>),
     VarAccess(String),
+    Coalesce(Rc<AstNode>, Rc<AstNode>),
 }
