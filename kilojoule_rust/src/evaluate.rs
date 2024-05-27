@@ -550,6 +550,35 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
             }
             _ => Val::new_err("read() must be called on a string"),
         },
+        "keys" => match &obj.val.val {
+            ValType::Map(map) => {
+                let keys = map.keys();
+                Val::new_list(keys.as_slice())
+            }
+            _ => Val::new_err("keys() must be called on a map"),
+        },
+        "values" => match &obj.val.val {
+            ValType::Map(map) => {
+                let values = map.values();
+                Val::new_list(values.as_slice())
+            }
+            _ => Val::new_err("values() must be called on a map"),
+        },
+        "entries" => match &obj.val.val {
+            ValType::Map(map) => {
+                let values = map
+                    .entries()
+                    .map(|(key, val)| {
+                        Val::new_map_from_entries_iter(vec![
+                            (Val::new_string("key"), key.clone()),
+                            (Val::new_string("val"), val.clone()),
+                        ])
+                    })
+                    .collect::<Vec<_>>();
+                Val::new_list(values.as_slice())
+            }
+            _ => Val::new_err("entries() must be called on a map"),
+        },
         _ => Val::new_err("Function does not exist."),
     }
 }

@@ -507,6 +507,33 @@ impl ValHashMap {
     pub fn len(&self) -> usize {
         return self.key_to_idx.len();
     }
+
+    pub fn keys(&self) -> Vec<Val> {
+        self.pairs
+            .iter()
+            .filter_map(|pair| match pair {
+                None => None,
+                Some((key, _)) => Some(key.clone()),
+            })
+            .collect()
+    }
+
+    pub fn values(&self) -> Vec<Val> {
+        self.pairs
+            .iter()
+            .filter_map(|pair| match pair {
+                None => None,
+                Some((_, val)) => Some(val.clone()),
+            })
+            .collect()
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (&Val, &Val)> {
+        self.pairs.iter().filter_map(|pair| match pair {
+            None => None,
+            Some((key, val)) => Some((key, val)),
+        })
+    }
 }
 
 impl PartialEq for ValHashMap {
