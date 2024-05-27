@@ -427,7 +427,7 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
                         ValType::Number(val) => {
                             total += val;
                         }
-                        _ => {}
+                        _ => return Val::new_err("sum() can only be called on a list of numbers"),
                     }
                 }
                 Val::new_number(total)
@@ -578,6 +578,24 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
                 Val::new_list(values.as_slice())
             }
             _ => Val::new_err("entries() must be called on a map"),
+        },
+        "joinlines" => match &obj.val.val {
+            ValType::List(list) => {
+                let mut result = String::new();
+                for elem in list {
+                    match &elem.val.val {
+                        ValType::String(elem_text) => {
+                            result.push_str(elem_text.as_str());
+                            result.push('\n');
+                        }
+                        _ => {
+                            return Val::new_err("joinlines() must be called on a list of strings")
+                        }
+                    }
+                }
+                Val::new_string(result.as_str())
+            }
+            _ => Val::new_err("joinlines() must be called on a list"),
         },
         _ => Val::new_err("Function does not exist."),
     }

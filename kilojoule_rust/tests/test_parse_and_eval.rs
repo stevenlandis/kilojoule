@@ -241,7 +241,6 @@ mod tests {
     fn test_sum() {
         assert_json("[1,2,3,4] | sum()", json!(10));
         assert_json("[] | sum()", json!(0));
-        assert_json("[1, null, 2, [], 3, {}, 4] | sum()", json!(10));
     }
 
     #[test]
