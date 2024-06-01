@@ -118,12 +118,71 @@ impl<'a> Parser<'a> {
         ParseError { idx: self.idx, typ }
     }
 
+    fn parse_map_literal(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        if !self.parse_str_literal("{") {
+            return None;
+        }
+
+        let mut parts: Option<AstNodePtr> = None;
+
+        loop {
+            self.parse_ws();
+            let key = match self.parse_identifier() {
+                None => {
+                    break;
+                }
+                Some(val) => val,
+            };
+            self.parse_ws();
+
+            if !self.parse_str_literal(":") {
+                return Some(Err(self.get_err(ParseErrorType::NoColonInMapLiteral)));
+            }
+            self.parse_ws();
+
+            let val = match self.parse_expr() {
+                None => {
+                    return Some(Err(self.get_err(ParseErrorType::NoMapLiteralValue)));
+                }
+                Some(val) => match val {
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
+                    Ok(val) => val,
+                },
+            };
+
+            let kv_pair = self.pool.new_map_kv_pair(key, val);
+            match parts {
+                None => {
+                    parts = Some(kv_pair);
+                }
+                Some(prev_val) => {
+                    parts = Some(self.pool.new_list_node(prev_val, kv_pair));
+                }
+            }
+
+            self.parse_ws();
+
+            if !self.parse_str_literal(",") {
+                break;
+            }
+        }
+
+        if !self.parse_str_literal("}") {
+            return Some(Err(self.get_err(ParseErrorType::NoMapLiteralEndingBrace)));
+        }
+
+        Some(Ok(self.pool.new_map_literal(parts)))
+    }
+
     fn parse_base_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         if self.parse_str_literal(".") {
             let mut expr = self.pool.new_dot();
             self.parse_ws();
             if let Some(iden) = self.parse_identifier() {
-                expr = self.pool.new_access(expr, iden)
+                let access = self.pool.new_access(iden);
+                expr = self.pool.new_pipe(expr, access);
             }
             return Some(Ok(expr));
         }
@@ -143,6 +202,10 @@ impl<'a> Parser<'a> {
                 return Some(Err(self.get_err(ParseErrorType::NoClosingParen)));
             }
             return Some(Ok(expr));
+        }
+
+        if let Some(result) = self.parse_map_literal() {
+            return Some(result);
         }
 
         if let Some(expr) = self.parse_integer() {
@@ -317,6 +380,9 @@ enum ParseErrorType {
     NoClosingParenFcnCall,
     NoParenContents,
     NoExprAfterOperator,
+    NoColonInMapLiteral,
+    NoMapLiteralValue,
+    NoMapLiteralEndingBrace,
 }
 
 #[derive(Debug)]
@@ -326,10 +392,12 @@ enum AstNode<'a> {
     Integer(u64),
     Pipe(AstNodePtr, AstNodePtr),
     Dot,
-    Access(AstNodePtr, AstNodePtr),
+    Access(AstNodePtr),
     Add(AstNodePtr, AstNodePtr),
     FcnCall(Option<AstNodePtr>),
     ListNode(AstNodePtr, AstNodePtr),
+    MapKeyValPair { key: AstNodePtr, val: AstNodePtr },
+    MapLiteral(Option<AstNodePtr>),
 }
 
 type AstNodePtr = usize;
@@ -373,9 +441,9 @@ impl<'a> AstNodePool<'a> {
         ptr
     }
 
-    fn new_access(&mut self, expr: AstNodePtr, accessor: AstNodePtr) -> AstNodePtr {
+    fn new_access(&mut self, accessor: AstNodePtr) -> AstNodePtr {
         let ptr = self.vals.len();
-        self.vals.push(AstNode::Access(expr, accessor));
+        self.vals.push(AstNode::Access(accessor));
         ptr
     }
 
@@ -396,6 +464,18 @@ impl<'a> AstNodePool<'a> {
         self.vals.push(AstNode::FcnCall(args));
         ptr
     }
+
+    fn new_map_kv_pair(&mut self, key: AstNodePtr, val: AstNodePtr) -> AstNodePtr {
+        let ptr = self.vals.len();
+        self.vals.push(AstNode::MapKeyValPair { key, val });
+        ptr
+    }
+
+    fn new_map_literal(&mut self, contents: Option<AstNodePtr>) -> AstNodePtr {
+        let ptr = self.vals.len();
+        self.vals.push(AstNode::MapLiteral(contents));
+        ptr
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -407,7 +487,9 @@ enum ObjPoolObjValue {
     Null,
     Err(String),
     Float64(f64),
+    String(String),
     List(Vec<ObjPoolRef>),
+    Map(OrderedMap),
 }
 
 struct ObjPoolObj {
@@ -451,11 +533,29 @@ impl ObjPool {
         ObjPoolRef { idx }
     }
 
-    fn new_list(&mut self) -> ObjPoolRef {
+    fn new_str(&mut self, val: &str) -> ObjPoolRef {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
-            value: ObjPoolObjValue::List(Vec::new()),
+            value: ObjPoolObjValue::String(val.to_string()),
+        });
+        ObjPoolRef { idx }
+    }
+
+    // fn new_list(&mut self) -> ObjPoolRef {
+    //     let idx = self.vals.len();
+    //     self.vals.push(ObjPoolObj {
+    //         ref_count: 0,
+    //         value: ObjPoolObjValue::List(Vec::new()),
+    //     });
+    //     ObjPoolRef { idx }
+    // }
+
+    fn new_map(&mut self, map: OrderedMap) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::Map(map),
         });
         ObjPoolRef { idx }
     }
@@ -490,9 +590,16 @@ impl ObjPool {
                 ObjPoolObjValue::Null => {}
                 ObjPoolObjValue::Err(_) => {}
                 ObjPoolObjValue::Float64(_) => {}
+                ObjPoolObjValue::String(_) => {}
                 ObjPoolObjValue::List(val) => {
                     for elem in val {
                         self.decr_ref(elem);
+                    }
+                }
+                ObjPoolObjValue::Map(val) => {
+                    for (key, val) in val.pairs {
+                        self.decr_ref(key);
+                        self.decr_ref(val);
                     }
                 }
             }
@@ -543,6 +650,9 @@ impl ObjPool {
                 // TODO: Don't allocate on every float write
                 writer.write(val.to_string().as_str().as_bytes())?;
             }
+            ObjPoolObjValue::String(val) => {
+                self.write_json_escaped_str(writer, val.as_str())?;
+            }
             ObjPoolObjValue::Err(val) => {
                 writer.write("{\"ERROR\":".as_bytes())?;
                 self.write_json_escaped_str(writer, val.as_str())?;
@@ -570,8 +680,127 @@ impl ObjPool {
                 }
                 writer.write("]".as_bytes())?;
             }
+            ObjPoolObjValue::Map(val) => {
+                writer.write("{".as_bytes())?;
+                for (idx, (key, val)) in val.pairs.iter().enumerate() {
+                    if idx > 0 {
+                        if use_indent {
+                            writer.write(", ".as_bytes())?;
+                        } else {
+                            writer.write(",".as_bytes())?;
+                        }
+                    }
+                    if use_indent {
+                        writer.write("\n".as_bytes())?;
+                        write_indent(writer, indent + 1)?;
+                    }
+                    self.inner_write_str(writer, *key, indent + 1, use_indent)?;
+                    if use_indent {
+                        writer.write(": ".as_bytes())?;
+                    } else {
+                        writer.write(":".as_bytes())?;
+                    }
+                    self.inner_write_str(writer, *val, indent + 1, use_indent)?;
+                }
+                if val.pairs.len() > 0 && use_indent {
+                    writer.write("\n".as_bytes())?;
+                    write_indent(writer, indent)?;
+                }
+                writer.write("}".as_bytes())?;
+            }
         }
         Ok(0)
+    }
+
+    fn val_equals(&self, left: ObjPoolRef, right: ObjPoolRef) -> bool {
+        match &self.vals[left.idx].value {
+            ObjPoolObjValue::Null => match self.vals[right.idx].value {
+                ObjPoolObjValue::Null => true,
+                _ => false,
+            },
+            ObjPoolObjValue::Err(left) => match &self.vals[right.idx].value {
+                ObjPoolObjValue::Err(right) => left == right,
+                _ => false,
+            },
+            ObjPoolObjValue::Float64(left) => match self.vals[right.idx].value {
+                ObjPoolObjValue::Float64(right) => {
+                    left.total_cmp(&right) == std::cmp::Ordering::Equal
+                }
+                _ => false,
+            },
+            ObjPoolObjValue::String(left) => match &self.vals[right.idx].value {
+                ObjPoolObjValue::String(right) => left == right,
+                _ => false,
+            },
+            ObjPoolObjValue::List(left) => match &self.vals[right.idx].value {
+                ObjPoolObjValue::List(right) => {
+                    if left.len() != right.len() {
+                        return false;
+                    }
+                    for (left_val, right_val) in std::iter::zip(left, right) {
+                        if !self.val_equals(*left_val, *right_val) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                _ => false,
+            },
+            ObjPoolObjValue::Map(left) => match &self.vals[right.idx].value {
+                ObjPoolObjValue::Map(right) => {
+                    if left.pairs.len() != right.pairs.len() {
+                        return false;
+                    }
+                    for (left_key, left_val) in &left.pairs {
+                        let mut found_match = false;
+                        for (right_key, right_val) in &right.pairs {
+                            if self.val_equals(*left_key, *right_key) {
+                                found_match = true;
+                                if !self.val_equals(*left_val, *right_val) {
+                                    return false;
+                                }
+                                break;
+                            }
+                        }
+                        if !found_match {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                _ => false,
+            },
+        }
+    }
+}
+
+struct OrderedMap {
+    pairs: Vec<(ObjPoolRef, ObjPoolRef)>,
+}
+
+impl OrderedMap {
+    fn new() -> Self {
+        OrderedMap { pairs: Vec::new() }
+    }
+
+    fn insert(&mut self, pool: &ObjPool, key: ObjPoolRef, val: ObjPoolRef) {
+        for (loop_key, loop_val) in &mut self.pairs {
+            if pool.val_equals(*loop_key, key) {
+                *loop_val = val;
+                return;
+            }
+        }
+
+        self.pairs.push((key, val));
+    }
+
+    fn get(&self, pool: &ObjPool, key: ObjPoolRef) -> Option<ObjPoolRef> {
+        for (loop_key, loop_val) in &self.pairs {
+            if pool.val_equals(*loop_key, key) {
+                return Some(*loop_val);
+            }
+        }
+        None
     }
 }
 
@@ -591,6 +820,11 @@ impl Evaluator {
     pub fn parse_and_eval(&mut self, text: &str) -> ObjPoolRef {
         let mut parser = Parser::new(text);
         let ast = parser.parse_expr().unwrap().unwrap();
+
+        // for (idx, val) in parser.pool.vals.iter().enumerate() {
+        //     println!("{}: {:?}", idx, val);
+        // }
+
         let val = self.obj_pool.new_null();
         self.eval(ast, val, &parser)
     }
@@ -625,7 +859,59 @@ impl Evaluator {
                 self.obj_pool.new_f64(left_val + right_val)
             }
             AstNode::Integer(val) => self.obj_pool.new_f64(val as f64),
-            _ => panic!(),
+            AstNode::MapLiteral(contents) => {
+                let mut map = OrderedMap::new();
+                fn helper(
+                    this: &mut Evaluator,
+                    obj: ObjPoolRef,
+                    parser: &Parser,
+                    map: &mut OrderedMap,
+                    node: AstNodePtr,
+                ) {
+                    match parser.pool.vals[node] {
+                        AstNode::ListNode(left, right) => {
+                            helper(this, obj, parser, map, left);
+                            helper(this, obj, parser, map, right);
+                        }
+                        AstNode::MapKeyValPair { key, val } => {
+                            let key_obj = match parser.pool.vals[key] {
+                                AstNode::Identifier(key_name) => this.obj_pool.new_str(key_name),
+                                _ => panic!(),
+                            };
+                            let val_obj = this.eval(val, obj, parser);
+                            map.insert(&this.obj_pool, key_obj, val_obj);
+                        }
+                        _ => panic!(),
+                    }
+                }
+
+                match contents {
+                    None => {}
+                    Some(contents) => {
+                        helper(self, obj, parser, &mut map, contents);
+                    }
+                };
+
+                self.obj_pool.new_map(map)
+            }
+            AstNode::Access(expr) => match &self.obj_pool.vals[obj.idx].value {
+                ObjPoolObjValue::Map(_) => {
+                    let key_val = match parser.pool.vals[expr] {
+                        AstNode::Identifier(key) => self.obj_pool.new_str(key),
+                        _ => panic!(),
+                    };
+                    let map = match &self.obj_pool.vals[obj.idx].value {
+                        ObjPoolObjValue::Map(map) => map,
+                        _ => panic!(),
+                    };
+                    match map.get(&self.obj_pool, key_val) {
+                        None => self.obj_pool.new_null(),
+                        Some(val) => val,
+                    }
+                }
+                _ => panic!(),
+            },
+            _ => panic!("Unimplemented {:?}", parser.pool.vals[node]),
         }
     }
 

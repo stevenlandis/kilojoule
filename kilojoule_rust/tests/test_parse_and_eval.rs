@@ -3,18 +3,31 @@ mod tests {
     use kilojoule_rust::*;
     use serde_json::json;
 
-    fn base_parse_and_eval(expr: &str) -> Vec<u8> {
+    fn base_parse_and_eval(expr: &str) -> (Vec<u8>, Vec<u8>) {
         let mut evaluator = Evaluator::new();
         let result = evaluator.parse_and_eval(expr);
 
-        let mut out = Vec::<u8>::new();
-        evaluator.write_val(result, &mut out, true).unwrap();
-        return out;
+        let mut out0 = Vec::<u8>::new();
+        evaluator.write_val(result, &mut out0, true).unwrap();
+
+        // make sure output is valid json when indent=false
+        let mut out1 = Vec::<u8>::new();
+        evaluator.write_val(result, &mut out1, false).unwrap();
+
+        return (out0, out1);
     }
 
     fn parse_and_eval_json(expr: &str) -> serde_json::Value {
-        let out = base_parse_and_eval(expr);
-        return serde_json::from_str(std::str::from_utf8(out.as_slice()).unwrap()).unwrap();
+        let (out0, out1) = base_parse_and_eval(expr);
+
+        let j0: serde_json::Value =
+            serde_json::from_str(std::str::from_utf8(out0.as_slice()).unwrap()).unwrap();
+        let j1: serde_json::Value =
+            serde_json::from_str(std::str::from_utf8(out1.as_slice()).unwrap()).unwrap();
+
+        assert_eq!(j0, j1);
+
+        return j0;
     }
 
     fn assert_json(expr: &str, value: serde_json::Value) {
@@ -24,12 +37,13 @@ mod tests {
     #[test]
     fn basic_functionality() {
         assert_json("123", json!(123));
-        // assert_json("{a: 1, b: 2}", json!({"a": 1, "b": 2}));
-        // assert_json("{a: 1, b: 2,}", json!({"a": 1, "b": 2}));
-        // assert_json("{a: 1, b: 2} | .b", json!(2));
-        // assert_json("{a: 1, b: 2} | {a: .b, b: .a}", json!({"a": 2, "b": 1}));
-        // assert_json("{}", json!({}));
-        // assert_json("{a:{b:{c:42}}}", json!({'a': {'b': {'c': 42}}}));
+        assert_json("42 | . | .", json!(42));
+        assert_json("{ a : 1, b : 2 }", json!({"a": 1, "b": 2}));
+        assert_json("{ a : 1 , b : 2 , }", json!({"a": 1, "b": 2}));
+        assert_json("{a: 1, b: 2} | . b", json!(2));
+        assert_json("{a: 1, b: 2} | {a: .b, b: .a}", json!({"a": 2, "b": 1}));
+        assert_json("{}", json!({}));
+        assert_json("{a:{b:{c:42}}}", json!({'a': {'b': {'c': 42}}}));
         // assert_json("[]", json!([]));
         // assert_json("[1]", json!([1]));
         // assert_json("[1,2,3]", json!([1, 2, 3]));
