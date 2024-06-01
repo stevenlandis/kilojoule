@@ -1,20 +1,22 @@
 use super::ast_node_pool::{AstNode, AstNodePool, AstNodePtr};
-use super::obj_pool::{ObjPool, ObjPoolObjValue, ObjPoolRef, OrderedMap};
-use std::collections::HashMap;
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     text: &'a str,
     pool: AstNodePool<'a>,
     idx: usize,
 }
 
 impl<'a> Parser<'a> {
-    fn new(text: &'a str) -> Self {
+    pub fn new(text: &'a str) -> Self {
         Parser {
             text,
             pool: AstNodePool::new(),
             idx: 0,
         }
+    }
+
+    pub fn get_node(&self, node: AstNodePtr) -> &AstNode {
+        self.pool.get(node)
     }
 
     fn peek(&self, n: usize) -> Option<u8> {
@@ -281,7 +283,7 @@ impl<'a> Parser<'a> {
         return true;
     }
 
-    fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    pub fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         let expr = match self.parse_base_expr() {
             None => {
                 return None;
@@ -371,7 +373,7 @@ impl<'a> Parser<'a> {
 }
 
 #[derive(Debug)]
-struct ParseError {
+pub struct ParseError {
     idx: usize,
     typ: ParseErrorType,
 }
@@ -385,133 +387,4 @@ enum ParseErrorType {
     NoColonInMapLiteral,
     NoMapLiteralValue,
     NoMapLiteralEndingBrace,
-}
-
-pub struct Evaluator {
-    obj_pool: ObjPool,
-    var_stack: Vec<HashMap<String, ObjPoolRef>>,
-}
-
-impl Evaluator {
-    pub fn new() -> Self {
-        Evaluator {
-            obj_pool: ObjPool::new(),
-            var_stack: Vec::new(),
-        }
-    }
-
-    pub fn parse_and_eval(&mut self, text: &str) -> ObjPoolRef {
-        let mut parser = Parser::new(text);
-        match parser.parse_expr() {
-            None => self.obj_pool.new_null(),
-            Some(ast) => match ast {
-                Err(_) => self.obj_pool.new_err("Parse Error"),
-                Ok(ast) => {
-                    // for (idx, val) in parser.pool.vals.iter().enumerate() {
-                    //     println!("{}: {:?}", idx, val);
-                    // }
-                    let val = self.obj_pool.new_null();
-                    self.eval(ast, val, &parser)
-                }
-            },
-        }
-    }
-
-    fn eval(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> ObjPoolRef {
-        match parser.pool.get(node) {
-            AstNode::Null => self.obj_pool.new_null(),
-            AstNode::Pipe(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                self.eval(*right, left_val, parser)
-            }
-            AstNode::Dot => obj,
-            AstNode::Add(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let left_val = match self.obj_pool.get(left_val) {
-                    ObjPoolObjValue::Float64(val) => *val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Left side of addition has to be a float");
-                    }
-                };
-                let right_val = self.eval(*right, obj, parser);
-                let right_val = match self.obj_pool.get(right_val) {
-                    ObjPoolObjValue::Float64(val) => val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Right side of addition has to be a float");
-                    }
-                };
-                self.obj_pool.new_f64(left_val + right_val)
-            }
-            AstNode::Integer(val) => self.obj_pool.new_f64(*val as f64),
-            AstNode::MapLiteral(contents) => {
-                let mut map = OrderedMap::new();
-                fn helper(
-                    this: &mut Evaluator,
-                    obj: ObjPoolRef,
-                    parser: &Parser,
-                    map: &mut OrderedMap,
-                    node: AstNodePtr,
-                ) {
-                    match parser.pool.get(node) {
-                        AstNode::ListNode(left, right) => {
-                            helper(this, obj, parser, map, *left);
-                            helper(this, obj, parser, map, *right);
-                        }
-                        AstNode::MapKeyValPair { key, val } => {
-                            let key_obj = match parser.pool.get(*key) {
-                                AstNode::Identifier(key_name) => this.obj_pool.new_str(key_name),
-                                _ => panic!(),
-                            };
-                            let val_obj = this.eval(*val, obj, parser);
-                            map.insert(&this.obj_pool, key_obj, val_obj);
-                        }
-                        _ => panic!(),
-                    }
-                }
-
-                match contents {
-                    None => {}
-                    Some(contents) => {
-                        helper(self, obj, parser, &mut map, *contents);
-                    }
-                };
-
-                self.obj_pool.new_map(map)
-            }
-            AstNode::Access(expr) => match &self.obj_pool.get(obj) {
-                ObjPoolObjValue::Map(_) => {
-                    let key_val = match parser.pool.get(*expr) {
-                        AstNode::Identifier(key) => self.obj_pool.new_str(key),
-                        _ => panic!(),
-                    };
-                    let map = match &self.obj_pool.get(obj) {
-                        ObjPoolObjValue::Map(map) => map,
-                        _ => panic!(),
-                    };
-                    match map.get(&self.obj_pool, key_val) {
-                        None => self.obj_pool.new_null(),
-                        Some(val) => val,
-                    }
-                }
-                _ => panic!(),
-            },
-            _ => panic!("Unimplemented {:?}", parser.pool.get(node)),
-        }
-    }
-
-    pub fn write_val(
-        &self,
-        val: ObjPoolRef,
-        writer: &mut impl std::io::Write,
-        use_indent: bool,
-    ) -> std::io::Result<()> {
-        match self.obj_pool.write_to_str(writer, val, 0, use_indent) {
-            Err(err) => Err(err),
-            Ok(_) => Ok(()),
-        }
-    }
 }
