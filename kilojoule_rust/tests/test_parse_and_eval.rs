@@ -44,14 +44,14 @@ mod tests {
         assert_json("{a: 1, b: 2} | {a: .b, b: .a}", json!({"a": 2, "b": 1}));
         assert_json("{}", json!({}));
         assert_json("{a:{b:{c:42}}}", json!({'a': {'b': {'c': 42}}}));
-        // assert_json("[]", json!([]));
-        // assert_json("[1]", json!([1]));
-        // assert_json("[1,2,3]", json!([1, 2, 3]));
-        // assert_json("[1,2,3,]", json!([1, 2, 3]));
-        // assert_json(
-        //     "{a: 1, b: 2} | [., .a, .b]",
-        //     json!([{"a": 1, "b": 2}, 1, 2]),
-        // );
+        assert_json("[]", json!([]));
+        assert_json("[1]", json!([1]));
+        assert_json("[1,2,3]", json!([1, 2, 3]));
+        assert_json("[1,2,3,]", json!([1, 2, 3]));
+        assert_json(
+            "{a: 1, b: 2} | [., .a, .b]",
+            json!([{"a": 1, "b": 2}, 1, 2]),
+        );
         // assert_json("[100, 200, 300] | .[1]", json!(200));
     }
 

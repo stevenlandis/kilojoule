@@ -66,14 +66,14 @@ impl ObjPool {
         ObjPoolRef { idx }
     }
 
-    // fn new_list(&mut self) -> ObjPoolRef {
-    //     let idx = self.vals.len();
-    //     self.vals.push(ObjPoolObj {
-    //         ref_count: 0,
-    //         value: ObjPoolObjValue::List(Vec::new()),
-    //     });
-    //     ObjPoolRef { idx }
-    // }
+    pub fn new_list(&mut self, list: Vec<ObjPoolRef>) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::List(list),
+        });
+        ObjPoolRef { idx }
+    }
 
     pub fn new_map(&mut self, map: OrderedMap) -> ObjPoolRef {
         let idx = self.vals.len();

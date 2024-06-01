@@ -95,6 +95,37 @@ impl Evaluator {
 
                 self.obj_pool.new_map(map)
             }
+            AstNode::ListLiteral(contents) => {
+                let mut list = Vec::<ObjPoolRef>::new();
+
+                fn helper(
+                    this: &mut Evaluator,
+                    obj: ObjPoolRef,
+                    parser: &Parser,
+                    list: &mut Vec<ObjPoolRef>,
+                    node: AstNodePtr,
+                ) {
+                    match parser.get_node(node) {
+                        AstNode::ListNode(left, right) => {
+                            helper(this, obj, parser, list, *left);
+                            helper(this, obj, parser, list, *right);
+                        }
+                        _ => {
+                            let elem_val = this.eval(node, obj, parser);
+                            list.push(elem_val);
+                        }
+                    }
+                }
+
+                match contents {
+                    None => {}
+                    Some(contents) => {
+                        helper(self, obj, parser, &mut list, *contents);
+                    }
+                };
+
+                self.obj_pool.new_list(list)
+            }
             AstNode::Access(expr) => match &self.obj_pool.get(obj) {
                 ObjPoolObjValue::Map(_) => {
                     let key_val = match parser.get_node(*expr) {

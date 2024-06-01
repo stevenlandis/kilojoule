@@ -122,6 +122,49 @@ impl<'a> Parser<'a> {
         ParseError { idx: self.idx, typ }
     }
 
+    fn parse_list_literal(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        if !self.parse_str_literal("[") {
+            return None;
+        }
+
+        let mut parts: Option<AstNodePtr> = None;
+
+        loop {
+            self.parse_ws();
+            let elem = match self.parse_expr() {
+                None => {
+                    break;
+                }
+                Some(val) => match val {
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
+                    Ok(val) => val,
+                },
+            };
+            match parts {
+                None => {
+                    parts = Some(elem);
+                }
+                Some(prev_val) => {
+                    parts = Some(self.pool.new_list_node(prev_val, elem));
+                }
+            }
+
+            self.parse_ws();
+
+            if !self.parse_str_literal(",") {
+                break;
+            }
+        }
+
+        if !self.parse_str_literal("]") {
+            return Some(Err(self.get_err(ParseErrorType::NoListLiteralEndingBracket)));
+        }
+
+        Some(Ok(self.pool.new_list_literal(parts)))
+    }
+
     fn parse_map_literal(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         if !self.parse_str_literal("{") {
             return None;
@@ -209,6 +252,10 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(result) = self.parse_map_literal() {
+            return Some(result);
+        }
+
+        if let Some(result) = self.parse_list_literal() {
             return Some(result);
         }
 
@@ -387,4 +434,5 @@ enum ParseErrorType {
     NoColonInMapLiteral,
     NoMapLiteralValue,
     NoMapLiteralEndingBrace,
+    NoListLiteralEndingBracket,
 }

@@ -11,6 +11,7 @@ pub enum AstNode<'a> {
     ListNode(AstNodePtr, AstNodePtr),
     MapKeyValPair { key: AstNodePtr, val: AstNodePtr },
     MapLiteral(Option<AstNodePtr>),
+    ListLiteral(Option<AstNodePtr>),
 }
 
 pub type AstNodePtr = usize;
@@ -91,6 +92,12 @@ impl<'a> AstNodePool<'a> {
     pub fn new_map_literal(&mut self, contents: Option<AstNodePtr>) -> AstNodePtr {
         let ptr = self.vals.len();
         self.vals.push(AstNode::MapLiteral(contents));
+        ptr
+    }
+
+    pub fn new_list_literal(&mut self, contents: Option<AstNodePtr>) -> AstNodePtr {
+        let ptr = self.vals.len();
+        self.vals.push(AstNode::ListLiteral(contents));
         ptr
     }
 }
