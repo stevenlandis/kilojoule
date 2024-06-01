@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 struct Parser<'a> {
     text: &'a str,
     pool: AstNodePool<'a>,
@@ -146,6 +148,9 @@ impl<'a> Parser<'a> {
         if let Some(expr) = self.parse_integer() {
             return Some(Ok(expr));
         }
+        if self.parse_str_literal("null") {
+            return Some(Ok(self.pool.new_null()));
+        }
         if let Some(expr) = self.parse_identifier() {
             self.parse_ws();
             if self.parse_str_literal("(") {
@@ -212,7 +217,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
-        let mut expr = match self.parse_base_expr() {
+        let expr = match self.parse_base_expr() {
             None => {
                 return None;
             }
@@ -393,19 +398,246 @@ impl<'a> AstNodePool<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[derive(Clone, Copy)]
+pub struct ObjPoolRef {
+    idx: usize,
+}
 
-    #[test]
-    fn test_make_parser() {
-        let mut parser = Parser::new("stuff + 1 + 2 | . | (9 | 10)");
-        let result = parser.parse_expr();
-        println!("Got result {:?}", result);
-        for (idx, elem) in parser.pool.vals.iter().enumerate() {
-            println!("{}: {:?}", idx, elem);
+enum ObjPoolObjValue {
+    Null,
+    Err(String),
+    Float64(f64),
+    List(Vec<ObjPoolRef>),
+}
+
+struct ObjPoolObj {
+    ref_count: usize,
+    value: ObjPoolObjValue,
+}
+
+struct ObjPool {
+    vals: Vec<ObjPoolObj>,
+}
+
+impl ObjPool {
+    fn new() -> Self {
+        ObjPool { vals: Vec::new() }
+    }
+
+    fn new_null(&mut self) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::Null,
+        });
+        ObjPoolRef { idx }
+    }
+
+    fn new_err(&mut self, msg: &str) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::Err(msg.to_string()),
+        });
+        ObjPoolRef { idx }
+    }
+
+    fn new_f64(&mut self, val: f64) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::Float64(val),
+        });
+        ObjPoolRef { idx }
+    }
+
+    fn new_list(&mut self) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::List(Vec::new()),
+        });
+        ObjPoolRef { idx }
+    }
+
+    fn get_f64(&self, obj: ObjPoolRef) -> f64 {
+        match self.vals[obj.idx].value {
+            ObjPoolObjValue::Float64(val) => val,
+            _ => panic!(),
+        }
+    }
+
+    fn get_list(&self, obj: ObjPoolRef) -> &[ObjPoolRef] {
+        match &self.vals[obj.idx].value {
+            ObjPoolObjValue::List(list) => list.as_slice(),
+            _ => panic!(),
+        }
+    }
+
+    fn incr_ref(&mut self, obj: ObjPoolRef) {
+        self.vals[obj.idx].ref_count += 1;
+    }
+
+    fn decr_ref(&mut self, obj: ObjPoolRef) {
+        assert!(self.vals[obj.idx].ref_count > 0);
+        self.vals[obj.idx].ref_count -= 1;
+    }
+
+    fn collect_garbage(&mut self) {
+        while self.vals.len() > 0 && self.vals[self.vals.len() - 1].ref_count == 0 {
+            let top = self.vals.pop().unwrap();
+            match top.value {
+                ObjPoolObjValue::Null => {}
+                ObjPoolObjValue::Err(_) => {}
+                ObjPoolObjValue::Float64(_) => {}
+                ObjPoolObjValue::List(val) => {
+                    for elem in val {
+                        self.decr_ref(elem);
+                    }
+                }
+            }
+        }
+    }
+
+    fn list_push(&mut self, obj: ObjPoolRef) {
+        match &mut self.vals[obj.idx].value {
+            ObjPoolObjValue::List(val) => {
+                val.push(obj);
+                self.incr_ref(obj);
+            }
+            _ => panic!(),
+        }
+    }
+
+    fn write_json_escaped_str(
+        &self,
+        writer: &mut impl std::io::Write,
+        val: &str,
+    ) -> std::io::Result<usize> {
+        writer.write("\"".as_bytes())?;
+        writer.write(val.as_bytes())?;
+        writer.write("\"".as_bytes())?;
+
+        Ok(0)
+    }
+
+    fn inner_write_str(
+        &self,
+        writer: &mut impl std::io::Write,
+        val: ObjPoolRef,
+        indent: u64,
+        use_indent: bool,
+    ) -> std::io::Result<usize> {
+        fn write_indent(writer: &mut impl std::io::Write, indent: u64) -> std::io::Result<usize> {
+            for _ in 0..indent {
+                writer.write("  ".as_bytes())?;
+            }
+            Ok(0)
         }
 
-        assert!(false);
+        match &self.vals[val.idx].value {
+            ObjPoolObjValue::Null => {
+                writer.write("null".as_bytes())?;
+            }
+            ObjPoolObjValue::Float64(val) => {
+                // TODO: Don't allocate on every float write
+                writer.write(val.to_string().as_str().as_bytes())?;
+            }
+            ObjPoolObjValue::Err(val) => {
+                writer.write("{\"ERROR\":".as_bytes())?;
+                self.write_json_escaped_str(writer, val.as_str())?;
+                writer.write("}".as_bytes())?;
+            }
+            ObjPoolObjValue::List(val) => {
+                writer.write("[".as_bytes())?;
+                for (idx, elem) in val.iter().enumerate() {
+                    if idx > 0 {
+                        if use_indent {
+                            writer.write(", ".as_bytes())?;
+                        } else {
+                            writer.write(",".as_bytes())?;
+                        }
+                    }
+                    if use_indent {
+                        writer.write("\n".as_bytes())?;
+                        write_indent(writer, indent + 1)?;
+                    }
+                    self.inner_write_str(writer, *elem, indent + 1, use_indent)?;
+                }
+                if val.len() > 0 && use_indent {
+                    writer.write("\n".as_bytes())?;
+                    write_indent(writer, indent)?;
+                }
+                writer.write("]".as_bytes())?;
+            }
+        }
+        Ok(0)
+    }
+}
+
+pub struct Evaluator {
+    obj_pool: ObjPool,
+    var_stack: Vec<HashMap<String, ObjPoolRef>>,
+}
+
+impl Evaluator {
+    pub fn new() -> Self {
+        Evaluator {
+            obj_pool: ObjPool::new(),
+            var_stack: Vec::new(),
+        }
+    }
+
+    pub fn parse_and_eval(&mut self, text: &str) -> ObjPoolRef {
+        let mut parser = Parser::new(text);
+        let ast = parser.parse_expr().unwrap().unwrap();
+        let val = self.obj_pool.new_null();
+        self.eval(ast, val, &parser)
+    }
+
+    fn eval(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> ObjPoolRef {
+        match parser.pool.vals[node] {
+            AstNode::Null => self.obj_pool.new_null(),
+            AstNode::Pipe(left, right) => {
+                let left_val = self.eval(left, obj, parser);
+                self.eval(right, left_val, parser)
+            }
+            AstNode::Dot => obj,
+            AstNode::Add(left, right) => {
+                let left_val = self.eval(left, obj, parser);
+                let left_val = match self.obj_pool.vals[left_val.idx].value {
+                    ObjPoolObjValue::Float64(val) => val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Left side of addition has to be a float");
+                    }
+                };
+                let right_val = self.eval(right, obj, parser);
+                let right_val = match self.obj_pool.vals[right_val.idx].value {
+                    ObjPoolObjValue::Float64(val) => val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Right side of addition has to be a float");
+                    }
+                };
+                self.obj_pool.new_f64(left_val + right_val)
+            }
+            AstNode::Integer(val) => self.obj_pool.new_f64(val as f64),
+            _ => panic!(),
+        }
+    }
+
+    pub fn write_val(
+        &self,
+        val: ObjPoolRef,
+        writer: &mut impl std::io::Write,
+        use_indent: bool,
+    ) -> std::io::Result<()> {
+        match self.obj_pool.inner_write_str(writer, val, 0, use_indent) {
+            Err(err) => Err(err),
+            Ok(_) => Ok(()),
+        }
     }
 }

@@ -16,5 +16,6 @@ mod val;
 pub use ast_node::AstNode;
 pub use evaluate::eval_ast_node;
 pub use parser::Parser;
+pub use parser2::Evaluator;
 pub use run_repl::run_repl;
 pub use val::Val;
