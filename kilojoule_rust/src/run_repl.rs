@@ -1,11 +1,9 @@
-use std::collections::HashMap;
-use std::io::Write;
+use crate::Evaluator;
 
-use super::evaluate::eval_ast_node;
-use super::parser::Parser;
-use super::val::{Val, ValType};
+use std::error::Error;
 
-pub fn run_repl(parser: &Parser) -> Result<(), rustyline::error::ReadlineError> {
+pub fn run_repl() -> Result<(), Box<dyn Error>> {
+    let mut evaluator = Evaluator::new();
     let mut rl = rustyline::DefaultEditor::new()?;
     let mut stdout = std::io::stdout();
     loop {
@@ -16,14 +14,9 @@ pub fn run_repl(parser: &Parser) -> Result<(), rustyline::error::ReadlineError> 
                     return Ok(());
                 }
                 rl.add_history_entry(&line)?;
-                let result = match parser.parse(line.as_str()) {
-                    Ok(ast) => eval_ast_node(&Val::new_null(), &ast, &HashMap::new()),
-                    Err(err) => Val::new_err(err.message.as_str()),
-                };
-                result.write_json_str(&mut stdout, true);
-                if let ValType::Bytes(_) = result.val.val {
-                    let _ = stdout.write(&['\n' as u8]);
-                }
+                let result = evaluator.parse_and_eval(line.as_str());
+
+                evaluator.write_val(result, &mut stdout, true)?;
             }
             Err(_) => {
                 return Ok(());

@@ -628,6 +628,20 @@ impl ObjPool {
         Ok(0)
     }
 
+    fn outer_write_str(
+        &self,
+        writer: &mut impl std::io::Write,
+        val: ObjPoolRef,
+        indent: u64,
+        use_indent: bool,
+    ) -> std::io::Result<usize> {
+        self.inner_write_str(writer, val, indent, use_indent)?;
+        if use_indent {
+            writer.write("\n".as_bytes())?;
+        }
+        Ok(0)
+    }
+
     fn inner_write_str(
         &self,
         writer: &mut impl std::io::Write,
@@ -819,14 +833,19 @@ impl Evaluator {
 
     pub fn parse_and_eval(&mut self, text: &str) -> ObjPoolRef {
         let mut parser = Parser::new(text);
-        let ast = parser.parse_expr().unwrap().unwrap();
-
-        // for (idx, val) in parser.pool.vals.iter().enumerate() {
-        //     println!("{}: {:?}", idx, val);
-        // }
-
-        let val = self.obj_pool.new_null();
-        self.eval(ast, val, &parser)
+        match parser.parse_expr() {
+            None => self.obj_pool.new_null(),
+            Some(ast) => match ast {
+                Err(_) => self.obj_pool.new_err("Parse Error"),
+                Ok(ast) => {
+                    // for (idx, val) in parser.pool.vals.iter().enumerate() {
+                    //     println!("{}: {:?}", idx, val);
+                    // }
+                    let val = self.obj_pool.new_null();
+                    self.eval(ast, val, &parser)
+                }
+            },
+        }
     }
 
     fn eval(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> ObjPoolRef {
@@ -921,7 +940,7 @@ impl Evaluator {
         writer: &mut impl std::io::Write,
         use_indent: bool,
     ) -> std::io::Result<()> {
-        match self.obj_pool.inner_write_str(writer, val, 0, use_indent) {
+        match self.obj_pool.outer_write_str(writer, val, 0, use_indent) {
             Err(err) => Err(err),
             Ok(_) => Ok(()),
         }
