@@ -316,6 +316,85 @@ impl Val {
         let mut writer = Writer { writer };
         let _ = writer.outer_write(self, use_indent);
     }
+
+    pub fn from_toml_str(toml_str: &str) -> Self {
+        let value = match toml::from_str(toml_str) {
+            Err(_) => {
+                return Val::new_err("Unable to parse toml string.");
+            }
+            Ok(val) => val,
+        };
+
+        fn helper(node: &toml::Value) -> Val {
+            match node {
+                toml::Value::Boolean(val) => Val::new_bool(*val),
+                toml::Value::Float(val) => Val::new_number(*val),
+                toml::Value::Integer(val) => Val::new_number(*val as f64),
+                toml::Value::String(val) => Val::new_string(val.as_str()),
+                toml::Value::Datetime(val) => Val::new_string(val.to_string().as_str()),
+                toml::Value::Array(val) => Val::new_list(
+                    val.iter()
+                        .map(|elem| helper(elem))
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                ),
+                toml::Value::Table(val) => {
+                    return Val::new_map_from_entries_iter(
+                        val.iter()
+                            .map(|(key, val)| (Val::new_string(key.as_str()), helper(val)))
+                            .collect::<Vec<_>>(),
+                    );
+                }
+            }
+        }
+
+        return helper(&value);
+    }
+
+    pub fn to_toml_str(&self) -> Val {
+        fn helper(node: &Val) -> toml::Value {
+            match &node.val.val {
+                ValType::Error(val) => {
+                    let mut result = toml::map::Map::new();
+                    result.insert("ERROR".to_string(), toml::Value::String(val.to_string()));
+                    toml::Value::Table(result)
+                }
+                ValType::Null => toml::Value::String("".to_string()),
+                ValType::Bool(val) => toml::Value::Boolean(*val),
+                ValType::Number(val) => toml::Value::Float(*val),
+                ValType::String(val) => toml::Value::String(val.clone()),
+                ValType::List(val) => {
+                    toml::Value::Array(val.iter().map(|elem| helper(elem)).collect())
+                }
+                ValType::Map(val) => {
+                    let mut result = toml::map::Map::new();
+                    for (key, val) in val.entries() {
+                        let key = match &key.val.val {
+                            ValType::String(val) => val.clone(),
+                            _ => {
+                                let mut buffer = Vec::<u8>::new();
+                                key.write_json_str(&mut buffer, false);
+                                std::str::from_utf8(buffer.as_slice()).unwrap().to_string()
+                            }
+                        };
+                        result.insert(key, helper(val));
+                    }
+                    toml::Value::Table(result)
+                }
+                ValType::Bytes(val) => toml::Value::String(STANDARD.encode(val)),
+            }
+        }
+
+        let value = helper(self);
+        println!("Got value {:?}", value);
+        let toml_str = match toml::to_string(&value) {
+            Err(_) => {
+                return Val::new_err("Unable to create toml string from value");
+            }
+            Ok(val) => val,
+        };
+        Val::new_string(toml_str.as_str())
+    }
 }
 
 #[derive(Hash)]

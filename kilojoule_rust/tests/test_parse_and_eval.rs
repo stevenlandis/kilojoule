@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_sort() {
-        assert_json("[4,1,3,2,5] | sort()", json!([1, 2, 3, 4, 5]));
+        assert_json("[4,1,3,2,5] | sort(.)", json!([1, 2, 3, 4, 5]));
     }
 
     #[test]

@@ -399,7 +399,7 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
         "sort" => match &obj.val.val {
             ValType::List(list) => {
                 let mut result = list.iter().cloned().collect::<Vec<_>>();
-                result.sort();
+                result.sort_by_cached_key(|elem| eval_ast_node(elem, args[0], vars));
                 Val::new_list(result.as_slice())
             }
             _ => Val::new_err("sort() has to be called on a list."),
@@ -597,6 +597,11 @@ fn evaluate_fcn(fcn_name: &str, args: &Vec<&AstNode>, obj: &Val, vars: &Variable
             }
             _ => Val::new_err("joinlines() must be called on a list"),
         },
+        "fromtoml" => match &obj.val.val {
+            ValType::String(val) => Val::from_toml_str(val),
+            _ => Val::new_err("fromtoml() called on invalid type"),
+        },
+        "totoml" => obj.to_toml_str(),
         _ => Val::new_err("Function does not exist."),
     }
 }
