@@ -2,6 +2,7 @@ mod ast_node;
 mod evaluate;
 mod lookup_rows;
 mod parser;
+mod parser2;
 mod parser_reducers;
 mod rule_type;
 mod rules;
