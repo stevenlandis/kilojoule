@@ -15,7 +15,7 @@ impl Evaluator {
 
     pub fn parse_and_eval(&mut self, text: &str) -> ObjPoolRef {
         let mut parser = Parser::new(text);
-        match parser.parse_expr() {
+        match parser.external_parse_expr() {
             None => self.obj_pool.new_null(),
             Some(ast) => match ast {
                 Err(err) => {

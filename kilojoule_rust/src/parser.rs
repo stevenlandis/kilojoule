@@ -496,8 +496,26 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    pub fn external_parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         self.parse_ws();
+        let expr = match self.parse_expr() {
+            None => self.pool.new_null(),
+            Some(expr) => match expr {
+                Err(err) => {
+                    return Some(Err(err));
+                }
+                Ok(expr) => expr,
+            },
+        };
+        self.parse_ws();
+        if self.idx < self.text.as_bytes().len() {
+            return Some(Err(self.get_err(ParseErrorType::IncompleteParse)));
+        }
+
+        Some(Ok(expr))
+    }
+
+    fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         let expr = match self.parse_base_expr_with_accesses() {
             None => {
                 return None;
@@ -608,4 +626,5 @@ enum ParseErrorType {
     NoClosingQuoteOnString,
     NoExprInFormatString,
     NoClosingBraceInFormatString,
+    IncompleteParse,
 }
