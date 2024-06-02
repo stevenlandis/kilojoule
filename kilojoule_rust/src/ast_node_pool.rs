@@ -3,6 +3,7 @@ pub enum AstNode<'a> {
     Null,
     SubString(&'a str),
     Integer(u64),
+    Bool(bool),
     Pipe(AstNodePtr, AstNodePtr),
     Dot,
     Access(AstNodePtr),
@@ -45,6 +46,12 @@ impl<'a> AstNodePool<'a> {
     pub fn new_integer(&mut self, val: u64) -> AstNodePtr {
         let ptr = self.vals.len() as AstNodePtr;
         self.vals.push(AstNode::Integer(val));
+        ptr
+    }
+
+    pub fn new_bool(&mut self, val: bool) -> AstNodePtr {
+        let ptr = self.vals.len() as AstNodePtr;
+        self.vals.push(AstNode::Bool(val));
         ptr
     }
 

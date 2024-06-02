@@ -387,6 +387,12 @@ impl<'a> Parser<'a> {
         if self.parse_str_literal("null") {
             return Some(Ok(self.pool.new_null()));
         }
+        if self.parse_str_literal("true") {
+            return Some(Ok(self.pool.new_bool(true)));
+        }
+        if self.parse_str_literal("false") {
+            return Some(Ok(self.pool.new_bool(false)));
+        }
         if let Some(expr) = self.parse_identifier() {
             self.parse_ws();
             if self.parse_str_literal("(") {

@@ -7,6 +7,7 @@ pub enum ObjPoolObjValue {
     Null,
     Err(String),
     Float64(f64),
+    Bool(bool),
     String(String),
     List(Vec<ObjPoolRef>),
     Map(OrderedMap),
@@ -53,6 +54,15 @@ impl ObjPool {
         self.vals.push(ObjPoolObj {
             ref_count: 0,
             value: ObjPoolObjValue::Float64(val),
+        });
+        ObjPoolRef { idx }
+    }
+
+    pub fn new_bool(&mut self, val: bool) -> ObjPoolRef {
+        let idx = self.vals.len();
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::Bool(val),
         });
         ObjPoolRef { idx }
     }
@@ -114,6 +124,7 @@ impl ObjPool {
                 ObjPoolObjValue::Null => {}
                 ObjPoolObjValue::Err(_) => {}
                 ObjPoolObjValue::Float64(_) => {}
+                ObjPoolObjValue::Bool(_) => {}
                 ObjPoolObjValue::String(_) => {}
                 ObjPoolObjValue::List(val) => {
                     for elem in val {
@@ -209,6 +220,13 @@ impl ObjPool {
                 // TODO: Don't allocate on every float write
                 writer.write(val.to_string().as_str().as_bytes())?;
             }
+            ObjPoolObjValue::Bool(val) => {
+                if *val {
+                    writer.write("true".as_bytes())?;
+                } else {
+                    writer.write("false".as_bytes())?;
+                }
+            }
             ObjPoolObjValue::String(val) => {
                 self.write_json_escaped_str(writer, val.as_str())?;
             }
@@ -285,6 +303,10 @@ impl ObjPool {
                 ObjPoolObjValue::Float64(right) => {
                     left.total_cmp(&right) == std::cmp::Ordering::Equal
                 }
+                _ => false,
+            },
+            ObjPoolObjValue::Bool(left) => match &self.vals[right.idx].value {
+                ObjPoolObjValue::Bool(right) => left == right,
                 _ => false,
             },
             ObjPoolObjValue::String(left) => match &self.vals[right.idx].value {

@@ -253,6 +253,7 @@ impl Evaluator {
                 ObjPoolObjValue::Null => obj,
                 _ => panic!(),
             },
+            AstNode::Bool(val) => self.obj_pool.new_bool(*val),
             _ => panic!("Unimplemented {:?}", parser.get_node(node)),
         }
     }
