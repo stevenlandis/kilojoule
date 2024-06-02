@@ -126,13 +126,13 @@ impl Evaluator {
 
                 self.obj_pool.new_list(list)
             }
-            AstNode::Access(expr) => match &self.obj_pool.get(obj) {
+            AstNode::Access(expr) => match self.obj_pool.get(obj) {
                 ObjPoolObjValue::Map(_) => {
                     let key_val = match parser.get_node(*expr) {
                         AstNode::Identifier(key) => self.obj_pool.new_str(key),
                         _ => panic!(),
                     };
-                    let map = match &self.obj_pool.get(obj) {
+                    let map = match self.obj_pool.get(obj) {
                         ObjPoolObjValue::Map(map) => map,
                         _ => panic!(),
                     };
@@ -141,6 +141,35 @@ impl Evaluator {
                         Some(val) => val,
                     }
                 }
+                ObjPoolObjValue::List(_) => {
+                    let access_val = self.eval(*expr, obj, parser);
+                    let access_idx = match self.obj_pool.get(access_val) {
+                        ObjPoolObjValue::Float64(val) => {
+                            if *val >= 0.0 && *val == val.floor() {
+                                *val as usize
+                            } else {
+                                return self
+                                    .obj_pool
+                                    .new_err("List access must be positive integer");
+                            }
+                        }
+                        _ => {
+                            return self
+                                .obj_pool
+                                .new_err("List access must be a positive integer");
+                        }
+                    };
+                    let list = match self.obj_pool.get(obj) {
+                        ObjPoolObjValue::List(list) => list,
+                        _ => panic!(),
+                    };
+                    if access_idx < list.len() {
+                        list[access_idx]
+                    } else {
+                        self.obj_pool.new_err("List access out of bounds")
+                    }
+                }
+                ObjPoolObjValue::Null => obj,
                 _ => panic!(),
             },
             _ => panic!("Unimplemented {:?}", parser.get_node(node)),

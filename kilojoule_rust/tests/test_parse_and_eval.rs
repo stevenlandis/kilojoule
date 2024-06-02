@@ -47,23 +47,23 @@ mod tests {
         assert_json("[]", json!([]));
         assert_json("[1]", json!([1]));
         assert_json("[1,2,3]", json!([1, 2, 3]));
-        assert_json("[1,2,3,]", json!([1, 2, 3]));
+        assert_json("[ 1 , 2 , 3 , ]", json!([1, 2, 3]));
         assert_json(
             "{a: 1, b: 2} | [., .a, .b]",
             json!([{"a": 1, "b": 2}, 1, 2]),
         );
-        // assert_json("[100, 200, 300] | .[1]", json!(200));
+        assert_json("[100, 200, 300] | .[1]", json!(200));
     }
 
-    // #[test]
-    // fn test_chained_access() {
-    //     assert_json("{a: {b: {c: 42}}}.a.b.c", json!(42));
-    //     assert_json("{a: {b: {c: 42}}} | .a.b.c", json!(42));
-    //     assert_json("{a: {b: {c: 42}}}['a']['b']['c']", json!(42));
-    //     assert_json("{a: {b: {c: 42}}} | .['a']['b']['c']", json!(42));
+    #[test]
+    fn test_chained_access() {
+        assert_json("{a: {b: {c: 42}}}.a.b.c", json!(42));
+        assert_json("{a: {b: {c: 42}}} | .a.b.c", json!(42));
+        // assert_json("{a: {b: {c: 42}}}['a']['b']['c']", json!(42));
+        // assert_json("{a: {b: {c: 42}}} | .['a']['b']['c']", json!(42));
 
-    //     assert_json("null.a", json!(null));
-    // }
+        assert_json("null.a", json!(null));
+    }
 
     // #[test]
     // fn string_literals() {

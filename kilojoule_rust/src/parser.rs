@@ -223,6 +223,35 @@ impl<'a> Parser<'a> {
         Some(Ok(self.pool.new_map_literal(parts)))
     }
 
+    fn parse_base_expr_with_accesses(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        let mut expr = match self.parse_base_expr() {
+            None => return None,
+            Some(expr) => match expr {
+                Err(err) => {
+                    return Some(Err(err));
+                }
+                Ok(expr) => expr,
+            },
+        };
+
+        loop {
+            let accessor = match self.parse_access() {
+                None => {
+                    break;
+                }
+                Some(expr) => match expr {
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
+                    Ok(expr) => expr,
+                },
+            };
+            expr = self.pool.new_pipe(expr, accessor);
+        }
+
+        Some(Ok(expr))
+    }
+
     fn parse_base_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         if self.parse_str_literal(".") {
             let mut expr = self.pool.new_dot();
@@ -330,8 +359,46 @@ impl<'a> Parser<'a> {
         return true;
     }
 
+    fn parse_access(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        if self.parse_str_literal(".") {
+            self.parse_ws();
+            let identifier = match self.parse_identifier() {
+                None => {
+                    return Some(Err(self.get_err(ParseErrorType::NoIdentifierAfterDotAccess)));
+                }
+                Some(val) => val,
+            };
+
+            Some(Ok(self.pool.new_access(identifier)))
+        } else if self.parse_str_literal("[") {
+            self.parse_ws();
+            let expr = match self.parse_expr() {
+                None => {
+                    return Some(Err(
+                        self.get_err(ParseErrorType::NoExpressionForBracketAccess)
+                    ));
+                }
+                Some(expr) => match expr {
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
+                    Ok(expr) => expr,
+                },
+            };
+            if !self.parse_str_literal("]") {
+                return Some(Err(
+                    self.get_err(ParseErrorType::NoClosingBracketForBracketAccess)
+                ));
+            }
+
+            Some(Ok(self.pool.new_access(expr)))
+        } else {
+            None
+        }
+    }
+
     pub fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
-        let expr = match self.parse_base_expr() {
+        let expr = match self.parse_base_expr_with_accesses() {
             None => {
                 return None;
             }
@@ -396,7 +463,7 @@ impl<'a> Parser<'a> {
                 break;
             } {
                 self.parse_ws();
-                let next_expr = match self.parse_base_expr() {
+                let next_expr = match self.parse_base_expr_with_accesses() {
                     None => {
                         return Some(Err(self.get_err(ParseErrorType::NoExprAfterOperator)));
                     }
@@ -435,4 +502,7 @@ enum ParseErrorType {
     NoMapLiteralValue,
     NoMapLiteralEndingBrace,
     NoListLiteralEndingBracket,
+    NoIdentifierAfterDotAccess,
+    NoClosingBracketForBracketAccess,
+    NoExpressionForBracketAccess,
 }
