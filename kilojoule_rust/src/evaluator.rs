@@ -311,13 +311,39 @@ impl Evaluator {
         args: Vec<AstNodePtr>,
     ) -> ObjPoolRef {
         match name {
-            "len" => match self.obj_pool.get(obj) {
-                ObjPoolObjValue::List(val) => self.obj_pool.new_f64(val.len() as f64),
-                ObjPoolObjValue::Map(val) => self.obj_pool.new_f64(val.len() as f64),
-                _ => self
-                    .obj_pool
-                    .new_err("len() can only be called on a list or map"),
-            },
+            "len" => {
+                if args.len() != 0 {
+                    return self
+                        .obj_pool
+                        .new_err("len() must be called with 0 arguments.");
+                }
+                match self.obj_pool.get(obj) {
+                    ObjPoolObjValue::List(val) => self.obj_pool.new_f64(val.len() as f64),
+                    ObjPoolObjValue::Map(val) => self.obj_pool.new_f64(val.len() as f64),
+                    _ => self
+                        .obj_pool
+                        .new_err("len() can only be called on a list or map"),
+                }
+            }
+            "map" => {
+                if args.len() != 1 {
+                    return self
+                        .obj_pool
+                        .new_err("map() must be called with 1 argument.");
+                }
+                match self.obj_pool.get(obj) {
+                    ObjPoolObjValue::List(val) => {
+                        // TODO: figure out how to not clone here
+                        let val = val.clone();
+                        let mut result = Vec::<ObjPoolRef>::with_capacity(val.len());
+                        for elem in val {
+                            result.push(self.eval(args[0], elem, parser));
+                        }
+                        self.obj_pool.new_list(result)
+                    }
+                    _ => self.obj_pool.new_err("map() must be called on a list"),
+                }
+            }
             _ => self
                 .obj_pool
                 .new_err(format!("Unknown function \"{}\"", name).as_str()),

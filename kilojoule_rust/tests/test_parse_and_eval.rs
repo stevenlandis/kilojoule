@@ -148,10 +148,10 @@ mod tests {
         assert_json("{a: 1, b: 2, c: 3, d: 4} | len()", json!(4));
     }
 
-    // #[test]
-    // fn test_map_fcn() {
-    //     assert_json("[[],[1,2],[1]] | map(len())", json!([0, 2, 1]));
-    // }
+    #[test]
+    fn test_map_fcn() {
+        assert_json("[[],[1,2],[1]] | map(len())", json!([0, 2, 1]));
+    }
 
     // #[test]
     // fn test_group_fcn() {
