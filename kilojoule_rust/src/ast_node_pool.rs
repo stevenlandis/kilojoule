@@ -8,9 +8,15 @@ pub enum AstNode<'a> {
     Dot,
     Access(AstNodePtr),
     Add(AstNodePtr, AstNodePtr),
-    FcnCall(Option<AstNodePtr>),
+    FcnCall {
+        name: AstNodePtr,
+        args: Option<AstNodePtr>,
+    },
     ListNode(AstNodePtr, AstNodePtr),
-    MapKeyValPair { key: AstNodePtr, val: AstNodePtr },
+    MapKeyValPair {
+        key: AstNodePtr,
+        val: AstNodePtr,
+    },
     MapLiteral(Option<AstNodePtr>),
     ListLiteral(Option<AstNodePtr>),
     FormatString(Option<AstNodePtr>),
@@ -85,9 +91,9 @@ impl<'a> AstNodePool<'a> {
         ptr
     }
 
-    pub fn new_fcn_call(&mut self, args: Option<AstNodePtr>) -> AstNodePtr {
+    pub fn new_fcn_call(&mut self, name: AstNodePtr, args: Option<AstNodePtr>) -> AstNodePtr {
         let ptr = self.vals.len();
-        self.vals.push(AstNode::FcnCall(args));
+        self.vals.push(AstNode::FcnCall { name, args });
         ptr
     }
 

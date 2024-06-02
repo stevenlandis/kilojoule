@@ -383,4 +383,8 @@ impl OrderedMap {
         }
         None
     }
+
+    pub fn len(&self) -> usize {
+        self.pairs.len()
+    }
 }

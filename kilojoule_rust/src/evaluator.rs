@@ -254,6 +254,39 @@ impl Evaluator {
                 _ => panic!(),
             },
             AstNode::Bool(val) => self.obj_pool.new_bool(*val),
+            AstNode::FcnCall { name, args } => {
+                let name = match parser.get_node(*name) {
+                    AstNode::SubString(name) => *name,
+                    _ => panic!(),
+                };
+
+                let mut args_vec = Vec::<AstNodePtr>::new();
+                fn helper(
+                    obj: ObjPoolRef,
+                    parser: &Parser,
+                    args_vec: &mut Vec<AstNodePtr>,
+                    node: AstNodePtr,
+                ) {
+                    match parser.get_node(node) {
+                        AstNode::ListNode(left, right) => {
+                            helper(obj, parser, args_vec, *left);
+                            helper(obj, parser, args_vec, *right);
+                        }
+                        _ => {
+                            args_vec.push(node);
+                        }
+                    }
+                }
+
+                match args {
+                    None => {}
+                    Some(args) => {
+                        helper(obj, parser, &mut args_vec, *args);
+                    }
+                };
+
+                self.eval_fcn(parser, obj, name, args_vec)
+            }
             _ => panic!("Unimplemented {:?}", parser.get_node(node)),
         }
     }
@@ -267,6 +300,27 @@ impl Evaluator {
         match self.obj_pool.write_to_str(writer, val, 0, use_indent) {
             Err(err) => Err(err),
             Ok(_) => Ok(()),
+        }
+    }
+
+    pub fn eval_fcn(
+        &mut self,
+        parser: &Parser,
+        obj: ObjPoolRef,
+        name: &str,
+        args: Vec<AstNodePtr>,
+    ) -> ObjPoolRef {
+        match name {
+            "len" => match self.obj_pool.get(obj) {
+                ObjPoolObjValue::List(val) => self.obj_pool.new_f64(val.len() as f64),
+                ObjPoolObjValue::Map(val) => self.obj_pool.new_f64(val.len() as f64),
+                _ => self
+                    .obj_pool
+                    .new_err("len() can only be called on a list or map"),
+            },
+            _ => self
+                .obj_pool
+                .new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
 }

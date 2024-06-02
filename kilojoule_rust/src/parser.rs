@@ -425,7 +425,7 @@ impl<'a> Parser<'a> {
                 }
 
                 if self.parse_str_literal(")") {
-                    return Some(Ok(self.pool.new_fcn_call(args_node)));
+                    return Some(Ok(self.pool.new_fcn_call(expr, args_node)));
                 } else {
                     return Some(Err(self.get_err(ParseErrorType::NoClosingParenFcnCall)));
                 }
