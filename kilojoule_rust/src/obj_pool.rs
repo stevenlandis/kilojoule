@@ -146,7 +146,28 @@ impl ObjPool {
         val: &str,
     ) -> std::io::Result<usize> {
         writer.write("\"".as_bytes())?;
-        writer.write(val.as_bytes())?;
+        for ch in val.as_bytes() {
+            match *ch as char {
+                '\n' => {
+                    writer.write("\\n".as_bytes())?;
+                }
+                '\t' => {
+                    writer.write("\\t".as_bytes())?;
+                }
+                '\r' => {
+                    writer.write("\\r".as_bytes())?;
+                }
+                '"' => {
+                    writer.write("\\\"".as_bytes())?;
+                }
+                '\\' => {
+                    writer.write("\\\\".as_bytes())?;
+                }
+                _ => {
+                    writer.write(&[*ch])?;
+                }
+            }
+        }
         writer.write("\"".as_bytes())?;
 
         Ok(0)

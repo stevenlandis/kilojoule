@@ -18,7 +18,10 @@ impl Evaluator {
         match parser.parse_expr() {
             None => self.obj_pool.new_null(),
             Some(ast) => match ast {
-                Err(_) => self.obj_pool.new_err("Parse Error"),
+                Err(err) => {
+                    println!("Parse Error: {:?}", err);
+                    self.obj_pool.new_err("Parse Error")
+                }
                 Ok(ast) => {
                     // for (idx, val) in parser.pool.vals.iter().enumerate() {
                     //     println!("{}: {:?}", idx, val);
@@ -76,7 +79,7 @@ impl Evaluator {
                         }
                         AstNode::MapKeyValPair { key, val } => {
                             let key_obj = match parser.get_node(*key) {
-                                AstNode::Identifier(key_name) => this.obj_pool.new_str(key_name),
+                                AstNode::SubString(key_name) => this.obj_pool.new_str(key_name),
                                 _ => panic!(),
                             };
                             let val_obj = this.eval(*val, obj, parser);
@@ -126,11 +129,89 @@ impl Evaluator {
 
                 self.obj_pool.new_list(list)
             }
+            AstNode::FormatString(contents) => {
+                let mut buffer = Vec::<u8>::new();
+                fn helper(
+                    this: &mut Evaluator,
+                    obj: ObjPoolRef,
+                    parser: &Parser,
+                    buffer: &mut Vec<u8>,
+                    node: AstNodePtr,
+                ) {
+                    match parser.get_node(node) {
+                        AstNode::ListNode(left, right) => {
+                            helper(this, obj, parser, buffer, *left);
+                            helper(this, obj, parser, buffer, *right);
+                        }
+                        AstNode::SubString(text) => {
+                            let text_bytes = text.as_bytes();
+                            let mut idx = 0 as usize;
+                            while idx < text_bytes.len() {
+                                let ch = text_bytes[idx];
+                                if ch as char == '\\' {
+                                    match text_bytes[idx + 1] as char {
+                                        'n' => {
+                                            buffer.push('\n' as u8);
+                                        }
+                                        'r' => {
+                                            buffer.push('\r' as u8);
+                                        }
+                                        't' => {
+                                            buffer.push('\t' as u8);
+                                        }
+                                        '\\' => {
+                                            buffer.push('\\' as u8);
+                                        }
+                                        '"' => {
+                                            buffer.push('"' as u8);
+                                        }
+                                        '\'' => {
+                                            buffer.push('\'' as u8);
+                                        }
+                                        '{' => {
+                                            buffer.push('{' as u8);
+                                        }
+                                        '}' => {
+                                            buffer.push('}' as u8);
+                                        }
+                                        _ => panic!(),
+                                    }
+                                    idx += 1;
+                                } else {
+                                    buffer.push(ch);
+                                }
+                                idx += 1;
+                            }
+                        }
+                        _ => {
+                            let elem_val = this.eval(node, obj, parser);
+                            match this.obj_pool.get(elem_val) {
+                                ObjPoolObjValue::String(sub_text) => {
+                                    buffer.extend(sub_text.as_bytes());
+                                }
+                                _ => {
+                                    this.write_val(elem_val, buffer, false).unwrap();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                match contents {
+                    None => {}
+                    Some(contents) => {
+                        helper(self, obj, parser, &mut buffer, *contents);
+                    }
+                };
+
+                self.obj_pool
+                    .new_str(std::str::from_utf8(buffer.as_slice()).unwrap())
+            }
             AstNode::Access(expr) => match self.obj_pool.get(obj) {
                 ObjPoolObjValue::Map(_) => {
                     let key_val = match parser.get_node(*expr) {
-                        AstNode::Identifier(key) => self.obj_pool.new_str(key),
-                        _ => panic!(),
+                        AstNode::SubString(key) => self.obj_pool.new_str(key),
+                        _ => self.eval(*expr, obj, parser),
                     };
                     let map = match self.obj_pool.get(obj) {
                         ObjPoolObjValue::Map(map) => map,

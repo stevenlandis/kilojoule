@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub enum AstNode<'a> {
     Null,
-    Identifier(&'a str),
+    SubString(&'a str),
     Integer(u64),
     Pipe(AstNodePtr, AstNodePtr),
     Dot,
@@ -12,12 +12,13 @@ pub enum AstNode<'a> {
     MapKeyValPair { key: AstNodePtr, val: AstNodePtr },
     MapLiteral(Option<AstNodePtr>),
     ListLiteral(Option<AstNodePtr>),
+    FormatString(Option<AstNodePtr>),
 }
 
 pub type AstNodePtr = usize;
 
 pub struct AstNodePool<'a> {
-    vals: Vec<AstNode<'a>>,
+    pub vals: Vec<AstNode<'a>>,
 }
 
 impl<'a> AstNodePool<'a> {
@@ -37,7 +38,7 @@ impl<'a> AstNodePool<'a> {
 
     pub fn new_identifier(&mut self, text: &'a str) -> AstNodePtr {
         let ptr = self.vals.len() as AstNodePtr;
-        self.vals.push(AstNode::Identifier(text));
+        self.vals.push(AstNode::SubString(text));
         ptr
     }
 
@@ -98,6 +99,12 @@ impl<'a> AstNodePool<'a> {
     pub fn new_list_literal(&mut self, contents: Option<AstNodePtr>) -> AstNodePtr {
         let ptr = self.vals.len();
         self.vals.push(AstNode::ListLiteral(contents));
+        ptr
+    }
+
+    pub fn new_format_string(&mut self, contents: Option<AstNodePtr>) -> AstNodePtr {
+        let ptr = self.vals.len();
+        self.vals.push(AstNode::FormatString(contents));
         ptr
     }
 }

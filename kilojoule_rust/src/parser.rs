@@ -2,7 +2,7 @@ use super::ast_node_pool::{AstNode, AstNodePool, AstNodePtr};
 
 pub struct Parser<'a> {
     text: &'a str,
-    pool: AstNodePool<'a>,
+    pub pool: AstNodePool<'a>,
     idx: usize,
 }
 
@@ -223,6 +223,91 @@ impl<'a> Parser<'a> {
         Some(Ok(self.pool.new_map_literal(parts)))
     }
 
+    fn get_substring(&mut self, start_offset: usize, end_offset: usize) -> AstNodePtr {
+        self.pool.new_identifier(
+            std::str::from_utf8(
+                &self.text.as_bytes()[self.idx + start_offset..self.idx + end_offset],
+            )
+            .unwrap(),
+        )
+    }
+
+    fn parse_format_string(&mut self, quote_char: u8) -> Option<Result<AstNodePtr, ParseError>> {
+        if self.peek(0) != Some(quote_char) {
+            return None;
+        }
+        self.idx += 1;
+
+        let mut parts: Option<AstNodePtr> = None;
+
+        let mut idx = 0 as usize;
+        loop {
+            match self.peek(idx) {
+                None => {
+                    return Some(Err(self.get_err(ParseErrorType::NoClosingQuoteOnString)));
+                }
+                Some(ch) => {
+                    if ch == quote_char || ch == ('{' as u8) {
+                        let part = self.get_substring(0, idx);
+                        match parts {
+                            None => {
+                                parts = Some(part);
+                            }
+                            Some(prev) => {
+                                parts = Some(self.pool.new_list_node(prev, part));
+                            }
+                        }
+
+                        if ch == quote_char {
+                            break;
+                        } else {
+                            self.idx += idx + 1;
+                            self.parse_ws();
+                            let part = match self.parse_expr() {
+                                None => {
+                                    return Some(Err(
+                                        self.get_err(ParseErrorType::NoExprInFormatString)
+                                    ));
+                                }
+                                Some(expr) => match expr {
+                                    Err(err) => {
+                                        return Some(Err(err));
+                                    }
+                                    Ok(expr) => expr,
+                                },
+                            };
+
+                            match parts {
+                                None => {
+                                    parts = Some(part);
+                                }
+                                Some(prev) => {
+                                    parts = Some(self.pool.new_list_node(prev, part));
+                                }
+                            }
+
+                            self.parse_ws();
+                            if !self.parse_str_literal("}") {
+                                return Some(Err(
+                                    self.get_err(ParseErrorType::NoClosingBraceInFormatString)
+                                ));
+                            }
+                            idx = 0;
+                        }
+                    } else if ch == ('\\' as u8) {
+                        idx += 2;
+                    } else {
+                        idx += 1;
+                    }
+                }
+            }
+        }
+
+        self.idx += idx + 1;
+
+        Some(Ok(self.pool.new_format_string(parts)))
+    }
+
     fn parse_base_expr_with_accesses(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         let mut expr = match self.parse_base_expr() {
             None => return None,
@@ -285,6 +370,14 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(result) = self.parse_list_literal() {
+            return Some(result);
+        }
+
+        if let Some(result) = self.parse_format_string('\'' as u8) {
+            return Some(result);
+        }
+
+        if let Some(result) = self.parse_format_string('"' as u8) {
             return Some(result);
         }
 
@@ -398,6 +491,7 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        self.parse_ws();
         let expr = match self.parse_base_expr_with_accesses() {
             None => {
                 return None;
@@ -505,4 +599,7 @@ enum ParseErrorType {
     NoIdentifierAfterDotAccess,
     NoClosingBracketForBracketAccess,
     NoExpressionForBracketAccess,
+    NoClosingQuoteOnString,
+    NoExprInFormatString,
+    NoClosingBraceInFormatString,
 }
