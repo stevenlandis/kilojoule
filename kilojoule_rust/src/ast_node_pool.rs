@@ -7,6 +7,12 @@ pub enum AstNode<'a> {
     Pipe(AstNodePtr, AstNodePtr),
     Dot,
     Access(AstNodePtr),
+    Equals(AstNodePtr, AstNodePtr),
+    NotEquals(AstNodePtr, AstNodePtr),
+    LessThan(AstNodePtr, AstNodePtr),
+    LessThanOrEqual(AstNodePtr, AstNodePtr),
+    GreaterThan(AstNodePtr, AstNodePtr),
+    GreaterThanOrEqual(AstNodePtr, AstNodePtr),
     Or(AstNodePtr, AstNodePtr),
     And(AstNodePtr, AstNodePtr),
     Add(AstNodePtr, AstNodePtr),
@@ -40,7 +46,7 @@ impl<'a> AstNodePool<'a> {
         &self.vals[ptr]
     }
 
-    fn new_node(&mut self, val: AstNode<'a>) -> AstNodePtr {
+    pub fn new_node(&mut self, val: AstNode<'a>) -> AstNodePtr {
         let ptr = self.vals.len() as AstNodePtr;
         self.vals.push(val);
         ptr

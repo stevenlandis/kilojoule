@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::ast_node_pool::{AstNode, AstNodePtr};
 use super::obj_pool::{ObjPool, ObjPoolObjValue, ObjPoolRef, OrderedMap};
 use super::parser::Parser;
@@ -120,6 +122,42 @@ impl Evaluator {
                 "Right side of OR has to be a boolean",
                 |left, right| left && right,
             ),
+            AstNode::Equals(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let right_val = self.eval(*right, obj, parser);
+                self.obj_pool
+                    .new_bool(self.obj_pool.val_equals(left_val, right_val))
+            }
+            AstNode::NotEquals(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let right_val = self.eval(*right, obj, parser);
+                self.obj_pool
+                    .new_bool(!self.obj_pool.val_equals(left_val, right_val))
+            }
+            AstNode::LessThan(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let right_val = self.eval(*right, obj, parser);
+                self.obj_pool
+                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) == Ordering::Less)
+            }
+            AstNode::LessThanOrEqual(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let right_val = self.eval(*right, obj, parser);
+                self.obj_pool
+                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) != Ordering::Greater)
+            }
+            AstNode::GreaterThan(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let right_val = self.eval(*right, obj, parser);
+                self.obj_pool
+                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) == Ordering::Greater)
+            }
+            AstNode::GreaterThanOrEqual(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let right_val = self.eval(*right, obj, parser);
+                self.obj_pool
+                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) != Ordering::Less)
+            }
             AstNode::Add(left, right) => self.eval_f64_expr(
                 obj,
                 parser,

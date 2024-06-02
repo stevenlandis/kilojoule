@@ -537,6 +537,12 @@ impl<'a> Parser<'a> {
             Base,
             Or,
             And,
+            Equals,
+            NotEquals,
+            LessThan,
+            LessThanOrEqual,
+            GreaterThan,
+            GreaterThanOrEqual,
             Add,
             Subtract,
             Pipe,
@@ -548,6 +554,7 @@ impl<'a> Parser<'a> {
             Pipe,
             Or,
             And,
+            Equality,
             Add,
             Base,
         }
@@ -569,6 +576,16 @@ impl<'a> Parser<'a> {
                             Op::Pipe => pool.new_pipe(left, right),
                             Op::Or => pool.new_or(left, right),
                             Op::And => pool.new_and(left, right),
+                            Op::Equals => pool.new_node(AstNode::Equals(left, right)),
+                            Op::NotEquals => pool.new_node(AstNode::NotEquals(left, right)),
+                            Op::LessThan => pool.new_node(AstNode::LessThan(left, right)),
+                            Op::LessThanOrEqual => {
+                                pool.new_node(AstNode::LessThanOrEqual(left, right))
+                            }
+                            Op::GreaterThan => pool.new_node(AstNode::GreaterThan(left, right)),
+                            Op::GreaterThanOrEqual => {
+                                pool.new_node(AstNode::GreaterThanOrEqual(left, right))
+                            }
                             Op::Add => pool.new_add(left, right),
                             Op::Subtract => pool.new_subtract(left, right),
                             Op::Base => panic!(),
@@ -591,6 +608,18 @@ impl<'a> Parser<'a> {
                 Some((Op::Or, OpOrder::Or))
             } else if self.parse_str_literal("and") {
                 Some((Op::And, OpOrder::And))
+            } else if self.parse_str_literal("==") {
+                Some((Op::Equals, OpOrder::Equality))
+            } else if self.parse_str_literal("!=") {
+                Some((Op::NotEquals, OpOrder::Equality))
+            } else if self.parse_str_literal("<=") {
+                Some((Op::LessThanOrEqual, OpOrder::Equality))
+            } else if self.parse_str_literal("<") {
+                Some((Op::LessThan, OpOrder::Equality))
+            } else if self.parse_str_literal(">=") {
+                Some((Op::GreaterThanOrEqual, OpOrder::Equality))
+            } else if self.parse_str_literal(">") {
+                Some((Op::GreaterThan, OpOrder::Equality))
             } else if self.parse_str_literal("+") {
                 Some((Op::Add, OpOrder::Add))
             } else if self.parse_str_literal("-") {

@@ -220,15 +220,15 @@ mod tests {
         assert_json("1 - 2 + 10", json!(9));
     }
 
-    // #[test]
-    // fn test_equality_operators() {
-    //     assert_json("[4, 5, 6] | map(. == 5)", json!([false, true, false]));
-    //     assert_json("[4, 5, 6] | map(. != 5)", json!([true, false, true]));
-    //     assert_json("[4, 5, 6] | map(. < 5)", json!([true, false, false]));
-    //     assert_json("[4, 5, 6] | map(. <= 5)", json!([true, true, false]));
-    //     assert_json("[4, 5, 6] | map(. > 5)", json!([false, false, true]));
-    //     assert_json("[4, 5, 6] | map(. >= 5)", json!([false, true, true]));
-    // }
+    #[test]
+    fn test_equality_operators() {
+        assert_json("[4, 5, 6] | map(. == 5)", json!([false, true, false]));
+        assert_json("[4, 5, 6] | map(. != 5)", json!([true, false, true]));
+        assert_json("[4, 5, 6] | map(. < 5)", json!([true, false, false]));
+        assert_json("[4, 5, 6] | map(. <= 5)", json!([true, true, false]));
+        assert_json("[4, 5, 6] | map(. > 5)", json!([false, false, true]));
+        assert_json("[4, 5, 6] | map(. >= 5)", json!([false, true, true]));
+    }
 
     #[test]
     fn test_or_and_and() {
