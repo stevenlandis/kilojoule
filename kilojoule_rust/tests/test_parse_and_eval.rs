@@ -207,10 +207,10 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_null() {
-    //     assert_json("null", json!(null));
-    // }
+    #[test]
+    fn test_null() {
+        assert_json("null", json!(null));
+    }
 
     #[test]
     fn test_add_and_subtract() {
@@ -253,19 +253,19 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_and_and_or() {
-    //     assert_json(
-    //         "[1, 2, 3, 4, 5, 6, 7] | filter(. >= 6 or 2 <= . and . <= 4)",
-    //         json!([2, 3, 4, 6, 7]),
-    //     );
+    #[test]
+    fn test_and_and_or() {
+        assert_json(
+            "[1, 2, 3, 4, 5, 6, 7] | filter(. >= 6 or 2 <= . and . <= 4)",
+            json!([2, 3, 4, 6, 7]),
+        );
 
-    //     // make sure expression is different with different associativity
-    //     assert_json(
-    //         "[1, 2, 3, 4, 5, 6, 7] | filter((. >= 6 or 2 <= .) and . <= 4)",
-    //         json!([2, 3, 4]),
-    //     );
-    // }
+        // // make sure expression is different with different associativity
+        // assert_json(
+        //     "[1, 2, 3, 4, 5, 6, 7] | filter((. >= 6 or 2 <= .) and . <= 4)",
+        //     json!([2, 3, 4]),
+        // );
+    }
 
     // #[test]
     // fn test_filter() {

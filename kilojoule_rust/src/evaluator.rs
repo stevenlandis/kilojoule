@@ -522,6 +522,33 @@ impl Evaluator {
                     _ => self.obj_pool.new_err("sort() must be called on a list"),
                 }
             }
+            "filter" => {
+                if args.len() != 1 {
+                    return self
+                        .obj_pool
+                        .new_err("filter() must be called with one argument");
+                }
+                match self.obj_pool.get(obj) {
+                    ObjPoolObjValue::List(val) => {
+                        let val = val.clone();
+                        let mut result = Vec::<ObjPoolRef>::new();
+                        for elem in val {
+                            let filter_val = self.eval(args[0], elem, parser);
+                            match self.obj_pool.get(filter_val) {
+                                ObjPoolObjValue::Bool(bool_val) => {
+                                    if *bool_val {
+                                        result.push(elem);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        self.obj_pool.new_list(result)
+                    }
+                    _ => self.obj_pool.new_err("filter() must be called on a list"),
+                }
+            }
             _ => self
                 .obj_pool
                 .new_err(format!("Unknown function \"{}\"", name).as_str()),

@@ -43,7 +43,7 @@ impl<'a> Parser<'a> {
         val == (' ' as u8) || val == ('\n' as u8) || val == ('\t' as u8) || val == ('\r' as u8)
     }
 
-    fn parse_identifier(&mut self) -> Option<AstNodePtr> {
+    fn parse_identifier(&mut self, exclude_keywords: bool) -> Option<AstNodePtr> {
         match self.peek(0) {
             None => {
                 return None;
@@ -74,6 +74,17 @@ impl<'a> Parser<'a> {
 
         let iden_str =
             std::str::from_utf8(&self.text.as_bytes()[self.idx..self.idx + idx]).unwrap();
+
+        if exclude_keywords
+            && (match iden_str {
+                "and" => true,
+                "or" => true,
+                _ => false,
+            })
+        {
+            return None;
+        }
+
         self.idx += idx;
         Some(self.pool.new_identifier(iden_str))
     }
@@ -178,7 +189,7 @@ impl<'a> Parser<'a> {
 
         loop {
             self.parse_ws();
-            let key = match self.parse_identifier() {
+            let key = match self.parse_identifier(false) {
                 None => {
                     break;
                 }
@@ -345,7 +356,7 @@ impl<'a> Parser<'a> {
         if self.parse_str_literal(".") {
             let mut expr = self.pool.new_dot();
             self.parse_ws();
-            if let Some(iden) = self.parse_identifier() {
+            if let Some(iden) = self.parse_identifier(true) {
                 let access = self.pool.new_access(iden);
                 expr = self.pool.new_pipe(expr, access);
             }
@@ -397,7 +408,7 @@ impl<'a> Parser<'a> {
         if self.parse_str_literal("false") {
             return Some(Ok(self.pool.new_bool(false)));
         }
-        if let Some(expr) = self.parse_identifier() {
+        if let Some(expr) = self.parse_identifier(true) {
             self.parse_ws();
             if self.parse_str_literal("(") {
                 // This is a function call
@@ -465,7 +476,7 @@ impl<'a> Parser<'a> {
     fn parse_access(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         if self.parse_str_literal(".") {
             self.parse_ws();
-            let identifier = match self.parse_identifier() {
+            let identifier = match self.parse_identifier(true) {
                 None => {
                     return Some(Err(self.get_err(ParseErrorType::NoIdentifierAfterDotAccess)));
                 }
