@@ -230,26 +230,40 @@ mod tests {
     //     assert_json("[4, 5, 6] | map(. >= 5)", json!([false, true, true]));
     // }
 
+    #[test]
+    fn test_or_and_and() {
+        assert_json(
+            "[
+                [false, false],
+                [false, true],
+                [true, false],
+                [true, true],
+            ] | map(.[0] or .[1])",
+            json!([false, true, true, true]),
+        );
+
+        assert_json(
+            "[
+                [false, false],
+                [false, true],
+                [true, false],
+                [true, true],
+            ] | map(.[0] and .[1])",
+            json!([false, false, false, true]),
+        );
+    }
+
     // #[test]
-    // fn test_or_and_and() {
+    // fn test_and_and_or() {
     //     assert_json(
-    //         "[
-    //             [false, false],
-    //             [false, true],
-    //             [true, false],
-    //             [true, true],
-    //         ] | map(.[0] or .[1])",
-    //         json!([false, true, true, true]),
+    //         "[1, 2, 3, 4, 5, 6, 7] | filter(. >= 6 or 2 <= . and . <= 4)",
+    //         json!([2, 3, 4, 6, 7]),
     //     );
 
+    //     // make sure expression is different with different associativity
     //     assert_json(
-    //         "[
-    //             [false, false],
-    //             [false, true],
-    //             [true, false],
-    //             [true, true],
-    //         ] | map(.[0] and .[1])",
-    //         json!([false, false, false, true]),
+    //         "[1, 2, 3, 4, 5, 6, 7] | filter((. >= 6 or 2 <= .) and . <= 4)",
+    //         json!([2, 3, 4]),
     //     );
     // }
 

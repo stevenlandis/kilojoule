@@ -41,6 +41,48 @@ impl Evaluator {
                 self.eval(*right, left_val, parser)
             }
             AstNode::Dot => obj,
+            AstNode::Or(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let left_val = match self.obj_pool.get(left_val) {
+                    ObjPoolObjValue::Bool(val) => *val,
+                    _ => {
+                        return self.obj_pool.new_err("Left side of OR has to be a boolean");
+                    }
+                };
+                let right_val = self.eval(*right, obj, parser);
+                let right_val = match self.obj_pool.get(right_val) {
+                    ObjPoolObjValue::Bool(val) => *val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Right side of OR has to be a boolean");
+                    }
+                };
+
+                self.obj_pool.new_bool(left_val || right_val)
+            }
+            AstNode::And(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let left_val = match self.obj_pool.get(left_val) {
+                    ObjPoolObjValue::Bool(val) => *val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Left side of AND has to be a boolean");
+                    }
+                };
+                let right_val = self.eval(*right, obj, parser);
+                let right_val = match self.obj_pool.get(right_val) {
+                    ObjPoolObjValue::Bool(val) => *val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Right side of OR has to be a boolean");
+                    }
+                };
+
+                self.obj_pool.new_bool(left_val && right_val)
+            }
             AstNode::Add(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let left_val = match self.obj_pool.get(left_val) {

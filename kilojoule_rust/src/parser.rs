@@ -535,6 +535,8 @@ impl<'a> Parser<'a> {
         #[derive(Clone)]
         enum Op {
             Base,
+            Or,
+            And,
             Add,
             Subtract,
             Pipe,
@@ -542,10 +544,12 @@ impl<'a> Parser<'a> {
 
         #[derive(PartialEq, PartialOrd, Clone, Copy)]
         enum OpOrder {
-            Base,
-            Add,
-            Pipe,
             End,
+            Pipe,
+            Or,
+            And,
+            Add,
+            Base,
         }
 
         struct OpStack {
@@ -554,7 +558,7 @@ impl<'a> Parser<'a> {
 
         impl OpStack {
             fn reduce_for_op_order(&mut self, pool: &mut AstNodePool, order: OpOrder) {
-                while self.stack.len() >= 2 && self.stack[self.stack.len() - 1].2 <= order {
+                while self.stack.len() >= 2 && self.stack[self.stack.len() - 1].2 >= order {
                     let t0 = self.stack.pop().unwrap();
                     let t1 = self.stack.pop().unwrap();
                     let left = t1.1;
@@ -562,9 +566,11 @@ impl<'a> Parser<'a> {
                     self.stack.push((
                         t1.0,
                         match t0.0 {
+                            Op::Pipe => pool.new_pipe(left, right),
+                            Op::Or => pool.new_or(left, right),
+                            Op::And => pool.new_and(left, right),
                             Op::Add => pool.new_add(left, right),
                             Op::Subtract => pool.new_subtract(left, right),
-                            Op::Pipe => pool.new_pipe(left, right),
                             Op::Base => panic!(),
                         },
                         t1.2,
@@ -581,6 +587,10 @@ impl<'a> Parser<'a> {
             self.parse_ws();
             if let Some((next_op, next_order)) = if self.parse_str_literal("|") {
                 Some((Op::Pipe, OpOrder::Pipe))
+            } else if self.parse_str_literal("or") {
+                Some((Op::Or, OpOrder::Or))
+            } else if self.parse_str_literal("and") {
+                Some((Op::And, OpOrder::And))
             } else if self.parse_str_literal("+") {
                 Some((Op::Add, OpOrder::Add))
             } else if self.parse_str_literal("-") {
