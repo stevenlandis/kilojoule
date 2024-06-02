@@ -1,3 +1,8 @@
+use std::cell::OnceCell;
+use std::cmp::Ordering;
+use std::hash::Hasher;
+use std::hash::{DefaultHasher, Hash};
+
 #[derive(Clone, Copy)]
 pub struct ObjPoolRef {
     idx: usize,
@@ -13,8 +18,20 @@ pub enum ObjPoolObjValue {
     Map(OrderedMap),
 }
 
+#[derive(Hash)]
+enum HashTypes {
+    Null,
+    Err,
+    Float64,
+    Bool,
+    String,
+    List,
+    Map,
+}
+
 struct ObjPoolObj {
     ref_count: usize,
+    hash: OnceCell<u64>,
     value: ObjPoolObjValue,
 }
 
@@ -35,6 +52,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::Null,
         });
         ObjPoolRef { idx }
@@ -44,6 +62,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::Err(msg.to_string()),
         });
         ObjPoolRef { idx }
@@ -53,6 +72,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::Float64(val),
         });
         ObjPoolRef { idx }
@@ -62,6 +82,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::Bool(val),
         });
         ObjPoolRef { idx }
@@ -71,6 +92,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::String(val.to_string()),
         });
         ObjPoolRef { idx }
@@ -80,6 +102,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::List(list),
         });
         ObjPoolRef { idx }
@@ -89,6 +112,7 @@ impl ObjPool {
         let idx = self.vals.len();
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::Map(map),
         });
         ObjPoolRef { idx }
@@ -106,17 +130,11 @@ impl ObjPool {
 
         self.vals.push(ObjPoolObj {
             ref_count: 0,
+            hash: OnceCell::new(),
             value: ObjPoolObjValue::Map(map),
         });
         ObjPoolRef { idx }
     }
-
-    // fn get_f64(&self, obj: ObjPoolRef) -> f64 {
-    //     match self.vals[obj.idx].value {
-    //         ObjPoolObjValue::Float64(val) => val,
-    //         _ => panic!(),
-    //     }
-    // }
 
     fn get_list(&self, obj: ObjPoolRef) -> &[ObjPoolRef] {
         match &self.vals[obj.idx].value {
@@ -370,35 +388,253 @@ impl ObjPool {
             },
         }
     }
+
+    fn cmp_values(&self, left: ObjPoolRef, right: ObjPoolRef) -> Ordering {
+        let lval = &self.vals[left.idx].value;
+        let rval = &self.vals[right.idx].value;
+        match lval {
+            ObjPoolObjValue::Err(lval) => match rval {
+                ObjPoolObjValue::Err(rval) => lval.cmp(rval),
+                ObjPoolObjValue::Null => Ordering::Less,
+                ObjPoolObjValue::Bool(_) => Ordering::Less,
+                ObjPoolObjValue::Float64(_) => Ordering::Less,
+                ObjPoolObjValue::String(_) => Ordering::Less,
+                ObjPoolObjValue::List(_) => Ordering::Less,
+                ObjPoolObjValue::Map(_) => Ordering::Less,
+            },
+            ObjPoolObjValue::Null => match rval {
+                ObjPoolObjValue::Err(_) => Ordering::Greater,
+                ObjPoolObjValue::Null => Ordering::Equal,
+                ObjPoolObjValue::Bool(_) => Ordering::Less,
+                ObjPoolObjValue::Float64(_) => Ordering::Less,
+                ObjPoolObjValue::String(_) => Ordering::Less,
+                ObjPoolObjValue::List(_) => Ordering::Less,
+                ObjPoolObjValue::Map(_) => Ordering::Less,
+            },
+            ObjPoolObjValue::Bool(lval) => match rval {
+                ObjPoolObjValue::Err(_) => Ordering::Greater,
+                ObjPoolObjValue::Null => Ordering::Greater,
+                ObjPoolObjValue::Bool(rval) => lval.cmp(rval),
+                ObjPoolObjValue::Float64(_) => Ordering::Less,
+                ObjPoolObjValue::String(_) => Ordering::Less,
+                ObjPoolObjValue::List(_) => Ordering::Less,
+                ObjPoolObjValue::Map(_) => Ordering::Less,
+            },
+            ObjPoolObjValue::Float64(lval) => match rval {
+                ObjPoolObjValue::Err(_) => Ordering::Greater,
+                ObjPoolObjValue::Null => Ordering::Greater,
+                ObjPoolObjValue::Bool(_) => Ordering::Greater,
+                ObjPoolObjValue::Float64(rval) => lval.total_cmp(rval),
+                ObjPoolObjValue::String(_) => Ordering::Less,
+                ObjPoolObjValue::List(_) => Ordering::Less,
+                ObjPoolObjValue::Map(_) => Ordering::Less,
+            },
+            ObjPoolObjValue::String(lval) => match rval {
+                ObjPoolObjValue::Err(_) => Ordering::Greater,
+                ObjPoolObjValue::Null => Ordering::Greater,
+                ObjPoolObjValue::Bool(_) => Ordering::Greater,
+                ObjPoolObjValue::Float64(_) => Ordering::Greater,
+                ObjPoolObjValue::String(rval) => lval.cmp(rval),
+                ObjPoolObjValue::List(_) => Ordering::Less,
+                ObjPoolObjValue::Map(_) => Ordering::Less,
+            },
+            ObjPoolObjValue::List(lval) => match rval {
+                ObjPoolObjValue::Err(_) => Ordering::Greater,
+                ObjPoolObjValue::Null => Ordering::Greater,
+                ObjPoolObjValue::Bool(_) => Ordering::Greater,
+                ObjPoolObjValue::Float64(_) => Ordering::Greater,
+                ObjPoolObjValue::String(_) => Ordering::Greater,
+                ObjPoolObjValue::List(rval) => self.list_cmp(lval, rval),
+                ObjPoolObjValue::Map(_) => Ordering::Less,
+            },
+            ObjPoolObjValue::Map(lval) => match rval {
+                ObjPoolObjValue::Err(_) => Ordering::Greater,
+                ObjPoolObjValue::Null => Ordering::Greater,
+                ObjPoolObjValue::Bool(_) => Ordering::Greater,
+                ObjPoolObjValue::Float64(_) => Ordering::Greater,
+                ObjPoolObjValue::String(_) => Ordering::Greater,
+                ObjPoolObjValue::List(_) => Ordering::Greater,
+                ObjPoolObjValue::Map(rval) => self.map_cmp(lval, rval),
+            },
+        }
+    }
+
+    fn list_cmp(&self, left: &Vec<ObjPoolRef>, right: &Vec<ObjPoolRef>) -> Ordering {
+        for idx in 0..std::cmp::min(left.len(), right.len()) {
+            let result = self.cmp_values(left[idx], right[idx]);
+            if result != std::cmp::Ordering::Equal {
+                return result;
+            }
+        }
+
+        return left.len().cmp(&right.len());
+    }
+
+    fn map_cmp(&self, left: &OrderedMap, right: &OrderedMap) -> Ordering {
+        let len_cmp = left.len().cmp(&right.len());
+        if len_cmp == Ordering::Equal {
+            return Ordering::Equal;
+        }
+
+        let lpairs = self.map_get_sorted_kv_pairs(left);
+        let rpairs = self.map_get_sorted_kv_pairs(right);
+        assert_eq!(lpairs.len(), rpairs.len());
+
+        for idx in 0..lpairs.len() {
+            let result = self.cmp_values(lpairs[idx].0, rpairs[idx].0);
+            if result != std::cmp::Ordering::Equal {
+                return result;
+            }
+        }
+
+        Ordering::Equal
+    }
+
+    fn map_get_sorted_kv_pairs(&self, map: &OrderedMap) -> Vec<(ObjPoolRef, ObjPoolRef)> {
+        let mut pairs = map.pairs.clone();
+        pairs.sort_by(|(left, _), (right, _)| self.cmp_values(*left, *right));
+        return pairs;
+    }
+
+    fn get_hash(&self, obj: ObjPoolRef) -> u64 {
+        *self.vals[obj.idx].hash.get_or_init(|| {
+            let mut hasher = DefaultHasher::new();
+            match &self.vals[obj.idx].value {
+                ObjPoolObjValue::Null => {
+                    HashTypes::Null.hash(&mut hasher);
+                }
+                ObjPoolObjValue::Err(val) => {
+                    HashTypes::Err.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
+                ObjPoolObjValue::Float64(val) => {
+                    HashTypes::Float64.hash(&mut hasher);
+                    val.to_ne_bytes().hash(&mut hasher);
+                }
+                ObjPoolObjValue::Bool(val) => {
+                    HashTypes::Bool.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
+                ObjPoolObjValue::String(val) => {
+                    HashTypes::String.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
+                ObjPoolObjValue::List(val) => {
+                    HashTypes::List.hash(&mut hasher);
+
+                    // TODO: Don't clone here
+                    let val = val.clone();
+                    for elem in val {
+                        self.get_hash(elem).hash(&mut hasher);
+                    }
+                }
+                ObjPoolObjValue::Map(val) => {
+                    HashTypes::Map.hash(&mut hasher);
+
+                    // get kv pairs sorted by key
+                    let pairs = self.map_get_sorted_kv_pairs(val);
+                    for (key, val) in pairs {
+                        self.get_hash(key).hash(&mut hasher);
+                        self.get_hash(val).hash(&mut hasher);
+                    }
+                }
+            };
+            hasher.finish()
+        })
+    }
 }
 
 pub struct OrderedMap {
     pairs: Vec<(ObjPoolRef, ObjPoolRef)>,
+    key_to_idx: Vec<Option<(ObjPoolRef, usize)>>,
+    // key_to_idx: Vec<Option<usize>>,
 }
 
 impl OrderedMap {
     pub fn new() -> Self {
-        OrderedMap { pairs: Vec::new() }
+        OrderedMap {
+            pairs: Vec::new(),
+            key_to_idx: Vec::new(),
+        }
+    }
+
+    fn resize_key_to_idx(&mut self, pool: &ObjPool) {
+        if self.key_to_idx.len() < (self.pairs.len() + 1) << 1 {
+            let mut size: usize = 1;
+            while size < (self.pairs.len() + 1) << 1 {
+                size <<= 1;
+            }
+
+            self.key_to_idx = vec![None; size];
+
+            for (idx, (key, _)) in self.pairs.iter().enumerate() {
+                let hash = pool.get_hash(*key);
+                let mut hash_idx = (hash as usize) % size;
+                loop {
+                    match &self.key_to_idx[hash_idx] {
+                        None => {
+                            self.key_to_idx[hash_idx] = Some((*key, idx));
+                            break;
+                        }
+                        Some(_) => {
+                            hash_idx += 1;
+                            if hash_idx == size {
+                                hash_idx = 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     pub fn insert(&mut self, pool: &ObjPool, key: ObjPoolRef, val: ObjPoolRef) {
-        for (loop_key, loop_val) in &mut self.pairs {
-            if pool.val_equals(*loop_key, key) {
-                *loop_val = val;
-                return;
+        self.resize_key_to_idx(pool);
+
+        let hash = pool.get_hash(key);
+        let mut hash_idx = (hash as usize) % self.key_to_idx.len();
+        loop {
+            match &self.key_to_idx[hash_idx] {
+                None => {
+                    self.key_to_idx[hash_idx] = Some((key, self.pairs.len()));
+                    self.pairs.push((key, val));
+                    break;
+                }
+                Some((existing_key, existing_idx)) => {
+                    if pool.val_equals(key, *existing_key) {
+                        self.pairs[*existing_idx].1 = val;
+                        break;
+                    } else {
+                        hash_idx += 1;
+                        if hash_idx == self.key_to_idx.len() {
+                            hash_idx = 0;
+                        }
+                    }
+                }
             }
         }
-
-        self.pairs.push((key, val));
     }
 
     pub fn get(&self, pool: &ObjPool, key: ObjPoolRef) -> Option<ObjPoolRef> {
-        for (loop_key, loop_val) in &self.pairs {
-            if pool.val_equals(*loop_key, key) {
-                return Some(*loop_val);
+        let hash = pool.get_hash(key);
+        let mut hash_idx = (hash as usize) % self.key_to_idx.len();
+        loop {
+            match &self.key_to_idx[hash_idx] {
+                None => {
+                    return None;
+                }
+                Some((existing_key, existing_idx)) => {
+                    if pool.val_equals(key, *existing_key) {
+                        return Some(self.pairs[*existing_idx].1);
+                    } else {
+                        hash_idx += 1;
+                        if hash_idx == self.key_to_idx.len() {
+                            hash_idx = 0;
+                        }
+                    }
+                }
             }
         }
-        None
     }
 
     pub fn len(&self) -> usize {
