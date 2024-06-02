@@ -260,11 +260,11 @@ mod tests {
             json!([2, 3, 4, 6, 7]),
         );
 
-        // // make sure expression is different with different associativity
-        // assert_json(
-        //     "[1, 2, 3, 4, 5, 6, 7] | filter((. >= 6 or 2 <= .) and . <= 4)",
-        //     json!([2, 3, 4]),
-        // );
+        // make sure expression is different with different associativity
+        assert_json(
+            "[1, 2, 3, 4, 5, 6, 7] | filter((. >= 6 or 2 <= .) and . <= 4)",
+            json!([2, 3, 4]),
+        );
     }
 
     // #[test]
