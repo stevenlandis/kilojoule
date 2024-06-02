@@ -384,6 +384,30 @@ impl Evaluator {
                     _ => self.obj_pool.new_err("group() must be called on a list"),
                 }
             }
+            "sort" => {
+                if args.len() != 1 {
+                    return self
+                        .obj_pool
+                        .new_err("sort() must be called with one argument");
+                }
+                match self.obj_pool.get(obj) {
+                    ObjPoolObjValue::List(val) => {
+                        let val = val.clone();
+                        let mut values = Vec::<(ObjPoolRef, ObjPoolRef)>::with_capacity(val.len());
+                        for elem in val {
+                            values.push((elem, self.eval(args[0], elem, parser)));
+                        }
+                        values.sort_by(|(_, left), (_, right)| {
+                            self.obj_pool.cmp_values(*left, *right)
+                        });
+
+                        let result = values.iter().map(|(val, _)| *val).collect::<Vec<_>>();
+
+                        self.obj_pool.new_list(result)
+                    }
+                    _ => self.obj_pool.new_err("sort() must be called on a list"),
+                }
+            }
             _ => self
                 .obj_pool
                 .new_err(format!("Unknown function \"{}\"", name).as_str()),

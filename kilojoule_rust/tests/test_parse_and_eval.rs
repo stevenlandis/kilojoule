@@ -178,10 +178,34 @@ mod tests {
     //     assert_json("[3,1,2,3,1,5] | unique()", json!([3, 1, 2, 5]));
     // }
 
-    // #[test]
-    // fn test_sort() {
-    //     assert_json("[4,1,3,2,5] | sort()", json!([1, 2, 3, 4, 5]));
-    // }
+    #[test]
+    fn test_sort() {
+        assert_json("[4,1,3,2,5] | sort(.)", json!([1, 2, 3, 4, 5]));
+        assert_json(
+            "[ [true,false], [false,true] ] | map(sort(.))",
+            json!([[false, true], [false, true]]),
+        );
+        assert_json(
+            "[
+                bad_fcn(),
+                'text',
+                true,
+                123,
+                null,
+                {},
+                [],
+            ] | sort(.)",
+            json!([
+                {"ERROR": "Unknown function \"bad_fcn\""},
+                null,
+                true,
+                123,
+                "text",
+                [],
+                {}
+            ]),
+        );
+    }
 
     // #[test]
     // fn test_null() {

@@ -27,12 +27,16 @@ impl<'a> Parser<'a> {
         ('A' as u8) <= val && val <= ('Z' as u8) || ('a' as u8) <= val && val <= ('z' as u8)
     }
 
+    fn is_alpha_underscore(val: u8) -> bool {
+        Parser::is_alpha(val) || val == ('_' as u8)
+    }
+
     fn is_numeric(val: u8) -> bool {
         ('0' as u8) <= val && val <= ('9' as u8)
     }
 
-    fn is_alpha_numeric(val: u8) -> bool {
-        Parser::is_alpha(val) || Parser::is_numeric(val)
+    fn is_alpha_underscore_numeric(val: u8) -> bool {
+        Parser::is_alpha_underscore(val) || Parser::is_numeric(val)
     }
 
     fn is_whitespace(val: u8) -> bool {
@@ -45,7 +49,7 @@ impl<'a> Parser<'a> {
                 return None;
             }
             Some(c0) => {
-                if Parser::is_alpha(c0) {
+                if Parser::is_alpha_underscore(c0) {
                     c0
                 } else {
                     return None;
@@ -60,7 +64,7 @@ impl<'a> Parser<'a> {
                     break 'outer;
                 }
                 Some(cn) => {
-                    if !Parser::is_alpha_numeric(cn) {
+                    if !Parser::is_alpha_underscore_numeric(cn) {
                         break 'outer;
                     }
                 }

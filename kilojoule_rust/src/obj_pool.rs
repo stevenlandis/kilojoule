@@ -389,7 +389,7 @@ impl ObjPool {
         }
     }
 
-    fn cmp_values(&self, left: ObjPoolRef, right: ObjPoolRef) -> Ordering {
+    pub fn cmp_values(&self, left: ObjPoolRef, right: ObjPoolRef) -> Ordering {
         let lval = &self.vals[left.idx].value;
         let rval = &self.vals[right.idx].value;
         match lval {
