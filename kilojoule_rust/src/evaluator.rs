@@ -33,6 +33,67 @@ impl Evaluator {
         }
     }
 
+    fn eval_bool(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> Option<bool> {
+        let val = self.eval(node, obj, parser);
+        match self.obj_pool.get(val) {
+            ObjPoolObjValue::Bool(val) => Some(*val),
+            _ => None,
+        }
+    }
+
+    fn eval_bool_expr(
+        &mut self,
+        obj: ObjPoolRef,
+        parser: &Parser,
+        left: AstNodePtr,
+        right: AstNodePtr,
+        left_err: &str,
+        right_err: &str,
+        callback: impl Fn(bool, bool) -> bool,
+    ) -> ObjPoolRef {
+        let left_val = match self.eval_bool(left, obj, parser) {
+            None => {
+                return self.obj_pool.new_err(left_err);
+            }
+            Some(val) => val,
+        };
+        let right_val = match self.eval_bool(right, obj, parser) {
+            None => {
+                return self.obj_pool.new_err(right_err);
+            }
+            Some(val) => val,
+        };
+
+        self.obj_pool.new_bool(callback(left_val, right_val))
+    }
+
+    fn eval_f64_expr(
+        &mut self,
+        obj: ObjPoolRef,
+        parser: &Parser,
+        left: AstNodePtr,
+        right: AstNodePtr,
+        left_err: &str,
+        right_err: &str,
+        callback: impl Fn(f64, f64) -> f64,
+    ) -> ObjPoolRef {
+        let left_val = self.eval(left, obj, parser);
+        let left_val = match self.obj_pool.get(left_val) {
+            ObjPoolObjValue::Float64(val) => *val,
+            _ => {
+                return self.obj_pool.new_err(left_err);
+            }
+        };
+        let right_val = self.eval(right, obj, parser);
+        let right_val = match self.obj_pool.get(right_val) {
+            ObjPoolObjValue::Float64(val) => *val,
+            _ => {
+                return self.obj_pool.new_err(right_err);
+            }
+        };
+        self.obj_pool.new_f64(callback(left_val, right_val))
+    }
+
     fn eval(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> ObjPoolRef {
         match parser.get_node(node) {
             AstNode::Null => self.obj_pool.new_null(),
@@ -41,90 +102,42 @@ impl Evaluator {
                 self.eval(*right, left_val, parser)
             }
             AstNode::Dot => obj,
-            AstNode::Or(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let left_val = match self.obj_pool.get(left_val) {
-                    ObjPoolObjValue::Bool(val) => *val,
-                    _ => {
-                        return self.obj_pool.new_err("Left side of OR has to be a boolean");
-                    }
-                };
-                let right_val = self.eval(*right, obj, parser);
-                let right_val = match self.obj_pool.get(right_val) {
-                    ObjPoolObjValue::Bool(val) => *val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Right side of OR has to be a boolean");
-                    }
-                };
-
-                self.obj_pool.new_bool(left_val || right_val)
-            }
-            AstNode::And(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let left_val = match self.obj_pool.get(left_val) {
-                    ObjPoolObjValue::Bool(val) => *val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Left side of AND has to be a boolean");
-                    }
-                };
-                let right_val = self.eval(*right, obj, parser);
-                let right_val = match self.obj_pool.get(right_val) {
-                    ObjPoolObjValue::Bool(val) => *val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Right side of OR has to be a boolean");
-                    }
-                };
-
-                self.obj_pool.new_bool(left_val && right_val)
-            }
-            AstNode::Add(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let left_val = match self.obj_pool.get(left_val) {
-                    ObjPoolObjValue::Float64(val) => *val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Left side of addition has to be a float");
-                    }
-                };
-                let right_val = self.eval(*right, obj, parser);
-                let right_val = match self.obj_pool.get(right_val) {
-                    ObjPoolObjValue::Float64(val) => val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Right side of addition has to be a float");
-                    }
-                };
-                self.obj_pool.new_f64(left_val + right_val)
-            }
-            AstNode::Subtract(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let left_val = match self.obj_pool.get(left_val) {
-                    ObjPoolObjValue::Float64(val) => *val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Left side of subtraction has to be a float");
-                    }
-                };
-                let right_val = self.eval(*right, obj, parser);
-                let right_val = match self.obj_pool.get(right_val) {
-                    ObjPoolObjValue::Float64(val) => val,
-                    _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Right side of subtraction has to be a float");
-                    }
-                };
-                self.obj_pool.new_f64(left_val - right_val)
-            }
+            AstNode::Or(left, right) => self.eval_bool_expr(
+                obj,
+                parser,
+                *left,
+                *right,
+                "Left side of OR has to be a boolean",
+                "Right side of OR has to be a boolean",
+                |left, right| left || right,
+            ),
+            AstNode::And(left, right) => self.eval_bool_expr(
+                obj,
+                parser,
+                *left,
+                *right,
+                "Left side of OR has to be a boolean",
+                "Right side of OR has to be a boolean",
+                |left, right| left && right,
+            ),
+            AstNode::Add(left, right) => self.eval_f64_expr(
+                obj,
+                parser,
+                *left,
+                *right,
+                "Left side of addition has to be a float",
+                "Right side of addition has to be a float",
+                |left, right| left + right,
+            ),
+            AstNode::Subtract(left, right) => self.eval_f64_expr(
+                obj,
+                parser,
+                *left,
+                *right,
+                "Left side of subtraction has to be a float",
+                "Right side of subtraction has to be a float",
+                |left, right| left - right,
+            ),
             AstNode::Integer(val) => self.obj_pool.new_f64(*val as f64),
             AstNode::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
