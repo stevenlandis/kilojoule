@@ -536,6 +536,7 @@ impl<'a> Parser<'a> {
         enum Op {
             Base,
             Add,
+            Subtract,
             Pipe,
         }
 
@@ -562,8 +563,9 @@ impl<'a> Parser<'a> {
                         t1.0,
                         match t0.0 {
                             Op::Add => pool.new_add(left, right),
+                            Op::Subtract => pool.new_subtract(left, right),
                             Op::Pipe => pool.new_pipe(left, right),
-                            _ => panic!(),
+                            Op::Base => panic!(),
                         },
                         t1.2,
                     ));
@@ -581,6 +583,8 @@ impl<'a> Parser<'a> {
                 Some((Op::Pipe, OpOrder::Pipe))
             } else if self.parse_str_literal("+") {
                 Some((Op::Add, OpOrder::Add))
+            } else if self.parse_str_literal("-") {
+                Some((Op::Subtract, OpOrder::Add))
             } else {
                 break;
             } {

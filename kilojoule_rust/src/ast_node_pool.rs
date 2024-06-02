@@ -8,6 +8,7 @@ pub enum AstNode<'a> {
     Dot,
     Access(AstNodePtr),
     Add(AstNodePtr, AstNodePtr),
+    Subtract(AstNodePtr, AstNodePtr),
     FcnCall {
         name: AstNodePtr,
         args: Option<AstNodePtr>,
@@ -82,6 +83,12 @@ impl<'a> AstNodePool<'a> {
     pub fn new_add(&mut self, left: AstNodePtr, right: AstNodePtr) -> AstNodePtr {
         let ptr = self.vals.len();
         self.vals.push(AstNode::Add(left, right));
+        ptr
+    }
+
+    pub fn new_subtract(&mut self, left: AstNodePtr, right: AstNodePtr) -> AstNodePtr {
+        let ptr = self.vals.len();
+        self.vals.push(AstNode::Subtract(left, right));
         ptr
     }
 

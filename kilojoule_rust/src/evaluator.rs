@@ -62,6 +62,27 @@ impl Evaluator {
                 };
                 self.obj_pool.new_f64(left_val + right_val)
             }
+            AstNode::Subtract(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let left_val = match self.obj_pool.get(left_val) {
+                    ObjPoolObjValue::Float64(val) => *val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Left side of subtraction has to be a float");
+                    }
+                };
+                let right_val = self.eval(*right, obj, parser);
+                let right_val = match self.obj_pool.get(right_val) {
+                    ObjPoolObjValue::Float64(val) => val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Right side of subtraction has to be a float");
+                    }
+                };
+                self.obj_pool.new_f64(left_val - right_val)
+            }
             AstNode::Integer(val) => self.obj_pool.new_f64(*val as f64),
             AstNode::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
