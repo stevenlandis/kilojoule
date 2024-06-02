@@ -546,6 +546,7 @@ impl<'a> Parser<'a> {
         #[derive(Clone)]
         enum Op {
             Base,
+            Pipe,
             Or,
             And,
             Equals,
@@ -556,7 +557,8 @@ impl<'a> Parser<'a> {
             GreaterThanOrEqual,
             Add,
             Subtract,
-            Pipe,
+            Multiply,
+            Divide,
         }
 
         #[derive(PartialEq, PartialOrd, Clone, Copy)]
@@ -567,6 +569,7 @@ impl<'a> Parser<'a> {
             And,
             Equality,
             Add,
+            Multiply,
             Base,
         }
 
@@ -599,6 +602,8 @@ impl<'a> Parser<'a> {
                             }
                             Op::Add => pool.new_add(left, right),
                             Op::Subtract => pool.new_subtract(left, right),
+                            Op::Multiply => pool.new_node(AstNode::Multiply(left, right)),
+                            Op::Divide => pool.new_node(AstNode::Divide(left, right)),
                             Op::Base => panic!(),
                         },
                         t1.2,
@@ -635,6 +640,10 @@ impl<'a> Parser<'a> {
                 Some((Op::Add, OpOrder::Add))
             } else if self.parse_str_literal("-") {
                 Some((Op::Subtract, OpOrder::Add))
+            } else if self.parse_str_literal("*") {
+                Some((Op::Multiply, OpOrder::Multiply))
+            } else if self.parse_str_literal("/") {
+                Some((Op::Divide, OpOrder::Multiply))
             } else {
                 break;
             } {

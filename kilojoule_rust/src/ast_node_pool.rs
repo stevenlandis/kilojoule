@@ -17,6 +17,8 @@ pub enum AstNode<'a> {
     And(AstNodePtr, AstNodePtr),
     Add(AstNodePtr, AstNodePtr),
     Subtract(AstNodePtr, AstNodePtr),
+    Multiply(AstNodePtr, AstNodePtr),
+    Divide(AstNodePtr, AstNodePtr),
     FcnCall {
         name: AstNodePtr,
         args: Option<AstNodePtr>,

@@ -267,22 +267,22 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_filter() {
-    //     assert_json(
-    //         "[1, 2, 3, 4, 5, 6] | filter(. < 3 or . > 4)",
-    //         json!([1, 2, 5, 6]),
-    //     );
-    // }
+    #[test]
+    fn test_filter() {
+        assert_json(
+            "[1, 2, 3, 4, 5, 6] | filter(. < 3 or . > 4)",
+            json!([1, 2, 5, 6]),
+        );
+    }
 
-    // #[test]
-    // fn test_multiply_and_divide() {
-    //     assert_json("3*4", json!(12));
-    //     assert_json("8/2", json!(4));
-    //     assert_json("3*5/3", json!(5));
-    //     assert_json("3 * 4 + 100*2", json!(3 * 4 + 100 * 2));
-    //     assert_json("1/0", json!({"ERROR": "divide by zero"}));
-    // }
+    #[test]
+    fn test_multiply_and_divide() {
+        assert_json("3*4", json!(12));
+        assert_json("8/2", json!(4));
+        assert_json("3*5/3", json!(5));
+        assert_json("3 * 4 + 100*2", json!(3 * 4 + 100 * 2));
+        assert_json("1/0", json!({"ERROR": "divide by zero"}));
+    }
 
     // #[test]
     // fn test_sum() {

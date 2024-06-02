@@ -176,6 +176,40 @@ impl Evaluator {
                 "Right side of subtraction has to be a float",
                 |left, right| left - right,
             ),
+            AstNode::Multiply(left, right) => self.eval_f64_expr(
+                obj,
+                parser,
+                *left,
+                *right,
+                "Left side of multiplication has to be a float",
+                "Right side of multiplication has to be a float",
+                |left, right| left * right,
+            ),
+            AstNode::Divide(left, right) => {
+                let left_val = self.eval(*left, obj, parser);
+                let left_val = match self.obj_pool.get(left_val) {
+                    ObjPoolObjValue::Float64(val) => *val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Left side of division has to be a float");
+                    }
+                };
+                let right_val = self.eval(*right, obj, parser);
+                let right_val = match self.obj_pool.get(right_val) {
+                    ObjPoolObjValue::Float64(val) => *val,
+                    _ => {
+                        return self
+                            .obj_pool
+                            .new_err("Right side of division has to be a float");
+                    }
+                };
+                if right_val == 0.0 {
+                    self.obj_pool.new_err("divide by zero")
+                } else {
+                    self.obj_pool.new_f64(left_val / right_val)
+                }
+            }
             AstNode::Integer(val) => self.obj_pool.new_f64(*val as f64),
             AstNode::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
