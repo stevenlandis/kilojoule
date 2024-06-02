@@ -153,25 +153,25 @@ mod tests {
         assert_json("[[],[1,2],[1]] | map(len())", json!([0, 2, 1]));
     }
 
-    // #[test]
-    // fn test_group_fcn() {
-    //     assert_json(
-    //         "[[1,'a'], [2,'b'], [1,'c'], [3,'d'], [2,'e']] | group(.[0])",
-    //         json!([
-    //             {"key": 1, "rows": [
-    //                 [1, 'a'],
-    //                 [1, 'c']
-    //             ]},
-    //             {"key": 2, "rows": [
-    //                 [2, 'b'],
-    //                 [2, 'e']
-    //             ]},
-    //             {"key": 3, "rows": [
-    //                 [3, 'd'],
-    //             ]},
-    //         ]),
-    //     );
-    // }
+    #[test]
+    fn test_group_fcn() {
+        assert_json(
+            "[[1,'a'], [2,'b'], [1,'c'], [3,'d'], [2,'e']] | group(.[0])",
+            json!([
+                {"key": 1, "rows": [
+                    [1, 'a'],
+                    [1, 'c']
+                ]},
+                {"key": 2, "rows": [
+                    [2, 'b'],
+                    [2, 'e']
+                ]},
+                {"key": 3, "rows": [
+                    [3, 'd'],
+                ]},
+            ]),
+        );
+    }
 
     // #[test]
     // fn test_unique() {

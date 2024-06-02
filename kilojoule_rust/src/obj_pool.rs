@@ -94,6 +94,23 @@ impl ObjPool {
         ObjPoolRef { idx }
     }
 
+    pub fn new_map_from_iter<'a>(
+        &mut self,
+        pairs: impl Iterator<Item = &'a (ObjPoolRef, ObjPoolRef)>,
+    ) -> ObjPoolRef {
+        let idx = self.vals.len();
+        let mut map = OrderedMap::new();
+        for (key, val) in pairs {
+            map.insert(self, *key, *val);
+        }
+
+        self.vals.push(ObjPoolObj {
+            ref_count: 0,
+            value: ObjPoolObjValue::Map(map),
+        });
+        ObjPoolRef { idx }
+    }
+
     // fn get_f64(&self, obj: ObjPoolRef) -> f64 {
     //     match self.vals[obj.idx].value {
     //         ObjPoolObjValue::Float64(val) => val,
@@ -289,7 +306,7 @@ impl ObjPool {
         Ok(0)
     }
 
-    fn val_equals(&self, left: ObjPoolRef, right: ObjPoolRef) -> bool {
+    pub fn val_equals(&self, left: ObjPoolRef, right: ObjPoolRef) -> bool {
         match &self.vals[left.idx].value {
             ObjPoolObjValue::Null => match self.vals[right.idx].value {
                 ObjPoolObjValue::Null => true,

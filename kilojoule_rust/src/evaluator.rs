@@ -344,6 +344,46 @@ impl Evaluator {
                     _ => self.obj_pool.new_err("map() must be called on a list"),
                 }
             }
+            "group" => {
+                if args.len() != 1 {
+                    return self
+                        .obj_pool
+                        .new_err("group() must be called with one argument");
+                }
+                match self.obj_pool.get(obj) {
+                    ObjPoolObjValue::List(val) => {
+                        let mut groups = Vec::<(ObjPoolRef, Vec<ObjPoolRef>)>::new();
+                        let val = val.clone();
+                        // let mut result = Vec::<ObjPoolRef>::with_capacity(val.len());
+                        for elem in val {
+                            let key_val = self.eval(args[0], elem, parser);
+                            let mut found = false;
+                            for (loop_key_val, loop_vals) in &mut groups {
+                                if self.obj_pool.val_equals(key_val, *loop_key_val) {
+                                    loop_vals.push(elem);
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if !found {
+                                groups.push((key_val, vec![elem]));
+                            }
+                        }
+
+                        let mut result = Vec::<ObjPoolRef>::with_capacity(groups.len());
+                        for (key, rows) in groups {
+                            let key_label = self.obj_pool.new_str("key");
+                            let rows_label = self.obj_pool.new_str("rows");
+                            let rows_obj = self.obj_pool.new_list(rows);
+                            result.push(self.obj_pool.new_map_from_iter(
+                                [(key_label, key), (rows_label, rows_obj)].iter(),
+                            ));
+                        }
+                        self.obj_pool.new_list(result)
+                    }
+                    _ => self.obj_pool.new_err("group() must be called on a list"),
+                }
+            }
             _ => self
                 .obj_pool
                 .new_err(format!("Unknown function \"{}\"", name).as_str()),
