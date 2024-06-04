@@ -596,6 +596,62 @@ impl Evaluator {
                     _ => Val::new_err("filter() must be called on a list"),
                 }
             }
+            "lines" => match obj.get_val() {
+                ValType::String(val) => {
+                    let mut lines = val
+                        .split("\n")
+                        .map(|line| Val::new_str(line))
+                        .collect::<Vec<_>>();
+                    if lines.len() > 0
+                        && match lines[lines.len() - 1].get_val() {
+                            ValType::String(text) => text == "",
+                            _ => panic!(),
+                        }
+                    {
+                        lines.pop();
+                    }
+                    Val::new_list(lines)
+                }
+                _ => Val::new_err("lines() must be called on a string"),
+            },
+            "split" => match obj.get_val() {
+                ValType::String(text) => match self.eval(args[0], obj, parser).get_val() {
+                    ValType::String(split_pattern) => Val::new_list(
+                        text.split(split_pattern)
+                            .map(|elem| Val::new_str(elem))
+                            .collect::<Vec<_>>(),
+                    ),
+                    _ => Val::new_err("split() pattern must be a string"),
+                },
+                _ => Val::new_err("split() must be called on a string"),
+            },
+            "join" => match &obj.get_val() {
+                ValType::List(elems) => {
+                    let joiner = self.eval(args[0], obj, parser);
+                    let joiner = match joiner.get_val() {
+                        ValType::String(joiner) => joiner.as_str(),
+                        _ => return Val::new_err("join() pattern must be a string"),
+                    };
+
+                    let mut strings_to_join = Vec::<&str>::with_capacity(elems.len());
+                    for elem in elems {
+                        match elem.get_val() {
+                            ValType::String(elem_str) => {
+                                strings_to_join.push(elem_str.as_str());
+                            }
+                            _ => {
+                                return Val::new_err(
+                                    "All elements passed to join() must be strings",
+                                );
+                            }
+                        }
+                    }
+
+                    let result = strings_to_join.join(joiner);
+                    Val::new_str(result.as_str())
+                }
+                _ => Val::new_err("join() must be called on a list"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

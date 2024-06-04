@@ -361,32 +361,32 @@ mod tests {
     //     assert_json("let a = 5 | a + 2", json!(7));
     // }
 
-    // #[test]
-    // fn test_lines() {
-    //     assert_json(
-    //         "'line 0\n\nline 1\nline 2 \n' | lines()",
-    //         json!(["line 0", "", "line 1", "line 2 "]),
-    //     );
-    // }
+    #[test]
+    fn test_lines() {
+        assert_json(
+            "'line 0\n\nline 1\nline 2 \n' | lines()",
+            json!(["line 0", "", "line 1", "line 2 "]),
+        );
+    }
 
-    // #[test]
-    // fn test_split() {
-    //     assert_json(
-    //         "'one,two,,three,' | split(',')",
-    //         json!(["one", "two", "", "three", ""]),
-    //     );
-    //     assert_json("'' | split(',')", json!([""]));
-    // }
+    #[test]
+    fn test_split() {
+        assert_json(
+            "'one,two,,three,' | split(',')",
+            json!(["one", "two", "", "three", ""]),
+        );
+        assert_json("'' | split(',')", json!([""]));
+    }
 
-    // #[test]
-    // fn test_join() {
-    //     assert_json(
-    //         "['one', 'two', '', 'three', ''] | join(',')",
-    //         json!("one,two,,three,"),
-    //     );
-    //     assert_json("[] | join(',')", json!(""));
-    //     assert_json("[''] | join(',')", json!(""));
-    // }
+    #[test]
+    fn test_join() {
+        assert_json(
+            "['one', 'two', '', 'three', ''] | join(',')",
+            json!("one,two,,three,"),
+        );
+        assert_json("[] | join(',')", json!(""));
+        assert_json("[''] | join(',')", json!(""));
+    }
 
     // #[test]
     // fn test_coalesce() {
