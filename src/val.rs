@@ -1,526 +1,269 @@
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::{hash::DefaultHasher, rc::Rc};
+use std::cmp::Ordering;
+use std::collections::hash_map::Entry;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::{cell::OnceCell, collections::HashMap, hash::DefaultHasher, rc::Rc};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Val {
-    pub val: Rc<InnerVal>,
+    inner_val: Rc<InnerVal>,
 }
 
-#[derive(Debug)]
-pub struct InnerVal {
-    pub hash: u64,
-    pub val: ValType,
+struct InnerVal {
+    hash: OnceCell<u64>,
+    val_type: ValType,
 }
 
-#[derive(Debug, PartialEq)]
 pub enum ValType {
-    Error(String),
     Null,
+    Err(String),
+    Float64(f64),
     Bool(bool),
-    Number(f64),
     String(String),
     List(Vec<Val>),
-    Map(ValHashMap),
-    Bytes(Vec<u8>),
+    Map(OrderedMap),
 }
 
 impl Val {
-    pub fn new_null() -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::Null.hash(&mut hasher);
-        let hash = hasher.finish();
-        return Val {
-            val: Rc::new(InnerVal {
-                hash,
-                val: ValType::Null,
-            }),
-        };
+    pub fn get_val(&self) -> &ValType {
+        &self.inner_val.val_type
     }
 
-    pub fn new_bool(val: bool) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::Bool.hash(&mut hasher);
-        val.hash(&mut hasher);
-        return Val {
-            val: Rc::new(InnerVal {
-                hash: hasher.finish(),
-                val: ValType::Bool(val),
-            }),
-        };
-    }
-
-    pub fn new_number(val: f64) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::Number.hash(&mut hasher);
-        (val as u64).hash(&mut hasher);
-        return Val {
-            val: Rc::new(InnerVal {
-                hash: hasher.finish(),
-                val: ValType::Number(val),
-            }),
-        };
-    }
-
-    pub fn new_string(text: &str) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::String.hash(&mut hasher);
-        text.hash(&mut hasher);
-        let hash = hasher.finish();
-        return Val {
-            val: Rc::new(InnerVal {
-                hash,
-                val: ValType::String(text.to_string()),
-            }),
-        };
-    }
-
-    pub fn new_err(text: &str) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::String.hash(&mut hasher);
-        text.hash(&mut hasher);
-        let hash = hasher.finish();
-        return Val {
-            val: Rc::new(InnerVal {
-                hash,
-                val: ValType::Error(text.to_string()),
-            }),
-        };
-    }
-
-    pub fn new_list(values: &[Val]) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::List.hash(&mut hasher);
-        for val in values {
-            val.val.hash.hash(&mut hasher);
-        }
-        let hash = hasher.finish();
-
-        return Val {
-            val: Rc::new(InnerVal {
-                hash,
-                val: ValType::List(values.iter().cloned().collect()),
-            }),
-        };
-    }
-
-    pub fn new_map_from_entries_iter(pairs: Vec<(Val, Val)>) -> Self {
-        let map = ValHashMap::from_pairs(&pairs);
-
-        let mut hasher = DefaultHasher::new();
-        HashTypes::Map.hash(&mut hasher);
-        map.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        return Val {
-            val: Rc::new(InnerVal {
-                hash,
-                val: ValType::Map(map),
-            }),
-        };
-    }
-
-    pub fn new_map(map: ValHashMap) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::Map.hash(&mut hasher);
-        map.hash(&mut hasher);
-
-        return Val {
-            val: Rc::new(InnerVal {
-                hash: hasher.finish(),
-                val: ValType::Map(map),
-            }),
-        };
-    }
-
-    pub fn new_bytes(bytes: Vec<u8>) -> Self {
-        let mut hasher = DefaultHasher::new();
-        HashTypes::Bytes.hash(&mut hasher);
-        bytes.hash(&mut hasher);
-
+    fn new_val(val_type: ValType) -> Val {
         Val {
-            val: Rc::new(InnerVal {
-                hash: hasher.finish(),
-                val: ValType::Bytes(bytes),
+            inner_val: Rc::new(InnerVal {
+                hash: OnceCell::new(),
+                val_type,
             }),
         }
     }
 
-    pub fn from_json_str(json_str: &str) -> Self {
-        let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
-
-        fn helper(node: &serde_json::Value) -> Val {
-            match node {
-                serde_json::Value::Null => Val::new_null(),
-                serde_json::Value::Bool(val) => Val::new_bool(*val),
-                serde_json::Value::Number(val) => Val::new_number(val.as_f64().unwrap()),
-                serde_json::Value::String(val) => Val::new_string(val.as_str()),
-                serde_json::Value::Array(val) => Val::new_list(
-                    val.iter()
-                        .map(|elem| helper(elem))
-                        .collect::<Vec<_>>()
-                        .as_slice(),
-                ),
-                serde_json::Value::Object(val) => {
-                    return Val::new_map_from_entries_iter(
-                        val.iter()
-                            .map(|(key, val)| (Val::new_string(key.as_str()), helper(val)))
-                            .collect::<Vec<_>>(),
-                    );
-                }
-            }
-        }
-
-        return helper(&value);
+    pub fn new_null() -> Val {
+        Val::new_val(ValType::Null)
     }
 
-    pub fn write_json_str<W>(&self, writer: &mut W, use_indent: bool)
-    where
-        W: std::io::Write,
-    {
-        struct Writer<'a, W>
-        where
-            W: std::io::Write,
-        {
-            writer: &'a mut W,
-        }
-
-        impl<W> Writer<'_, W>
-        where
-            W: std::io::Write,
-        {
-            pub fn outer_write(&mut self, val: &Val, use_indent: bool) -> std::io::Result<usize> {
-                if let ValType::Bytes(bytes) = &val.val.val {
-                    self.writer.write(bytes.as_slice())?;
-                    return Ok(0);
-                }
-                self.write(val, 0, use_indent)?;
-                if use_indent {
-                    self.str("\n")?;
-                }
-                Ok(0)
-            }
-
-            fn write(
-                &mut self,
-                val: &Val,
-                indent: u64,
-                use_indent: bool,
-            ) -> std::io::Result<usize> {
-                match &val.val.val {
-                    ValType::Null => {
-                        self.str("null")?;
-                    }
-                    ValType::Bool(val) => {
-                        if *val {
-                            self.str("true")?;
-                        } else {
-                            self.str("false")?;
-                        }
-                    }
-                    ValType::Number(val) => {
-                        self.str(val.to_string().as_str())?;
-                    }
-                    ValType::String(val) => {
-                        self.str(
-                            serde_json::to_string(&serde_json::Value::String(val.clone()))?
-                                .as_str(),
-                        )?;
-                    }
-                    ValType::List(val) => {
-                        self.str("[")?;
-                        for (idx, elem) in val.iter().enumerate() {
-                            if idx > 0 {
-                                if use_indent {
-                                    self.str(", ")?;
-                                } else {
-                                    self.str(",")?;
-                                }
-                            }
-                            if use_indent {
-                                self.str("\n")?;
-                                self.indent(indent + 1)?;
-                            }
-                            self.write(elem, indent + 1, use_indent)?;
-                        }
-                        if val.len() > 0 && use_indent {
-                            self.str("\n")?;
-                            self.indent(indent)?;
-                        }
-                        self.str("]")?;
-                    }
-                    ValType::Map(val) => {
-                        self.str("{")?;
-                        for (idx, (key, val)) in val
-                            .pairs
-                            .iter()
-                            .filter_map(|pair| match pair {
-                                None => None,
-                                Some(pair) => Some(pair),
-                            })
-                            .enumerate()
-                        {
-                            if idx > 0 {
-                                if use_indent {
-                                    self.str(", ")?;
-                                } else {
-                                    self.str(",")?;
-                                }
-                            }
-                            if use_indent {
-                                self.str("\n")?;
-                                self.indent(indent + 1)?;
-                            }
-                            self.write(key, indent + 1, use_indent)?;
-                            if use_indent {
-                                self.str(": ")?;
-                            } else {
-                                self.str(":")?;
-                            }
-                            self.write(val, indent + 1, use_indent)?;
-                        }
-                        if val.len() > 0 && use_indent {
-                            self.str("\n")?;
-                            self.indent(indent)?;
-                        }
-                        self.str("}")?;
-                    }
-                    ValType::Error(message) => {
-                        self.str("{\"ERROR\":")?;
-                        self.write(&Val::new_string(message.as_str()), 0, false)?;
-                        self.str("}")?;
-                    }
-                    ValType::Bytes(bytes) => {
-                        self.str("\"")?;
-                        self.writer.write(STANDARD.encode(bytes).as_bytes())?;
-                        self.str("\"")?;
-                    }
-                }
-                Ok(0)
-            }
-
-            fn str(&mut self, text: &str) -> std::io::Result<usize> {
-                self.writer.write(text.as_bytes())?;
-                Ok(0)
-            }
-
-            fn indent(&mut self, indent: u64) -> std::io::Result<usize> {
-                for _ in 0..indent {
-                    self.str("  ")?;
-                }
-                Ok(0)
-            }
-        }
-
-        let mut writer = Writer { writer };
-        let _ = writer.outer_write(self, use_indent);
+    pub fn new_err(msg: &str) -> Val {
+        Val::new_val(ValType::Err(msg.to_string()))
     }
 
-    pub fn from_toml_str(toml_str: &str) -> Self {
-        let value = match toml::from_str(toml_str) {
-            Err(_) => {
-                return Val::new_err("Unable to parse toml string.");
-            }
-            Ok(val) => val,
-        };
-
-        fn helper(node: &toml::Value) -> Val {
-            match node {
-                toml::Value::Boolean(val) => Val::new_bool(*val),
-                toml::Value::Float(val) => Val::new_number(*val),
-                toml::Value::Integer(val) => Val::new_number(*val as f64),
-                toml::Value::String(val) => Val::new_string(val.as_str()),
-                toml::Value::Datetime(val) => Val::new_string(val.to_string().as_str()),
-                toml::Value::Array(val) => Val::new_list(
-                    val.iter()
-                        .map(|elem| helper(elem))
-                        .collect::<Vec<_>>()
-                        .as_slice(),
-                ),
-                toml::Value::Table(val) => {
-                    return Val::new_map_from_entries_iter(
-                        val.iter()
-                            .map(|(key, val)| (Val::new_string(key.as_str()), helper(val)))
-                            .collect::<Vec<_>>(),
-                    );
-                }
-            }
-        }
-
-        return helper(&value);
+    pub fn new_f64(val: f64) -> Val {
+        Val::new_val(ValType::Float64(val))
     }
 
-    pub fn to_toml_str(&self) -> Val {
-        fn helper(node: &Val) -> toml::Value {
-            match &node.val.val {
-                ValType::Error(val) => {
-                    let mut result = toml::map::Map::new();
-                    result.insert("ERROR".to_string(), toml::Value::String(val.to_string()));
-                    toml::Value::Table(result)
+    pub fn new_bool(val: bool) -> Val {
+        Val::new_val(ValType::Bool(val))
+    }
+
+    pub fn new_str(val: &str) -> Val {
+        Val::new_val(ValType::String(val.to_string()))
+    }
+
+    pub fn new_list(val: Vec<Val>) -> Val {
+        Val::new_val(ValType::List(val))
+    }
+
+    pub fn new_map(val: OrderedMap) -> Val {
+        Val::new_val(ValType::Map(val))
+    }
+
+    fn get_hash(&self) -> u64 {
+        *self.inner_val.hash.get_or_init(|| {
+            #[derive(Hash)]
+            enum HashTypes {
+                Null,
+                Err,
+                Float64,
+                Bool,
+                String,
+                List,
+                Map,
+            }
+
+            let mut hasher = DefaultHasher::new();
+            match self.get_val() {
+                ValType::Null => {
+                    HashTypes::Null.hash(&mut hasher);
                 }
-                ValType::Null => toml::Value::String("".to_string()),
-                ValType::Bool(val) => toml::Value::Boolean(*val),
-                ValType::Number(val) => toml::Value::Float(*val),
-                ValType::String(val) => toml::Value::String(val.clone()),
+                ValType::Err(val) => {
+                    HashTypes::Err.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
+                ValType::Float64(val) => {
+                    HashTypes::Float64.hash(&mut hasher);
+                    val.to_ne_bytes().hash(&mut hasher);
+                }
+                ValType::Bool(val) => {
+                    HashTypes::Bool.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
+                ValType::String(val) => {
+                    HashTypes::String.hash(&mut hasher);
+                    val.hash(&mut hasher);
+                }
                 ValType::List(val) => {
-                    toml::Value::Array(val.iter().map(|elem| helper(elem)).collect())
+                    HashTypes::List.hash(&mut hasher);
+                    for elem in val {
+                        elem.get_hash().hash(&mut hasher);
+                    }
                 }
                 ValType::Map(val) => {
-                    let mut result = toml::map::Map::new();
-                    for (key, val) in val.entries() {
-                        let key = match &key.val.val {
-                            ValType::String(val) => val.clone(),
-                            _ => {
-                                let mut buffer = Vec::<u8>::new();
-                                key.write_json_str(&mut buffer, false);
-                                std::str::from_utf8(buffer.as_slice()).unwrap().to_string()
-                            }
-                        };
-                        result.insert(key, helper(val));
+                    HashTypes::Map.hash(&mut hasher);
+
+                    // get kv pairs sorted by key
+                    let pairs = val.get_sorted_kv_pairs();
+                    for (key, val) in pairs {
+                        key.get_hash().hash(&mut hasher);
+                        val.get_hash().hash(&mut hasher);
                     }
-                    toml::Value::Table(result)
                 }
-                ValType::Bytes(val) => toml::Value::String(STANDARD.encode(val)),
+            };
+            hasher.finish()
+        })
+    }
+
+    pub fn write_to_str(
+        &self,
+        writer: &mut impl std::io::Write,
+        indent: u64,
+        use_indent: bool,
+    ) -> std::io::Result<usize> {
+        self.inner_write_str(writer, indent, use_indent)?;
+        if use_indent {
+            writer.write("\n".as_bytes())?;
+        }
+        Ok(0)
+    }
+
+    fn inner_write_str(
+        &self,
+        writer: &mut impl std::io::Write,
+        indent: u64,
+        use_indent: bool,
+    ) -> std::io::Result<usize> {
+        fn write_indent(writer: &mut impl std::io::Write, indent: u64) -> std::io::Result<usize> {
+            for _ in 0..indent {
+                writer.write("  ".as_bytes())?;
             }
+            Ok(0)
         }
 
-        let value = helper(self);
-        println!("Got value {:?}", value);
-        let toml_str = match toml::to_string(&value) {
-            Err(_) => {
-                return Val::new_err("Unable to create toml string from value");
+        match self.get_val() {
+            ValType::Null => {
+                writer.write("null".as_bytes())?;
             }
-            Ok(val) => val,
-        };
-        Val::new_string(toml_str.as_str())
+            ValType::Float64(val) => {
+                // TODO: Don't allocate on every float write
+                writer.write(val.to_string().as_str().as_bytes())?;
+            }
+            ValType::Bool(val) => {
+                if *val {
+                    writer.write("true".as_bytes())?;
+                } else {
+                    writer.write("false".as_bytes())?;
+                }
+            }
+            ValType::String(val) => {
+                write_json_escaped_str(writer, val.as_str())?;
+            }
+            ValType::Err(val) => {
+                writer.write("{\"ERROR\":".as_bytes())?;
+                write_json_escaped_str(writer, val.as_str())?;
+                writer.write("}".as_bytes())?;
+            }
+            ValType::List(val) => {
+                writer.write("[".as_bytes())?;
+                for (idx, elem) in val.iter().enumerate() {
+                    if idx > 0 {
+                        if use_indent {
+                            writer.write(", ".as_bytes())?;
+                        } else {
+                            writer.write(",".as_bytes())?;
+                        }
+                    }
+                    if use_indent {
+                        writer.write("\n".as_bytes())?;
+                        write_indent(writer, indent + 1)?;
+                    }
+                    elem.inner_write_str(writer, indent + 1, use_indent)?;
+                }
+                if val.len() > 0 && use_indent {
+                    writer.write("\n".as_bytes())?;
+                    write_indent(writer, indent)?;
+                }
+                writer.write("]".as_bytes())?;
+            }
+            ValType::Map(val) => {
+                writer.write("{".as_bytes())?;
+                for (idx, (key, val)) in val.pairs.iter().enumerate() {
+                    if idx > 0 {
+                        if use_indent {
+                            writer.write(", ".as_bytes())?;
+                        } else {
+                            writer.write(",".as_bytes())?;
+                        }
+                    }
+                    if use_indent {
+                        writer.write("\n".as_bytes())?;
+                        write_indent(writer, indent + 1)?;
+                    }
+                    key.inner_write_str(writer, indent + 1, use_indent)?;
+                    if use_indent {
+                        writer.write(": ".as_bytes())?;
+                    } else {
+                        writer.write(":".as_bytes())?;
+                    }
+                    val.inner_write_str(writer, indent + 1, use_indent)?;
+                }
+                if val.pairs.len() > 0 && use_indent {
+                    writer.write("\n".as_bytes())?;
+                    write_indent(writer, indent)?;
+                }
+                writer.write("}".as_bytes())?;
+            }
+        }
+        Ok(0)
     }
 }
 
-#[derive(Hash)]
-enum HashTypes {
-    Null,
-    Bool,
-    Number,
-    String,
-    List,
-    Map,
-    Bytes,
+fn write_json_escaped_str(writer: &mut impl std::io::Write, val: &str) -> std::io::Result<usize> {
+    writer.write("\"".as_bytes())?;
+    for ch in val.as_bytes() {
+        match *ch as char {
+            '\n' => {
+                writer.write("\\n".as_bytes())?;
+            }
+            '\t' => {
+                writer.write("\\t".as_bytes())?;
+            }
+            '\r' => {
+                writer.write("\\r".as_bytes())?;
+            }
+            '"' => {
+                writer.write("\\\"".as_bytes())?;
+            }
+            '\\' => {
+                writer.write("\\\\".as_bytes())?;
+            }
+            _ => {
+                writer.write(&[*ch])?;
+            }
+        }
+    }
+    writer.write("\"".as_bytes())?;
+
+    Ok(0)
 }
 
 impl PartialEq for Val {
     fn eq(&self, other: &Self) -> bool {
-        if self.val.hash != other.val.hash {
+        if self.get_hash() != other.get_hash() {
             return false;
         }
-        return self.val.val == other.val.val;
+        return self.cmp(other) == Ordering::Equal;
     }
 }
 
 impl Eq for Val {}
-
-impl Hash for Val {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.val.hash.hash(state);
-    }
-}
-
-impl Ord for Val {
-    /*
-    Order
-    - Error
-    - Null
-    - Bool
-    - Number
-    - String
-    - List
-    - Map
-    */
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match &self.val.val {
-            ValType::Error(err0) => match &other.val.val {
-                ValType::Error(err1) => err0.cmp(&err1),
-                ValType::Null => std::cmp::Ordering::Less,
-                ValType::Bool(_) => std::cmp::Ordering::Less,
-                ValType::Number(_) => std::cmp::Ordering::Less,
-                ValType::String(_) => std::cmp::Ordering::Less,
-                ValType::List(_) => std::cmp::Ordering::Less,
-                ValType::Map(_) => std::cmp::Ordering::Less,
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::Null => match other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Equal,
-                ValType::Bool(_) => std::cmp::Ordering::Less,
-                ValType::Number(_) => std::cmp::Ordering::Less,
-                ValType::String(_) => std::cmp::Ordering::Less,
-                ValType::List(_) => std::cmp::Ordering::Less,
-                ValType::Map(_) => std::cmp::Ordering::Less,
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::Bool(val0) => match &other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Greater,
-                ValType::Bool(val1) => val0.cmp(val1),
-                ValType::Number(_) => std::cmp::Ordering::Less,
-                ValType::String(_) => std::cmp::Ordering::Less,
-                ValType::List(_) => std::cmp::Ordering::Less,
-                ValType::Map(_) => std::cmp::Ordering::Less,
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::Number(val0) => match &other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Greater,
-                ValType::Bool(_) => std::cmp::Ordering::Greater,
-                ValType::Number(val1) => val0.total_cmp(val1),
-                ValType::String(_) => std::cmp::Ordering::Less,
-                ValType::List(_) => std::cmp::Ordering::Less,
-                ValType::Map(_) => std::cmp::Ordering::Less,
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::String(val0) => match &other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Greater,
-                ValType::Bool(_) => std::cmp::Ordering::Greater,
-                ValType::Number(_) => std::cmp::Ordering::Greater,
-                ValType::String(val1) => val0.cmp(val1),
-                ValType::List(_) => std::cmp::Ordering::Less,
-                ValType::Map(_) => std::cmp::Ordering::Less,
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::List(val0) => match &other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Greater,
-                ValType::Bool(_) => std::cmp::Ordering::Greater,
-                ValType::Number(_) => std::cmp::Ordering::Greater,
-                ValType::String(_) => std::cmp::Ordering::Greater,
-                ValType::List(val1) => list_cmp(val0, val1),
-                ValType::Map(_) => std::cmp::Ordering::Less,
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::Map(_) => match &other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Greater,
-                ValType::Bool(_) => std::cmp::Ordering::Greater,
-                ValType::Number(_) => std::cmp::Ordering::Greater,
-                ValType::String(_) => std::cmp::Ordering::Greater,
-                ValType::List(_) => std::cmp::Ordering::Greater,
-                ValType::Map(_) => panic!("map comparison is unimplemented"),
-                ValType::Bytes(_) => std::cmp::Ordering::Less,
-            },
-            ValType::Bytes(_) => match &other.val.val {
-                ValType::Error(_) => std::cmp::Ordering::Greater,
-                ValType::Null => std::cmp::Ordering::Greater,
-                ValType::Bool(_) => std::cmp::Ordering::Greater,
-                ValType::Number(_) => std::cmp::Ordering::Greater,
-                ValType::String(_) => std::cmp::Ordering::Greater,
-                ValType::List(_) => std::cmp::Ordering::Greater,
-                ValType::Map(_) => std::cmp::Ordering::Greater,
-                ValType::Bytes(_) => panic!("bytes comparison is unimplemented"),
-            },
-        }
-    }
-}
 
 impl PartialOrd for Val {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -528,7 +271,79 @@ impl PartialOrd for Val {
     }
 }
 
-fn list_cmp(left: &Vec<Val>, right: &Vec<Val>) -> std::cmp::Ordering {
+impl Ord for Val {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let lval = self.get_val();
+        let rval = other.get_val();
+        match lval {
+            ValType::Err(lval) => match rval {
+                ValType::Err(rval) => lval.cmp(rval),
+                ValType::Null => Ordering::Less,
+                ValType::Bool(_) => Ordering::Less,
+                ValType::Float64(_) => Ordering::Less,
+                ValType::String(_) => Ordering::Less,
+                ValType::List(_) => Ordering::Less,
+                ValType::Map(_) => Ordering::Less,
+            },
+            ValType::Null => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Equal,
+                ValType::Bool(_) => Ordering::Less,
+                ValType::Float64(_) => Ordering::Less,
+                ValType::String(_) => Ordering::Less,
+                ValType::List(_) => Ordering::Less,
+                ValType::Map(_) => Ordering::Less,
+            },
+            ValType::Bool(lval) => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Greater,
+                ValType::Bool(rval) => lval.cmp(rval),
+                ValType::Float64(_) => Ordering::Less,
+                ValType::String(_) => Ordering::Less,
+                ValType::List(_) => Ordering::Less,
+                ValType::Map(_) => Ordering::Less,
+            },
+            ValType::Float64(lval) => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Greater,
+                ValType::Bool(_) => Ordering::Greater,
+                ValType::Float64(rval) => lval.total_cmp(rval),
+                ValType::String(_) => Ordering::Less,
+                ValType::List(_) => Ordering::Less,
+                ValType::Map(_) => Ordering::Less,
+            },
+            ValType::String(lval) => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Greater,
+                ValType::Bool(_) => Ordering::Greater,
+                ValType::Float64(_) => Ordering::Greater,
+                ValType::String(rval) => lval.cmp(rval),
+                ValType::List(_) => Ordering::Less,
+                ValType::Map(_) => Ordering::Less,
+            },
+            ValType::List(lval) => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Greater,
+                ValType::Bool(_) => Ordering::Greater,
+                ValType::Float64(_) => Ordering::Greater,
+                ValType::String(_) => Ordering::Greater,
+                ValType::List(rval) => list_cmp(lval, rval),
+                ValType::Map(_) => Ordering::Less,
+            },
+            ValType::Map(lval) => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Greater,
+                ValType::Bool(_) => Ordering::Greater,
+                ValType::Float64(_) => Ordering::Greater,
+                ValType::String(_) => Ordering::Greater,
+                ValType::List(_) => Ordering::Greater,
+                ValType::Map(rval) => map_cmp(lval, rval),
+            },
+        }
+    }
+}
+
+fn list_cmp(left: &Vec<Val>, right: &Vec<Val>) -> Ordering {
     for idx in 0..std::cmp::min(left.len(), right.len()) {
         let result = left[idx].cmp(&right[idx]);
         if result != std::cmp::Ordering::Equal {
@@ -539,121 +354,120 @@ fn list_cmp(left: &Vec<Val>, right: &Vec<Val>) -> std::cmp::Ordering {
     return left.len().cmp(&right.len());
 }
 
-#[derive(Debug)]
-pub struct ValHashMap {
-    pairs: Vec<Option<(Val, Val)>>,
+fn map_cmp(left: &OrderedMap, right: &OrderedMap) -> Ordering {
+    let lpairs = left.get_sorted_kv_pairs();
+    let rpairs = right.get_sorted_kv_pairs();
+
+    for idx in 0..std::cmp::min(lpairs.len(), rpairs.len()) {
+        let (lkey, lval) = &lpairs[idx];
+        let (rkey, rval) = &rpairs[idx];
+
+        let key_ord = lkey.cmp(rkey);
+        if key_ord != Ordering::Equal {
+            return key_ord;
+        }
+
+        let val_ord = lval.cmp(rval);
+        if val_ord != Ordering::Equal {
+            return val_ord;
+        }
+    }
+
+    return left.len().cmp(&right.len());
+}
+
+impl Hash for Val {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.get_hash().hash(state)
+    }
+}
+
+pub struct OrderedMap {
+    pairs: Vec<(Val, Val)>,
     key_to_idx: HashMap<Val, usize>,
 }
 
-impl ValHashMap {
+impl OrderedMap {
     pub fn new() -> Self {
-        return ValHashMap {
+        OrderedMap {
             pairs: Vec::new(),
             key_to_idx: HashMap::new(),
-        };
+        }
     }
 
-    pub fn from_pairs(pairs: &Vec<(Val, Val)>) -> Self {
-        let mut map = Self::new();
+    pub fn insert(&mut self, key: &Val, val: &Val) {
+        match self.key_to_idx.entry(key.clone()) {
+            Entry::Occupied(entry) => {
+                self.pairs[*entry.get()].1 = val.clone();
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(self.pairs.len());
+                self.pairs.push((key.clone(), val.clone()));
+            }
+        }
+    }
 
-        for (key, val) in pairs {
+    pub fn get(&self, key: &Val) -> Option<Val> {
+        match self.key_to_idx.get(key) {
+            None => None,
+            Some(idx) => Some(self.pairs[*idx].1.clone()),
+        }
+    }
+
+    pub fn from_kv_pair_slice(slice: &[(Val, Val)]) -> Self {
+        let mut map = OrderedMap::new();
+        for (key, val) in slice {
             map.insert(key, val);
         }
-
-        return map;
-    }
-
-    pub fn insert(&mut self, key: &Val, value: &Val) {
-        let idx = *self
-            .key_to_idx
-            .entry(key.clone())
-            .or_insert(self.pairs.len());
-
-        if idx >= self.pairs.len() {
-            self.pairs.push(Some((key.clone(), value.clone())));
-        } else {
-            self.pairs[idx].as_mut().unwrap().1 = value.clone();
-        }
-    }
-
-    pub fn get(&self, key: &Val) -> Option<&Val> {
-        return match self.key_to_idx.get(key) {
-            None => None,
-            Some(idx) => Some(&self.pairs[*idx].as_ref().unwrap().1),
-        };
+        map
     }
 
     pub fn len(&self) -> usize {
-        return self.key_to_idx.len();
+        self.pairs.len()
     }
 
-    pub fn keys(&self) -> Vec<Val> {
-        self.pairs
-            .iter()
-            .filter_map(|pair| match pair {
-                None => None,
-                Some((key, _)) => Some(key.clone()),
-            })
-            .collect()
-    }
-
-    pub fn values(&self) -> Vec<Val> {
-        self.pairs
-            .iter()
-            .filter_map(|pair| match pair {
-                None => None,
-                Some((_, val)) => Some(val.clone()),
-            })
-            .collect()
-    }
-
-    pub fn entries(&self) -> impl Iterator<Item = (&Val, &Val)> {
-        self.pairs.iter().filter_map(|pair| match pair {
-            None => None,
-            Some((key, val)) => Some((key, val)),
-        })
+    fn get_sorted_kv_pairs(&self) -> Vec<(Val, Val)> {
+        let mut pairs = self.pairs.clone();
+        pairs.sort_by(|(left, _), (right, _)| left.cmp(right));
+        return pairs;
     }
 }
 
-impl PartialEq for ValHashMap {
+impl PartialEq for OrderedMap {
     fn eq(&self, other: &Self) -> bool {
-        if self.len() != other.len() {
-            return false;
-        }
+        self.cmp(other) == Ordering::Equal
+    }
+}
 
-        for (key, idx) in self.key_to_idx.iter() {
-            match other.get(key) {
-                None => {
-                    return false;
-                }
-                Some(other_val) => {
-                    let self_val = &self.pairs[*idx].as_ref().unwrap().1;
-                    if self_val != other_val {
-                        return false;
-                    }
-                }
+impl Eq for OrderedMap {}
+
+impl PartialOrd for OrderedMap {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for OrderedMap {
+    fn cmp(&self, right: &Self) -> Ordering {
+        let left = self;
+        let lpairs = left.get_sorted_kv_pairs();
+        let rpairs = right.get_sorted_kv_pairs();
+
+        for idx in 0..std::cmp::min(lpairs.len(), rpairs.len()) {
+            let (lkey, lval) = &lpairs[idx];
+            let (rkey, rval) = &rpairs[idx];
+
+            let key_ord = lkey.cmp(rkey);
+            if key_ord != Ordering::Equal {
+                return key_ord;
+            }
+
+            let val_ord = lval.cmp(rval);
+            if val_ord != Ordering::Equal {
+                return val_ord;
             }
         }
 
-        return true;
-    }
-}
-
-impl Hash for ValHashMap {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        let mut sorted_pairs = self
-            .pairs
-            .iter()
-            .filter_map(|pair| match pair {
-                None => None,
-                Some(pair) => Some(pair),
-            })
-            .collect::<Vec<_>>();
-        sorted_pairs.sort_by_key(|(key, _)| key);
-
-        for (key, val) in sorted_pairs {
-            key.hash(state);
-            val.hash(state);
-        }
+        return left.len().cmp(&right.len());
     }
 }

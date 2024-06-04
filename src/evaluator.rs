@@ -1,109 +1,108 @@
 use std::cmp::Ordering;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 
 use super::ast_node_pool::{AstNode, AstNodePtr};
-use super::obj_pool::{ObjPool, ObjPoolObjValue, ObjPoolRef, OrderedMap};
+// use super::obj_pool::{ObjPool, ObjPoolObjValue, Val, OrderedMap};
 use super::parser::Parser;
+use super::val::{OrderedMap, Val, ValType};
 
-pub struct Evaluator {
-    obj_pool: ObjPool,
-}
+pub struct Evaluator {}
 
 impl Evaluator {
     pub fn new() -> Self {
-        Evaluator {
-            obj_pool: ObjPool::new(),
-        }
+        Evaluator {}
     }
 
-    pub fn parse_and_eval(&mut self, text: &str) -> ObjPoolRef {
+    pub fn parse_and_eval(&mut self, text: &str) -> Val {
         let mut parser = Parser::new(text);
         match parser.external_parse_expr() {
-            None => self.obj_pool.new_null(),
+            None => Val::new_null(),
             Some(ast) => match ast {
                 Err(err) => {
                     println!("Parse Error: {:?}", err);
-                    self.obj_pool.new_err("Parse Error")
+                    Val::new_err("Parse Error")
                 }
                 Ok(ast) => {
                     // for (idx, val) in parser.pool.vals.iter().enumerate() {
                     //     println!("{}: {:?}", idx, val);
                     // }
-                    let val = self.obj_pool.new_null();
-                    self.eval(ast, val, &parser)
+                    let val = Val::new_null();
+                    self.eval(ast, &val, &parser)
                 }
             },
         }
     }
 
-    fn eval_bool(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> Option<bool> {
+    fn eval_bool(&mut self, node: AstNodePtr, obj: &Val, parser: &Parser) -> Option<bool> {
         let val = self.eval(node, obj, parser);
-        match self.obj_pool.get(val) {
-            ObjPoolObjValue::Bool(val) => Some(*val),
+        match val.get_val() {
+            ValType::Bool(val) => Some(*val),
             _ => None,
         }
     }
 
     fn eval_bool_expr(
         &mut self,
-        obj: ObjPoolRef,
+        obj: &Val,
         parser: &Parser,
         left: AstNodePtr,
         right: AstNodePtr,
         left_err: &str,
         right_err: &str,
         callback: impl Fn(bool, bool) -> bool,
-    ) -> ObjPoolRef {
+    ) -> Val {
         let left_val = match self.eval_bool(left, obj, parser) {
             None => {
-                return self.obj_pool.new_err(left_err);
+                return Val::new_err(left_err);
             }
             Some(val) => val,
         };
         let right_val = match self.eval_bool(right, obj, parser) {
             None => {
-                return self.obj_pool.new_err(right_err);
+                return Val::new_err(right_err);
             }
             Some(val) => val,
         };
 
-        self.obj_pool.new_bool(callback(left_val, right_val))
+        Val::new_bool(callback(left_val, right_val))
     }
 
     fn eval_f64_expr(
         &mut self,
-        obj: ObjPoolRef,
+        obj: &Val,
         parser: &Parser,
         left: AstNodePtr,
         right: AstNodePtr,
         left_err: &str,
         right_err: &str,
         callback: impl Fn(f64, f64) -> f64,
-    ) -> ObjPoolRef {
+    ) -> Val {
         let left_val = self.eval(left, obj, parser);
-        let left_val = match self.obj_pool.get(left_val) {
-            ObjPoolObjValue::Float64(val) => *val,
+        let left_val = match left_val.get_val() {
+            ValType::Float64(val) => *val,
             _ => {
-                return self.obj_pool.new_err(left_err);
+                return Val::new_err(left_err);
             }
         };
         let right_val = self.eval(right, obj, parser);
-        let right_val = match self.obj_pool.get(right_val) {
-            ObjPoolObjValue::Float64(val) => *val,
+        let right_val = match right_val.get_val() {
+            ValType::Float64(val) => *val,
             _ => {
-                return self.obj_pool.new_err(right_err);
+                return Val::new_err(right_err);
             }
         };
-        self.obj_pool.new_f64(callback(left_val, right_val))
+        Val::new_f64(callback(left_val, right_val))
     }
 
-    fn eval(&mut self, node: AstNodePtr, obj: ObjPoolRef, parser: &Parser) -> ObjPoolRef {
+    fn eval(&mut self, node: AstNodePtr, obj: &Val, parser: &Parser) -> Val {
         match parser.get_node(node) {
-            AstNode::Null => self.obj_pool.new_null(),
+            AstNode::Null => Val::new_null(),
             AstNode::Pipe(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
-                self.eval(*right, left_val, parser)
+                self.eval(*right, &left_val, parser)
             }
-            AstNode::Dot => obj,
+            AstNode::Dot => obj.clone(),
             AstNode::Or(left, right) => self.eval_bool_expr(
                 obj,
                 parser,
@@ -125,38 +124,32 @@ impl Evaluator {
             AstNode::Equals(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
-                self.obj_pool
-                    .new_bool(self.obj_pool.val_equals(left_val, right_val))
+                Val::new_bool(left_val == right_val)
             }
             AstNode::NotEquals(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
-                self.obj_pool
-                    .new_bool(!self.obj_pool.val_equals(left_val, right_val))
+                Val::new_bool(left_val != right_val)
             }
             AstNode::LessThan(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
-                self.obj_pool
-                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) == Ordering::Less)
+                Val::new_bool(left_val < right_val)
             }
             AstNode::LessThanOrEqual(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
-                self.obj_pool
-                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) != Ordering::Greater)
+                Val::new_bool(left_val <= right_val)
             }
             AstNode::GreaterThan(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
-                self.obj_pool
-                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) == Ordering::Greater)
+                Val::new_bool(left_val > right_val)
             }
             AstNode::GreaterThanOrEqual(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
-                self.obj_pool
-                    .new_bool(self.obj_pool.cmp_values(left_val, right_val) != Ordering::Less)
+                Val::new_bool(left_val >= right_val)
             }
             AstNode::Add(left, right) => self.eval_f64_expr(
                 obj,
@@ -187,35 +180,31 @@ impl Evaluator {
             ),
             AstNode::Divide(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
-                let left_val = match self.obj_pool.get(left_val) {
-                    ObjPoolObjValue::Float64(val) => *val,
+                let left_val = match left_val.get_val() {
+                    ValType::Float64(val) => *val,
                     _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Left side of division has to be a float");
+                        return Val::new_err("Left side of division has to be a float");
                     }
                 };
                 let right_val = self.eval(*right, obj, parser);
-                let right_val = match self.obj_pool.get(right_val) {
-                    ObjPoolObjValue::Float64(val) => *val,
+                let right_val = match right_val.get_val() {
+                    ValType::Float64(val) => *val,
                     _ => {
-                        return self
-                            .obj_pool
-                            .new_err("Right side of division has to be a float");
+                        return Val::new_err("Right side of division has to be a float");
                     }
                 };
                 if right_val == 0.0 {
-                    self.obj_pool.new_err("divide by zero")
+                    Val::new_err("divide by zero")
                 } else {
-                    self.obj_pool.new_f64(left_val / right_val)
+                    Val::new_f64(left_val / right_val)
                 }
             }
-            AstNode::Integer(val) => self.obj_pool.new_f64(*val as f64),
+            AstNode::Integer(val) => Val::new_f64(*val as f64),
             AstNode::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
                 fn helper(
                     this: &mut Evaluator,
-                    obj: ObjPoolRef,
+                    obj: &Val,
                     parser: &Parser,
                     map: &mut OrderedMap,
                     node: AstNodePtr,
@@ -227,11 +216,11 @@ impl Evaluator {
                         }
                         AstNode::MapKeyValPair { key, val } => {
                             let key_obj = match parser.get_node(*key) {
-                                AstNode::SubString(key_name) => this.obj_pool.new_str(key_name),
+                                AstNode::SubString(key_name) => Val::new_str(key_name),
                                 _ => panic!(),
                             };
                             let val_obj = this.eval(*val, obj, parser);
-                            map.insert(&this.obj_pool, key_obj, val_obj);
+                            map.insert(&key_obj, &val_obj);
                         }
                         _ => panic!(),
                     }
@@ -244,16 +233,16 @@ impl Evaluator {
                     }
                 };
 
-                self.obj_pool.new_map(map)
+                Val::new_map(map)
             }
             AstNode::ListLiteral(contents) => {
-                let mut list = Vec::<ObjPoolRef>::new();
+                let mut list = Vec::<Val>::new();
 
                 fn helper(
                     this: &mut Evaluator,
-                    obj: ObjPoolRef,
+                    obj: &Val,
                     parser: &Parser,
-                    list: &mut Vec<ObjPoolRef>,
+                    list: &mut Vec<Val>,
                     node: AstNodePtr,
                 ) {
                     match parser.get_node(node) {
@@ -275,13 +264,13 @@ impl Evaluator {
                     }
                 };
 
-                self.obj_pool.new_list(list)
+                Val::new_list(list)
             }
             AstNode::FormatString(contents) => {
                 let mut buffer = Vec::<u8>::new();
                 fn helper(
                     this: &mut Evaluator,
-                    obj: ObjPoolRef,
+                    obj: &Val,
                     parser: &Parser,
                     buffer: &mut Vec<u8>,
                     node: AstNodePtr,
@@ -333,8 +322,8 @@ impl Evaluator {
                         }
                         _ => {
                             let elem_val = this.eval(node, obj, parser);
-                            match this.obj_pool.get(elem_val) {
-                                ObjPoolObjValue::String(sub_text) => {
+                            match elem_val.get_val() {
+                                ValType::String(sub_text) => {
                                     buffer.extend(sub_text.as_bytes());
                                 }
                                 _ => {
@@ -352,56 +341,48 @@ impl Evaluator {
                     }
                 };
 
-                self.obj_pool
-                    .new_str(std::str::from_utf8(buffer.as_slice()).unwrap())
+                Val::new_str(std::str::from_utf8(buffer.as_slice()).unwrap())
             }
-            AstNode::Access(expr) => match self.obj_pool.get(obj) {
-                ObjPoolObjValue::Map(_) => {
+            AstNode::Access(expr) => match obj.get_val() {
+                ValType::Map(map) => {
                     let key_val = match parser.get_node(*expr) {
-                        AstNode::SubString(key) => self.obj_pool.new_str(key),
+                        AstNode::SubString(key) => Val::new_str(key),
                         _ => self.eval(*expr, obj, parser),
                     };
-                    let map = match self.obj_pool.get(obj) {
-                        ObjPoolObjValue::Map(map) => map,
-                        _ => panic!(),
-                    };
-                    match map.get(&self.obj_pool, key_val) {
-                        None => self.obj_pool.new_null(),
+
+                    match map.get(&key_val) {
+                        None => Val::new_null(),
                         Some(val) => val,
                     }
                 }
-                ObjPoolObjValue::List(_) => {
+                ValType::List(_) => {
                     let access_val = self.eval(*expr, obj, parser);
-                    let access_idx = match self.obj_pool.get(access_val) {
-                        ObjPoolObjValue::Float64(val) => {
+                    let access_idx = match access_val.get_val() {
+                        ValType::Float64(val) => {
                             if *val >= 0.0 && *val == val.floor() {
                                 *val as usize
                             } else {
-                                return self
-                                    .obj_pool
-                                    .new_err("List access must be positive integer");
+                                return Val::new_err("List access must be positive integer");
                             }
                         }
                         _ => {
-                            return self
-                                .obj_pool
-                                .new_err("List access must be a positive integer");
+                            return Val::new_err("List access must be a positive integer");
                         }
                     };
-                    let list = match self.obj_pool.get(obj) {
-                        ObjPoolObjValue::List(list) => list,
+                    let list = match obj.get_val() {
+                        ValType::List(list) => list,
                         _ => panic!(),
                     };
                     if access_idx < list.len() {
-                        list[access_idx]
+                        list[access_idx].clone()
                     } else {
-                        self.obj_pool.new_err("List access out of bounds")
+                        Val::new_err("List access out of bounds")
                     }
                 }
-                ObjPoolObjValue::Null => obj,
+                ValType::Null => obj.clone(),
                 _ => panic!(),
             },
-            AstNode::Bool(val) => self.obj_pool.new_bool(*val),
+            AstNode::Bool(val) => Val::new_bool(*val),
             AstNode::FcnCall { name, args } => {
                 let name = match parser.get_node(*name) {
                     AstNode::SubString(name) => *name,
@@ -410,7 +391,7 @@ impl Evaluator {
 
                 let mut args_vec = Vec::<AstNodePtr>::new();
                 fn helper(
-                    obj: ObjPoolRef,
+                    obj: &Val,
                     parser: &Parser,
                     args_vec: &mut Vec<AstNodePtr>,
                     node: AstNodePtr,
@@ -441,11 +422,11 @@ impl Evaluator {
 
     pub fn write_val(
         &self,
-        val: ObjPoolRef,
+        val: Val,
         writer: &mut impl std::io::Write,
         use_indent: bool,
     ) -> std::io::Result<()> {
-        match self.obj_pool.write_to_str(writer, val, 0, use_indent) {
+        match val.write_to_str(writer, 0, use_indent) {
             Err(err) => Err(err),
             Ok(_) => Ok(()),
         }
@@ -454,138 +435,110 @@ impl Evaluator {
     pub fn eval_fcn(
         &mut self,
         parser: &Parser,
-        obj: ObjPoolRef,
+        obj: &Val,
         name: &str,
         args: Vec<AstNodePtr>,
-    ) -> ObjPoolRef {
+    ) -> Val {
         match name {
             "len" => {
                 if args.len() != 0 {
-                    return self
-                        .obj_pool
-                        .new_err("len() must be called with 0 arguments.");
+                    return Val::new_err("len() must be called with 0 arguments.");
                 }
-                match self.obj_pool.get(obj) {
-                    ObjPoolObjValue::List(val) => self.obj_pool.new_f64(val.len() as f64),
-                    ObjPoolObjValue::Map(val) => self.obj_pool.new_f64(val.len() as f64),
-                    _ => self
-                        .obj_pool
-                        .new_err("len() can only be called on a list or map"),
+                match obj.get_val() {
+                    ValType::List(val) => Val::new_f64(val.len() as f64),
+                    ValType::Map(val) => Val::new_f64(val.len() as f64),
+                    _ => Val::new_err("len() can only be called on a list or map"),
                 }
             }
             "map" => {
                 if args.len() != 1 {
-                    return self
-                        .obj_pool
-                        .new_err("map() must be called with 1 argument.");
+                    return Val::new_err("map() must be called with 1 argument.");
                 }
-                match self.obj_pool.get(obj) {
-                    ObjPoolObjValue::List(val) => {
-                        // TODO: figure out how to not clone here
-                        let val = val.clone();
-                        let mut result = Vec::<ObjPoolRef>::with_capacity(val.len());
+                match obj.get_val() {
+                    ValType::List(val) => {
+                        let mut result = Vec::<Val>::with_capacity(val.len());
                         for elem in val {
-                            result.push(self.eval(args[0], elem, parser));
+                            result.push(self.eval(args[0], &elem, parser));
                         }
-                        self.obj_pool.new_list(result)
+                        Val::new_list(result)
                     }
-                    _ => self.obj_pool.new_err("map() must be called on a list"),
+                    _ => Val::new_err("map() must be called on a list"),
                 }
             }
             "group" => {
                 if args.len() != 1 {
-                    return self
-                        .obj_pool
-                        .new_err("group() must be called with one argument");
+                    return Val::new_err("group() must be called with one argument");
                 }
-                match self.obj_pool.get(obj) {
-                    ObjPoolObjValue::List(val) => {
-                        let mut groups = Vec::<(ObjPoolRef, Vec<ObjPoolRef>)>::new();
-                        let val = val.clone();
-                        // let mut result = Vec::<ObjPoolRef>::with_capacity(val.len());
+
+                match obj.get_val() {
+                    ValType::List(val) => {
+                        let mut groups = Vec::<(Val, Vec<Val>)>::new();
+                        let mut key_to_group_idx = HashMap::<Val, usize>::new();
+
                         for elem in val {
                             let key_val = self.eval(args[0], elem, parser);
-                            let mut found = false;
-                            for (loop_key_val, loop_vals) in &mut groups {
-                                if self.obj_pool.val_equals(key_val, *loop_key_val) {
-                                    loop_vals.push(elem);
-                                    found = true;
-                                    break;
+                            match key_to_group_idx.entry(key_val.clone()) {
+                                Entry::Occupied(entry) => {
+                                    groups[*entry.get()].1.push(elem.clone());
                                 }
-                            }
-                            if !found {
-                                groups.push((key_val, vec![elem]));
+                                Entry::Vacant(entry) => {
+                                    entry.insert(groups.len());
+                                    groups.push((key_val, vec![elem.clone()]));
+                                }
                             }
                         }
 
-                        let mut result = Vec::<ObjPoolRef>::with_capacity(groups.len());
-                        for (key, rows) in groups {
-                            let key_label = self.obj_pool.new_str("key");
-                            let rows_label = self.obj_pool.new_str("rows");
-                            let rows_obj = self.obj_pool.new_list(rows);
-                            result.push(self.obj_pool.new_map_from_iter(
-                                [(key_label, key), (rows_label, rows_obj)].iter(),
-                            ));
+                        let mut result = Vec::<Val>::with_capacity(groups.len());
+                        for (key, vals) in groups {
+                            result.push(Val::new_map(OrderedMap::from_kv_pair_slice(&[
+                                (Val::new_str("key"), key),
+                                (Val::new_str("vals"), Val::new_list(vals)),
+                            ])))
                         }
-                        self.obj_pool.new_list(result)
+                        Val::new_list(result)
                     }
-                    _ => self.obj_pool.new_err("group() must be called on a list"),
+                    _ => Val::new_err("group() must be called on a list"),
                 }
             }
             "sort" => {
                 if args.len() != 1 {
-                    return self
-                        .obj_pool
-                        .new_err("sort() must be called with one argument");
+                    return Val::new_err("sort() must be called with one argument");
                 }
-                match self.obj_pool.get(obj) {
-                    ObjPoolObjValue::List(val) => {
-                        let val = val.clone();
-                        let mut values = Vec::<(ObjPoolRef, ObjPoolRef)>::with_capacity(val.len());
-                        for elem in val {
-                            values.push((elem, self.eval(args[0], elem, parser)));
-                        }
-                        values.sort_by(|(_, left), (_, right)| {
-                            self.obj_pool.cmp_values(*left, *right)
-                        });
+                match obj.get_val() {
+                    ValType::List(val) => {
+                        let mut values = val.clone();
+                        values.sort_by_cached_key(|elem| self.eval(args[0], elem, parser));
 
-                        let result = values.iter().map(|(val, _)| *val).collect::<Vec<_>>();
-
-                        self.obj_pool.new_list(result)
+                        Val::new_list(values)
                     }
-                    _ => self.obj_pool.new_err("sort() must be called on a list"),
+                    _ => Val::new_err("sort() must be called on a list"),
                 }
             }
             "filter" => {
                 if args.len() != 1 {
-                    return self
-                        .obj_pool
-                        .new_err("filter() must be called with one argument");
+                    return Val::new_err("filter() must be called with one argument");
                 }
-                match self.obj_pool.get(obj) {
-                    ObjPoolObjValue::List(val) => {
-                        let val = val.clone();
-                        let mut result = Vec::<ObjPoolRef>::new();
+                match obj.get_val() {
+                    ValType::List(val) => {
+                        let mut result = Vec::<Val>::new();
                         for elem in val {
-                            let filter_val = self.eval(args[0], elem, parser);
-                            match self.obj_pool.get(filter_val) {
-                                ObjPoolObjValue::Bool(bool_val) => {
+                            let filter_val = self.eval(args[0], &elem, parser);
+                            match filter_val.get_val() {
+                                ValType::Bool(bool_val) => {
                                     if *bool_val {
-                                        result.push(elem);
+                                        result.push(elem.clone());
                                     }
                                 }
                                 _ => {}
                             }
                         }
 
-                        self.obj_pool.new_list(result)
+                        Val::new_list(result)
                     }
-                    _ => self.obj_pool.new_err("filter() must be called on a list"),
+                    _ => Val::new_err("filter() must be called on a list"),
                 }
             }
-            _ => self
-                .obj_pool
-                .new_err(format!("Unknown function \"{}\"", name).as_str()),
+            _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
 }

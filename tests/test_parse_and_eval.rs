@@ -8,7 +8,9 @@ mod tests {
         let result = evaluator.parse_and_eval(expr);
 
         let mut out0 = Vec::<u8>::new();
-        evaluator.write_val(result, &mut out0, true).unwrap();
+        evaluator
+            .write_val(result.clone(), &mut out0, true)
+            .unwrap();
 
         // make sure output is valid json when indent=false
         let mut out1 = Vec::<u8>::new();
@@ -158,15 +160,15 @@ mod tests {
         assert_json(
             "[[1,'a'], [2,'b'], [1,'c'], [3,'d'], [2,'e']] | group(.[0])",
             json!([
-                {"key": 1, "rows": [
+                {"key": 1, "vals": [
                     [1, 'a'],
                     [1, 'c']
                 ]},
-                {"key": 2, "rows": [
+                {"key": 2, "vals": [
                     [2, 'b'],
                     [2, 'e']
                 ]},
-                {"key": 3, "rows": [
+                {"key": 3, "vals": [
                     [3, 'd'],
                 ]},
             ]),
