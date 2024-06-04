@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::hash::Hash;
@@ -22,6 +23,7 @@ pub enum ValType {
     String(String),
     List(Vec<Val>),
     Map(OrderedMap),
+    Bytes(Vec<u8>),
 }
 
 impl Val {
@@ -66,6 +68,10 @@ impl Val {
         Val::new_val(ValType::Map(val))
     }
 
+    pub fn new_bytes(val: Vec<u8>) -> Val {
+        Val::new_val(ValType::Bytes(val))
+    }
+
     fn get_hash(&self) -> u64 {
         *self.inner_val.hash.get_or_init(|| {
             #[derive(Hash)]
@@ -77,6 +83,7 @@ impl Val {
                 String,
                 List,
                 Map,
+                Bytes,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -116,6 +123,11 @@ impl Val {
                         val.get_hash().hash(&mut hasher);
                     }
                 }
+                ValType::Bytes(val) => {
+                    HashTypes::Bytes.hash(&mut hasher);
+
+                    val.hash(&mut hasher);
+                }
             };
             hasher.finish()
         })
@@ -127,6 +139,10 @@ impl Val {
         indent: u64,
         use_indent: bool,
     ) -> std::io::Result<usize> {
+        if let ValType::Bytes(bytes) = self.get_val() {
+            writer.write(bytes.as_slice())?;
+            return Ok(0);
+        }
         self.inner_write_str(writer, indent, use_indent)?;
         if use_indent {
             writer.write("\n".as_bytes())?;
@@ -220,6 +236,11 @@ impl Val {
                 }
                 writer.write("}".as_bytes())?;
             }
+            ValType::Bytes(val) => {
+                writer.write("\"".as_bytes())?;
+                writer.write(STANDARD.encode(val).as_bytes())?;
+                writer.write("\"".as_bytes())?;
+            }
         }
         Ok(0)
     }
@@ -284,6 +305,7 @@ impl Ord for Val {
                 ValType::String(_) => Ordering::Less,
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
+                ValType::Bytes(_) => Ordering::Less,
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -293,6 +315,7 @@ impl Ord for Val {
                 ValType::String(_) => Ordering::Less,
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
+                ValType::Bytes(_) => Ordering::Less,
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -302,6 +325,7 @@ impl Ord for Val {
                 ValType::String(_) => Ordering::Less,
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
+                ValType::Bytes(_) => Ordering::Less,
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -311,6 +335,7 @@ impl Ord for Val {
                 ValType::String(_) => Ordering::Less,
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
+                ValType::Bytes(_) => Ordering::Less,
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -320,6 +345,7 @@ impl Ord for Val {
                 ValType::String(rval) => lval.cmp(rval),
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
+                ValType::Bytes(_) => Ordering::Less,
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -329,6 +355,7 @@ impl Ord for Val {
                 ValType::String(_) => Ordering::Greater,
                 ValType::List(rval) => list_cmp(lval, rval),
                 ValType::Map(_) => Ordering::Less,
+                ValType::Bytes(_) => Ordering::Less,
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -338,6 +365,17 @@ impl Ord for Val {
                 ValType::String(_) => Ordering::Greater,
                 ValType::List(_) => Ordering::Greater,
                 ValType::Map(rval) => map_cmp(lval, rval),
+                ValType::Bytes(_) => Ordering::Less,
+            },
+            ValType::Bytes(lval) => match rval {
+                ValType::Err(_) => Ordering::Greater,
+                ValType::Null => Ordering::Greater,
+                ValType::Bool(_) => Ordering::Greater,
+                ValType::Float64(_) => Ordering::Greater,
+                ValType::String(_) => Ordering::Greater,
+                ValType::List(_) => Ordering::Greater,
+                ValType::Map(_) => Ordering::Greater,
+                ValType::Bytes(rval) => bytes_cmp(lval, rval),
             },
         }
     }
@@ -370,6 +408,17 @@ fn map_cmp(left: &OrderedMap, right: &OrderedMap) -> Ordering {
         let val_ord = lval.cmp(rval);
         if val_ord != Ordering::Equal {
             return val_ord;
+        }
+    }
+
+    return left.len().cmp(&right.len());
+}
+
+fn bytes_cmp(left: &Vec<u8>, right: &Vec<u8>) -> Ordering {
+    for idx in 0..std::cmp::min(left.len(), right.len()) {
+        let result = left[idx].cmp(&right[idx]);
+        if result != std::cmp::Ordering::Equal {
+            return result;
         }
     }
 

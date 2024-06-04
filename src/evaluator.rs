@@ -1,5 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::io::Read;
 
 use super::ast_node_pool::{AstNode, AstNodePtr};
 use super::parser::Parser;
@@ -441,7 +442,7 @@ impl Evaluator {
                     }
                 };
 
-                self.eval_fcn(parser, obj, name, args_vec)
+                self.eval_fcn(parser, obj, name, &args_vec)
             }
             _ => panic!("Unimplemented {:?}", parser.get_node(node)),
         }
@@ -493,7 +494,7 @@ impl Evaluator {
         parser: &Parser,
         obj: &Val,
         name: &str,
-        args: Vec<AstNodePtr>,
+        args: &Vec<AstNodePtr>,
     ) -> Val {
         match name {
             "len" => {
@@ -557,13 +558,22 @@ impl Evaluator {
                 }
             }
             "sort" => {
-                if args.len() != 1 {
-                    return Val::new_err("sort() must be called with one argument");
+                if args.len() > 1 {
+                    return Val::new_err("sort() must be called with zero or one arguments");
                 }
                 match obj.get_val() {
                     ValType::List(val) => {
                         let mut values = val.clone();
-                        values.sort_by_cached_key(|elem| self.eval(args[0], elem, parser));
+                        let sort_expr = if args.len() == 1 { Some(args[0]) } else { None };
+                        match sort_expr {
+                            None => {
+                                values.sort();
+                            }
+                            Some(sort_expr) => {
+                                values
+                                    .sort_by_cached_key(|elem| self.eval(sort_expr, elem, parser));
+                            }
+                        }
 
                         Val::new_list(values)
                     }
@@ -610,7 +620,31 @@ impl Evaluator {
                     }
                     Val::new_list(lines)
                 }
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn(parser, obj, "str", args);
+                    self.eval_fcn(parser, &text, name, args)
+                }
                 _ => Val::new_err("lines() must be called on a string"),
+            },
+            "joinlines" => match obj.get_val() {
+                ValType::List(list) => {
+                    let mut result = String::new();
+                    for elem in list {
+                        match elem.get_val() {
+                            ValType::String(elem_text) => {
+                                result.push_str(elem_text.as_str());
+                                result.push('\n');
+                            }
+                            _ => {
+                                return Val::new_err(
+                                    "joinlines() must be called on a list of strings",
+                                )
+                            }
+                        }
+                    }
+                    Val::new_str(result.as_str())
+                }
+                _ => Val::new_err("joinlines() must be called on a list"),
             },
             "split" => match obj.get_val() {
                 ValType::String(text) => match self.eval(args[0], obj, parser).get_val() {
@@ -621,6 +655,10 @@ impl Evaluator {
                     ),
                     _ => Val::new_err("split() pattern must be a string"),
                 },
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn(parser, obj, "str", args);
+                    self.eval_fcn(parser, &text, name, args)
+                }
                 _ => Val::new_err("split() must be called on a string"),
             },
             "join" => match &obj.get_val() {
@@ -649,6 +687,37 @@ impl Evaluator {
                     Val::new_str(result.as_str())
                 }
                 _ => Val::new_err("join() must be called on a list"),
+            },
+            "in" => {
+                let mut buffer = Vec::<u8>::new();
+                std::io::stdin().read_to_end(&mut buffer).unwrap();
+                return Val::new_bytes(buffer);
+            }
+            "str" => match obj.get_val() {
+                ValType::Bytes(bytes) => match std::str::from_utf8(bytes) {
+                    Ok(str) => Val::new_str(str),
+                    Err(_) => Val::new_err("Unable to decode bytes as utf8 string."),
+                },
+                _ => Val::new_err("str() must be called on bytes"),
+            },
+            "bytes" => match obj.get_val() {
+                ValType::String(text) => {
+                    Val::new_bytes(text.as_bytes().iter().cloned().collect::<Vec<_>>())
+                }
+                _ => Val::new_err("bytes() must be called on str"),
+            },
+            "read" => match obj.get_val() {
+                ValType::String(file_path) => {
+                    let mut buffer = Vec::<u8>::new();
+                    match std::fs::File::open(file_path) {
+                        Err(_) => Val::new_err("Unable to open file"),
+                        Ok(mut fp) => match fp.read_to_end(&mut buffer) {
+                            Err(_) => Val::new_err("Unable to read file"),
+                            Ok(_) => Val::new_bytes(buffer),
+                        },
+                    }
+                }
+                _ => Val::new_err("read() must be called on a string"),
             },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
