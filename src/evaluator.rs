@@ -345,6 +345,10 @@ impl Evaluator {
             }
             AstNode::Access(expr) => match obj.get_val() {
                 ValType::Map(map) => {
+                    if let AstNode::ReverseIdx(_) = parser.get_node(*expr) {
+                        return Val::new_err("Maps cannot be accessed with a reverse index");
+                    }
+
                     let key_val = match parser.get_node(*expr) {
                         AstNode::SubString(key) => Val::new_str(key),
                         _ => self.eval(*expr, obj, parser),
@@ -355,30 +359,55 @@ impl Evaluator {
                         Some(val) => val,
                     }
                 }
-                ValType::List(_) => {
-                    let access_val = self.eval(*expr, obj, parser);
-                    let access_idx = match access_val.get_val() {
-                        ValType::Float64(val) => {
-                            if *val >= 0.0 && *val == val.floor() {
-                                *val as usize
+                ValType::List(list) => match parser.get_node(*expr) {
+                    AstNode::SliceAccess(start, end) => {
+                        let start_idx = match start {
+                            None => 0,
+                            Some(start_expr) => {
+                                match self.eval_list_access(obj, *start_expr, parser) {
+                                    Err(err) => {
+                                        return err;
+                                    }
+                                    Ok((start_idx, is_rev)) => {
+                                        if is_rev {
+                                            list.len().saturating_sub(start_idx)
+                                        } else {
+                                            start_idx.min(list.len())
+                                        }
+                                    }
+                                }
+                            }
+                        };
+                        let end_idx = match end {
+                            None => list.len(),
+                            Some(end_expr) => match self.eval_list_access(obj, *end_expr, parser) {
+                                Err(err) => {
+                                    return err;
+                                }
+                                Ok((end_idx, is_rev)) => {
+                                    if is_rev {
+                                        list.len().saturating_sub(end_idx)
+                                    } else {
+                                        end_idx.min(list.len())
+                                    }
+                                }
+                            },
+                        };
+                        let end_idx = end_idx.max(start_idx);
+                        Val::new_list(list[start_idx..end_idx].to_vec())
+                    }
+                    _ => match self.eval_list_access(obj, *expr, parser) {
+                        Err(err) => err,
+                        Ok((idx, is_rev)) => {
+                            if idx < list.len() {
+                                let idx = if is_rev { list.len() - idx - 1 } else { idx };
+                                list[idx].clone()
                             } else {
-                                return Val::new_err("List access must be positive integer");
+                                Val::new_err("List access out of bounds")
                             }
                         }
-                        _ => {
-                            return Val::new_err("List access must be a positive integer");
-                        }
-                    };
-                    let list = match obj.get_val() {
-                        ValType::List(list) => list,
-                        _ => panic!(),
-                    };
-                    if access_idx < list.len() {
-                        list[access_idx].clone()
-                    } else {
-                        Val::new_err("List access out of bounds")
-                    }
-                }
+                    },
+                },
                 ValType::Null => obj.clone(),
                 _ => panic!(),
             },
@@ -417,6 +446,35 @@ impl Evaluator {
                 self.eval_fcn(parser, obj, name, args_vec)
             }
             _ => panic!("Unimplemented {:?}", parser.get_node(node)),
+        }
+    }
+
+    fn eval_list_access(
+        &mut self,
+        obj: &Val,
+        expr: AstNodePtr,
+        parser: &Parser,
+    ) -> Result<(usize, bool), Val> {
+        let (is_rev, idx_expr) = match parser.get_node(expr) {
+            AstNode::ReverseIdx(rev_expr) => (true, *rev_expr),
+            _ => (false, expr),
+        };
+        let idx = self.eval(idx_expr, obj, parser);
+        match idx.get_val() {
+            ValType::Float64(num) => {
+                let num = *num;
+                if num == num.floor() && num >= 0.0 {
+                    let num = num as usize;
+                    if is_rev {
+                        Ok((num, is_rev))
+                    } else {
+                        Ok((num, is_rev))
+                    }
+                } else {
+                    Err(Val::new_err("Can only access a list with an integer."))
+                }
+            }
+            _ => Err(Val::new_err("Can only access a list with an integer.")),
         }
     }
 

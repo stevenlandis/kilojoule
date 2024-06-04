@@ -31,6 +31,8 @@ pub enum AstNode<'a> {
     MapLiteral(Option<AstNodePtr>),
     ListLiteral(Option<AstNodePtr>),
     FormatString(Option<AstNodePtr>),
+    ReverseIdx(AstNodePtr),
+    SliceAccess(Option<AstNodePtr>, Option<AstNodePtr>),
 }
 
 pub type AstNodePtr = usize;

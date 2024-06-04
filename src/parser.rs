@@ -473,6 +473,21 @@ impl<'a> Parser<'a> {
         return true;
     }
 
+    fn parse_access_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        if self.parse_str_literal("/") {
+            self.parse_ws();
+            match self.parse_expr() {
+                None => Some(Err(self.get_err(ParseErrorType::NoExprReverseIndex))),
+                Some(expr) => match expr {
+                    Err(err) => Some(Err(err)),
+                    Ok(expr) => Some(Ok(self.pool.new_node(AstNode::ReverseIdx(expr)))),
+                },
+            }
+        } else {
+            self.parse_expr()
+        }
+    }
+
     fn parse_access(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         if self.parse_str_literal(".") {
             self.parse_ws();
@@ -486,26 +501,94 @@ impl<'a> Parser<'a> {
             Some(Ok(self.pool.new_access(identifier)))
         } else if self.parse_str_literal("[") {
             self.parse_ws();
-            let expr = match self.parse_expr() {
-                None => {
-                    return Some(Err(
-                        self.get_err(ParseErrorType::NoExpressionForBracketAccess)
-                    ));
-                }
+
+            let start_expr = match self.parse_access_expr() {
+                None => None,
                 Some(expr) => match expr {
                     Err(err) => {
                         return Some(Err(err));
                     }
-                    Ok(expr) => expr,
+                    Ok(expr) => Some(expr),
                 },
             };
+
+            self.parse_ws();
+
+            let access_expr = if self.parse_str_literal(":") {
+                self.parse_ws();
+                let end_expr = match self.parse_access_expr() {
+                    None => None,
+                    Some(expr) => match expr {
+                        Err(err) => {
+                            return Some(Err(err));
+                        }
+                        Ok(expr) => Some(expr),
+                    },
+                };
+                self.parse_ws();
+                self.pool
+                    .new_node(AstNode::SliceAccess(start_expr, end_expr))
+            } else {
+                match start_expr {
+                    None => {
+                        return Some(Err(
+                            self.get_err(ParseErrorType::NoExpressionForBracketAccess)
+                        ));
+                    }
+                    Some(expr) => expr,
+                }
+            };
+
             if !self.parse_str_literal("]") {
                 return Some(Err(
                     self.get_err(ParseErrorType::NoClosingBracketForBracketAccess)
                 ));
             }
 
-            Some(Ok(self.pool.new_access(expr)))
+            Some(Ok(self.pool.new_node(AstNode::Access(access_expr))))
+            // let mut start_is_rev = false;
+            // if self.parse_str_literal("/") {
+            //     start_is_rev = true;
+            //     self.parse_ws();
+            // }
+            // let mut start_expr = match self.parse_expr() {
+            //     None => {
+            //         return Some(Err(
+            //             self.get_err(ParseErrorType::NoExpressionForBracketAccess)
+            //         ));
+            //     }
+            //     Some(expr) => match expr {
+            //         Err(err) => {
+            //             return Some(Err(err));
+            //         }
+            //         Ok(expr) => expr,
+            //     },
+            // };
+            // if start_is_rev {
+            //     start_expr = self.pool.new_node(AstNode::ReverseIdx(start_expr));
+            // }
+            // self.parse_ws();
+
+            // if self.parse_str_literal(":") {
+            //     // This is a range access
+            //     self.parse_ws();
+
+            //     let mut end_is_rev = false;
+            //     if self.parse_str_literal("/") {
+            //         end_is_rev = true;
+            //         self.parse_ws();
+            //     }
+
+            //     let mut end_expr =
+            // }
+
+            // if !self.parse_str_literal("]") {
+            //     return Some(Err(
+            //         self.get_err(ParseErrorType::NoClosingBracketForBracketAccess)
+            //     ));
+            // }
+
+            // Some(Ok(self.pool.new_access(start_expr)))
         } else {
             None
         }
@@ -694,4 +777,5 @@ enum ParseErrorType {
     NoExprInFormatString,
     NoClosingBraceInFormatString,
     IncompleteParse,
+    NoExprReverseIndex,
 }
