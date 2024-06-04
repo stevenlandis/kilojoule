@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use kilojoule_rust::*;
+    use kilojoule::*;
     use serde_json::json;
 
     fn base_parse_and_eval(expr: &str) -> (Vec<u8>, Vec<u8>) {

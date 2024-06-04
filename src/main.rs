@@ -1,4 +1,4 @@
-use kilojoule_rust::{run_repl, Evaluator};
+use kilojoule::{run_repl, Evaluator};
 
 fn main() {
     let mut evaluator = Evaluator::new();

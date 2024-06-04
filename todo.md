@@ -1,3 +1,0 @@
-# TODO
-
-trailing commas
