@@ -399,19 +399,25 @@ mod tests {
         assert_json("null ?? null ?? null", json!(null));
     }
 
-    // #[test]
-    // fn test_keys_values_entries() {
-    //     assert_json("{a: 1, b: 2, c: 3} | keys()", json!(["a", "b", "c"]));
-    //     assert_json("{a: 1, b: 2, c: 3} | values()", json!([1, 2, 3]));
-    //     assert_json(
-    //         "{a: 1, b: 2, c: 3} | entries()",
-    //         json!([
-    //             {"key": "a", "val": 1},
-    //             {"key": "b", "val": 2},
-    //             {"key": "c", "val": 3},
-    //         ]),
-    //     );
-    // }
+    #[test]
+    fn test_keys_values_items() {
+        assert_json("{a: 1, b: 2, c: 3} | keys()", json!(["a", "b", "c"]));
+        assert_json("{a: 1, b: 2, c: 3} | values()", json!([1, 2, 3]));
+        assert_json(
+            "{a: 1, b: 2, c: 3} | items()",
+            json!([
+                {"key": "a", "val": 1},
+                {"key": "b", "val": 2},
+                {"key": "c", "val": 3},
+            ]),
+        );
+        assert_json(
+            "{a: 1, b: 2, c: 3} | items() | fromitems()",
+            json!(
+                {"a": 1, "b": 2, "c": 3}
+            ),
+        );
+    }
 
     #[test]
     fn test_recursive_functions() {
