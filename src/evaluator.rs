@@ -224,7 +224,7 @@ impl Evaluator {
                         AstNode::MapKeyValPair { key, val } => {
                             let key_obj = match parser.get_node(*key) {
                                 AstNode::SubString(key_name) => Val::new_str(key_name),
-                                _ => panic!(),
+                                _ => this.eval(*key, obj, parser),
                             };
                             let val_obj = this.eval(*val, obj, parser);
                             map.insert(&key_obj, &val_obj);

@@ -224,11 +224,27 @@ impl<'a> Parser<'a> {
                     }
                 }
             } else {
-                let key = match self.parse_identifier(false) {
-                    None => {
-                        break;
+                let key = if self.parse_str_literal("[") {
+                    self.parse_ws();
+                    let key = match self.parse_expr() {
+                        None => return Some(Err(self.get_err(ParseErrorType::NoExprInMapKey))),
+                        Some(key) => match key {
+                            Err(err) => return Some(Err(err)),
+                            Ok(key) => key,
+                        },
+                    };
+                    self.parse_ws();
+                    if !self.parse_str_literal("]") {
+                        return Some(Err(self.get_err(ParseErrorType::NoClosingBracketForMapKey)));
                     }
-                    Some(val) => val,
+                    key
+                } else {
+                    match self.parse_identifier(false) {
+                        None => {
+                            break;
+                        }
+                        Some(val) => val,
+                    }
                 };
                 self.parse_ws();
 
@@ -283,7 +299,22 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_format_string(&mut self, quote_char: u8) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_format_string(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        if let Some(result) = self.inner_parse_format_string('\'' as u8) {
+            return Some(result);
+        }
+
+        if let Some(result) = self.inner_parse_format_string('"' as u8) {
+            return Some(result);
+        }
+
+        None
+    }
+
+    fn inner_parse_format_string(
+        &mut self,
+        quote_char: u8,
+    ) -> Option<Result<AstNodePtr, ParseError>> {
         if self.peek(0) != Some(quote_char) {
             return None;
         }
@@ -424,11 +455,7 @@ impl<'a> Parser<'a> {
             return Some(result);
         }
 
-        if let Some(result) = self.parse_format_string('\'' as u8) {
-            return Some(result);
-        }
-
-        if let Some(result) = self.parse_format_string('"' as u8) {
+        if let Some(result) = self.parse_format_string() {
             return Some(result);
         }
 
@@ -777,4 +804,6 @@ enum ParseErrorType {
     IncompleteParse,
     NoExprReverseIndex,
     NoExpressionAfterMapSpread,
+    NoExprInMapKey,
+    NoClosingBracketForMapKey,
 }

@@ -222,7 +222,19 @@ impl Val {
                         writer.write("\n".as_bytes())?;
                         write_indent(writer, indent + 1)?;
                     }
-                    key.inner_write_str(writer, indent + 1, use_indent)?;
+                    match key.get_val() {
+                        ValType::String(_) => {
+                            key.inner_write_str(writer, indent + 1, use_indent)?;
+                        }
+                        _ => {
+                            let mut temp_writer = Vec::<u8>::new();
+                            key.inner_write_str(&mut temp_writer, 0, false)?;
+                            let serialized_key =
+                                std::str::from_utf8(temp_writer.as_slice()).unwrap();
+                            println!("Serialized val: {}", serialized_key);
+                            write_json_escaped_str(writer, serialized_key)?;
+                        }
+                    }
                     if use_indent {
                         writer.write(": ".as_bytes())?;
                     } else {

@@ -475,4 +475,9 @@ mod tests {
             json!({"a": 3, "b": 2, "d": 4}),
         );
     }
+
+    #[test]
+    fn test_map_key_expression() {
+        assert_json("{['a']: 1, [21*2]: 2}", json!({"a": 1, "42": 2}));
+    }
 }
