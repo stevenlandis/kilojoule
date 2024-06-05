@@ -388,16 +388,16 @@ mod tests {
         assert_json("[''] | join(',')", json!(""));
     }
 
-    // #[test]
-    // fn test_coalesce() {
-    //     assert_json("null ?? 'val1'", json!("val1"));
-    //     assert_json("'val0' ?? 'val1'", json!("val0"));
+    #[test]
+    fn test_coalesce() {
+        assert_json("null ?? 'val1'", json!("val1"));
+        assert_json("'val0' ?? 'val1'", json!("val0"));
 
-    //     assert_json("'val0' ?? 'val1' ?? 'val2'", json!("val0"));
-    //     assert_json("null ?? 'val1' ?? 'val2'", json!("val1"));
-    //     assert_json("null ?? null ?? 'val2'", json!("val2"));
-    //     assert_json("null ?? null ?? null", json!(null));
-    // }
+        assert_json("'val0' ?? 'val1' ?? 'val2'", json!("val0"));
+        assert_json("null ?? 'val1' ?? 'val2'", json!("val1"));
+        assert_json("null ?? null ?? 'val2'", json!("val2"));
+        assert_json("null ?? null ?? null", json!(null));
+    }
 
     // #[test]
     // fn test_keys_values_entries() {

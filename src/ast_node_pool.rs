@@ -33,6 +33,7 @@ pub enum AstNode<'a> {
     FormatString(Option<AstNodePtr>),
     ReverseIdx(AstNodePtr),
     SliceAccess(Option<AstNodePtr>, Option<AstNodePtr>),
+    Coalesce(AstNodePtr, AstNodePtr),
 }
 
 pub type AstNodePtr = usize;

@@ -546,49 +546,6 @@ impl<'a> Parser<'a> {
             }
 
             Some(Ok(self.pool.new_node(AstNode::Access(access_expr))))
-            // let mut start_is_rev = false;
-            // if self.parse_str_literal("/") {
-            //     start_is_rev = true;
-            //     self.parse_ws();
-            // }
-            // let mut start_expr = match self.parse_expr() {
-            //     None => {
-            //         return Some(Err(
-            //             self.get_err(ParseErrorType::NoExpressionForBracketAccess)
-            //         ));
-            //     }
-            //     Some(expr) => match expr {
-            //         Err(err) => {
-            //             return Some(Err(err));
-            //         }
-            //         Ok(expr) => expr,
-            //     },
-            // };
-            // if start_is_rev {
-            //     start_expr = self.pool.new_node(AstNode::ReverseIdx(start_expr));
-            // }
-            // self.parse_ws();
-
-            // if self.parse_str_literal(":") {
-            //     // This is a range access
-            //     self.parse_ws();
-
-            //     let mut end_is_rev = false;
-            //     if self.parse_str_literal("/") {
-            //         end_is_rev = true;
-            //         self.parse_ws();
-            //     }
-
-            //     let mut end_expr =
-            // }
-
-            // if !self.parse_str_literal("]") {
-            //     return Some(Err(
-            //         self.get_err(ParseErrorType::NoClosingBracketForBracketAccess)
-            //     ));
-            // }
-
-            // Some(Ok(self.pool.new_access(start_expr)))
         } else {
             None
         }
@@ -630,6 +587,7 @@ impl<'a> Parser<'a> {
         enum Op {
             Base,
             Pipe,
+            Coalesce,
             Or,
             And,
             Equals,
@@ -648,6 +606,7 @@ impl<'a> Parser<'a> {
         enum OpOrder {
             End,
             Pipe,
+            Coalesce,
             Or,
             And,
             Equality,
@@ -671,6 +630,7 @@ impl<'a> Parser<'a> {
                         t1.0,
                         match t0.0 {
                             Op::Pipe => pool.new_pipe(left, right),
+                            Op::Coalesce => pool.new_node(AstNode::Coalesce(left, right)),
                             Op::Or => pool.new_or(left, right),
                             Op::And => pool.new_and(left, right),
                             Op::Equals => pool.new_node(AstNode::Equals(left, right)),
@@ -703,6 +663,8 @@ impl<'a> Parser<'a> {
             self.parse_ws();
             if let Some((next_op, next_order)) = if self.parse_str_literal("|") {
                 Some((Op::Pipe, OpOrder::Pipe))
+            } else if self.parse_str_literal("??") {
+                Some((Op::Coalesce, OpOrder::Coalesce))
             } else if self.parse_str_literal("or") {
                 Some((Op::Or, OpOrder::Or))
             } else if self.parse_str_literal("and") {

@@ -101,6 +101,13 @@ impl Evaluator {
                 let left_val = self.eval(*left, obj, parser);
                 self.eval(*right, &left_val, parser)
             }
+            AstNode::Coalesce(left, right) => {
+                let left = self.eval(*left, obj, parser);
+                match &left.get_val() {
+                    ValType::Null => self.eval(*right, obj, parser),
+                    _ => left,
+                }
+            }
             AstNode::Dot => obj.clone(),
             AstNode::Or(left, right) => self.eval_bool_expr(
                 obj,
