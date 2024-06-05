@@ -412,4 +412,48 @@ mod tests {
     //         ]),
     //     );
     // }
+
+    #[test]
+    fn test_recursive_functions() {
+        let mock_recursive_obj = r#"{
+            name: "a",
+            children: [
+                {name: "b", children: []},
+                {
+                    name: "c",
+                    children: [
+                        {name: "d", children: []},
+                        {name: "e", children: []}
+                    ],
+                },
+            ],
+        }"#;
+
+        assert_json(
+            format!("{} | recursivemap(.children, {{name2: .node.name, count: .vals | len(), children2: .vals}})", mock_recursive_obj).as_str(),
+        json!({
+            "name2": "a",
+            "count": 2,
+            "children2": [
+                {"name2": "b", "count": 0, "children2": []},
+                {
+                    "name2": "c",
+                    "count": 2,
+                    "children2": [
+                        {"name2": "d", "count": 0, "children2": []},
+                        {"name2": "e", "count": 0, "children2": []},
+                    ],
+                },
+            ],
+        }));
+
+        assert_json(
+            format!(
+                "{} | recursiveflatten(.children) | map(.name)",
+                mock_recursive_obj
+            )
+            .as_str(),
+            json!(["a", "b", "c", "d", "e",]),
+        );
+    }
 }

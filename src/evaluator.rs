@@ -408,7 +408,7 @@ impl Evaluator {
                     },
                 },
                 ValType::Null => obj.clone(),
-                _ => panic!(),
+                _ => Val::new_err("Invalid access"),
             },
             AstNode::Bool(val) => Val::new_bool(*val),
             AstNode::FcnCall { name, args } => {
@@ -783,6 +783,103 @@ impl Evaluator {
                 }
                 _ => Val::new_err("entries() must be called on a map"),
             },
+            "recursivemap" => {
+                if args.len() != 2 {
+                    return Val::new_err("recursivemap() must be called with 2 arguments.");
+                }
+
+                let sub_node_getter = args[0];
+                let mapper = args[1];
+
+                fn helper(
+                    this: &mut Evaluator,
+                    sub_node_getter: AstNodePtr,
+                    mapper: AstNodePtr,
+                    parser: &Parser,
+                    obj: &Val,
+                ) -> Val {
+                    let sub_nodes = this.eval(sub_node_getter, obj, parser);
+                    match sub_nodes.get_val() {
+                        ValType::List(sub_nodes) => {
+                            let mut mapped_sub_nodes = Vec::<Val>::with_capacity(sub_nodes.len());
+                            for sub_node in sub_nodes {
+                                mapped_sub_nodes.push(helper(
+                                    this,
+                                    sub_node_getter,
+                                    mapper,
+                                    parser,
+                                    sub_node,
+                                ));
+                            }
+                            let new_node = Val::new_map(OrderedMap::from_kv_pair_slice(&[
+                                (Val::new_str("node"), obj.clone()),
+                                (Val::new_str("vals"), Val::new_list(mapped_sub_nodes)),
+                            ]));
+
+                            this.eval(mapper, &new_node, parser)
+                        }
+                        ValType::Err(_) => sub_nodes,
+                        _ => Val::new_err("mapper function in recursivemap() must return a list"),
+                    }
+                }
+
+                helper(self, sub_node_getter, mapper, parser, obj)
+            }
+            "recursiveflatten" => {
+                if args.len() != 1 {
+                    return Val::new_err("recursiveflatten must be called with 1 argument.");
+                }
+
+                fn helper(
+                    this: &mut Evaluator,
+                    results: &mut Vec<Val>,
+                    sub_node_getter: AstNodePtr,
+                    parser: &Parser,
+                    obj: &Val,
+                ) -> Result<(), Val> {
+                    results.push(obj.clone());
+                    let sub_nodes = this.eval(sub_node_getter, obj, parser);
+                    match sub_nodes.get_val() {
+                        ValType::List(sub_nodes) => {
+                            for sub_node in sub_nodes {
+                                helper(this, results, sub_node_getter, parser, sub_node)?;
+                            }
+                            Ok(())
+                            // let mut mapped_sub_nodes = Vec::<Val>::with_capacity(sub_nodes.len());
+                            // for sub_node in sub_nodes {
+                            //     mapped_sub_nodes.push(helper(
+                            //         this,
+                            //         results,
+                            //         sub_node_getter,
+                            //         parser,
+                            //         sub_node,
+                            //     ));
+                            // }
+                            // let new_node = Val::new_map(OrderedMap::from_kv_pair_slice(&[
+                            //     (Val::new_str("node"), obj.clone()),
+                            //     (Val::new_str("vals"), Val::new_list(mapped_sub_nodes)),
+                            // ]));
+
+                            // this.eval(mapper, &new_node, parser)
+                        }
+                        ValType::Err(_) => Err(sub_nodes),
+                        _ => Err(Val::new_err(
+                            "mapper function in recursiveflatten() must return a list",
+                        )),
+                    }
+                }
+
+                let sub_node_getter = args[0];
+                let mut results = Vec::<Val>::new();
+                match helper(self, &mut results, sub_node_getter, parser, obj) {
+                    Ok(_) => {}
+                    Err(err) => {
+                        return err;
+                    }
+                }
+
+                Val::new_list(results)
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
