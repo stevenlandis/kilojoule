@@ -175,10 +175,10 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_unique() {
-    //     assert_json("[3,1,2,3,1,5] | unique()", json!([3, 1, 2, 5]));
-    // }
+    #[test]
+    fn test_unique() {
+        assert_json("[3,1,2,3,1,5] | unique()", json!([3, 1, 2, 5]));
+    }
 
     #[test]
     fn test_sort() {

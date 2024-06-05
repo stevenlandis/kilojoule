@@ -1,5 +1,5 @@
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 
 use super::ast_node_pool::{AstNode, AstNodePtr};
@@ -565,6 +565,19 @@ impl Evaluator {
                     _ => Val::new_err("group() must be called on a list"),
                 }
             }
+            "unique" => match obj.get_val() {
+                ValType::List(val) => {
+                    let mut result = Vec::<Val>::new();
+                    let mut reached_vals = HashSet::<Val>::new();
+                    for elem in val {
+                        if reached_vals.insert(elem.clone()) {
+                            result.push(elem.clone());
+                        }
+                    }
+                    Val::new_list(result)
+                }
+                _ => Val::new_err("unique() must be called on a list"),
+            },
             "sort" => {
                 if args.len() > 1 {
                     return Val::new_err("sort() must be called with zero or one arguments");
