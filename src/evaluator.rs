@@ -512,7 +512,10 @@ impl Evaluator {
                     ValType::List(val) => Val::new_f64(val.len() as f64),
                     ValType::Map(val) => Val::new_f64(val.len() as f64),
                     ValType::Bytes(val) => Val::new_f64(val.len() as f64),
-                    _ => Val::new_err("len() can only be called on a list or map or bytes"),
+                    ValType::String(val) => Val::new_f64(val.as_bytes().len() as f64),
+                    _ => {
+                        Val::new_err("len() can only be called on a list or map or bytes or string")
+                    }
                 }
             }
             "map" => {
@@ -767,6 +770,12 @@ impl Evaluator {
                 }
                 _ => Val::new_err("read() must be called on a string"),
             },
+            "env" => {
+                let kv_pairs = std::env::vars()
+                    .map(|(key, val)| (Val::new_str(key.as_str()), Val::new_str(val.as_str())))
+                    .collect::<Vec<_>>();
+                Val::new_map(OrderedMap::from_kv_pair_slice(kv_pairs.as_slice()))
+            }
             "fromjson" => match obj.get_val() {
                 ValType::String(val) => Val::from_json_str(val.as_str()),
                 ValType::Bytes(_) => {
