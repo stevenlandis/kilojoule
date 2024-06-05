@@ -504,7 +504,8 @@ impl Evaluator {
                 match obj.get_val() {
                     ValType::List(val) => Val::new_f64(val.len() as f64),
                     ValType::Map(val) => Val::new_f64(val.len() as f64),
-                    _ => Val::new_err("len() can only be called on a list or map"),
+                    ValType::Bytes(val) => Val::new_f64(val.len() as f64),
+                    _ => Val::new_err("len() can only be called on a list or map or bytes"),
                 }
             }
             "map" => {
@@ -580,6 +581,14 @@ impl Evaluator {
                     _ => Val::new_err("sort() must be called on a list"),
                 }
             }
+            "reverse" => match obj.get_val() {
+                ValType::List(val) => {
+                    let mut val = val.clone();
+                    val.reverse();
+                    Val::new_list(val)
+                }
+                _ => Val::new_err("reverse() must be called on a list"),
+            },
             "filter" => {
                 if args.len() != 1 {
                     return Val::new_err("filter() must be called with one argument");
@@ -718,6 +727,61 @@ impl Evaluator {
                     }
                 }
                 _ => Val::new_err("read() must be called on a string"),
+            },
+            "fromjson" => match obj.get_val() {
+                ValType::String(val) => Val::from_json_str(val.as_str()),
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn(parser, obj, "str", args);
+                    self.eval_fcn(parser, &text, name, args)
+                }
+                _ => Val::new_err("fromjson() must be called on a string"),
+            },
+            "keys" => match &obj.get_val() {
+                ValType::Map(map) => {
+                    let keys = map.keys();
+                    Val::new_list(keys)
+                }
+                _ => Val::new_err("keys() must be called on a map"),
+            },
+            "values" => match &obj.get_val() {
+                ValType::Map(map) => {
+                    let values = map.values();
+                    Val::new_list(values)
+                }
+                _ => Val::new_err("values() must be called on a map"),
+            },
+            "items" => match &obj.get_val() {
+                ValType::Map(map) => {
+                    let items = map.items();
+                    Val::new_list(items)
+                }
+                _ => Val::new_err("entries() must be called on a map"),
+            },
+            "fromitems" => match &obj.get_val() {
+                ValType::List(val) => {
+                    let key_name = Val::new_str("key");
+                    let val_name = Val::new_str("val");
+                    let mut kv_pairs = Vec::<(Val, Val)>::with_capacity(val.len());
+                    for elem in val {
+                        let kv_pair = match elem.get_val() {
+                            ValType::Map(elem) => {
+                                let key = match elem.get(&key_name) {
+                                    None => Val::new_null(),
+                                    Some(key) => key,
+                                };
+                                let val = match elem.get(&val_name) {
+                                    None => Val::new_null(),
+                                    Some(val) => val,
+                                };
+                                (key, val)
+                            }
+                            _ => return Val::new_err("entries() must be called on a list of maps"),
+                        };
+                        kv_pairs.push(kv_pair);
+                    }
+                    Val::new_map(OrderedMap::from_kv_pair_slice(kv_pairs.as_slice()))
+                }
+                _ => Val::new_err("entries() must be called on a map"),
             },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }

@@ -244,6 +244,32 @@ impl Val {
         }
         Ok(0)
     }
+
+    pub fn from_json_str(json_str: &str) -> Self {
+        let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
+
+        fn helper(node: &serde_json::Value) -> Val {
+            match node {
+                serde_json::Value::Null => Val::new_null(),
+                serde_json::Value::Bool(val) => Val::new_bool(*val),
+                serde_json::Value::Number(val) => Val::new_f64(val.as_f64().unwrap()),
+                serde_json::Value::String(val) => Val::new_str(val.as_str()),
+                serde_json::Value::Array(val) => {
+                    Val::new_list(val.iter().map(|elem| helper(elem)).collect::<Vec<_>>())
+                }
+                serde_json::Value::Object(val) => {
+                    return Val::new_map(OrderedMap::from_kv_pair_slice(
+                        val.iter()
+                            .map(|(key, val)| (Val::new_str(key.as_str()), helper(val)))
+                            .collect::<Vec<_>>()
+                            .as_slice(),
+                    ));
+                }
+            }
+        }
+
+        return helper(&value);
+    }
 }
 
 fn write_json_escaped_str(writer: &mut impl std::io::Write, val: &str) -> std::io::Result<usize> {
@@ -479,6 +505,26 @@ impl OrderedMap {
         let mut pairs = self.pairs.clone();
         pairs.sort_by(|(left, _), (right, _)| left.cmp(right));
         return pairs;
+    }
+
+    pub fn keys(&self) -> Vec<Val> {
+        self.pairs.iter().map(|(key, _)| key.clone()).collect()
+    }
+
+    pub fn values(&self) -> Vec<Val> {
+        self.pairs.iter().map(|(_, val)| val.clone()).collect()
+    }
+
+    pub fn items(&self) -> Vec<Val> {
+        self.pairs
+            .iter()
+            .map(|(key, val)| {
+                Val::new_map(OrderedMap::from_kv_pair_slice(&[
+                    (Val::new_str("key"), key.clone()),
+                    (Val::new_str("val"), val.clone()),
+                ]))
+            })
+            .collect()
     }
 }
 
