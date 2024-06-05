@@ -633,6 +633,25 @@ impl Evaluator {
                     _ => Val::new_err("filter() must be called on a list"),
                 }
             }
+            "sum" => match &obj.get_val() {
+                ValType::List(list) => {
+                    let mut total: f64 = 0.0;
+                    for elem in list {
+                        match elem.get_val() {
+                            ValType::Float64(val) => {
+                                total += val;
+                            }
+                            _ => {
+                                return Val::new_err(
+                                    "sum() can only be called on a list of numbers",
+                                )
+                            }
+                        }
+                    }
+                    Val::new_f64(total)
+                }
+                _ => Val::new_err("sum() has to be called on a list"),
+            },
             "lines" => match obj.get_val() {
                 ValType::String(val) => {
                     let mut lines = val
