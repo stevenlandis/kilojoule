@@ -497,6 +497,10 @@ impl OrderedMap {
         map
     }
 
+    pub fn get_kv_pair_slice(&self) -> &[(Val, Val)] {
+        &self.pairs
+    }
+
     pub fn len(&self) -> usize {
         self.pairs.len()
     }

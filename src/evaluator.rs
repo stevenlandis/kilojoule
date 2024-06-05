@@ -214,11 +214,12 @@ impl Evaluator {
                     parser: &Parser,
                     map: &mut OrderedMap,
                     node: AstNodePtr,
-                ) {
+                ) -> Result<(), Val> {
                     match parser.get_node(node) {
                         AstNode::ListNode(left, right) => {
-                            helper(this, obj, parser, map, *left);
-                            helper(this, obj, parser, map, *right);
+                            helper(this, obj, parser, map, *left)?;
+                            helper(this, obj, parser, map, *right)?;
+                            Ok(())
                         }
                         AstNode::MapKeyValPair { key, val } => {
                             let key_obj = match parser.get_node(*key) {
@@ -227,6 +228,21 @@ impl Evaluator {
                             };
                             let val_obj = this.eval(*val, obj, parser);
                             map.insert(&key_obj, &val_obj);
+                            Ok(())
+                        }
+                        AstNode::Spread(spread) => {
+                            let spread_val = this.eval(*spread, obj, parser);
+                            match spread_val.get_val() {
+                                ValType::Map(spread_val) => {
+                                    for (key, val) in spread_val.get_kv_pair_slice() {
+                                        map.insert(key, val);
+                                    }
+                                }
+                                _ => {
+                                    return Err(Val::new_err("can only spread a map"));
+                                }
+                            }
+                            Ok(())
                         }
                         _ => panic!(),
                     }
@@ -235,7 +251,10 @@ impl Evaluator {
                 match contents {
                     None => {}
                     Some(contents) => {
-                        helper(self, obj, parser, &mut map, *contents);
+                        match helper(self, obj, parser, &mut map, *contents) {
+                            Ok(_) => {}
+                            Err(err) => return err,
+                        };
                     }
                 };
 

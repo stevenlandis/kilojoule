@@ -200,38 +200,63 @@ impl<'a> Parser<'a> {
 
         loop {
             self.parse_ws();
-            let key = match self.parse_identifier(false) {
-                None => {
-                    break;
-                }
-                Some(val) => val,
-            };
-            self.parse_ws();
 
-            if !self.parse_str_literal(":") {
-                return Some(Err(self.get_err(ParseErrorType::NoColonInMapLiteral)));
-            }
-            self.parse_ws();
-
-            let val = match self.parse_expr() {
-                None => {
-                    return Some(Err(self.get_err(ParseErrorType::NoMapLiteralValue)));
-                }
-                Some(val) => match val {
-                    Err(err) => {
-                        return Some(Err(err));
+            if self.parse_str_literal("*") {
+                self.parse_ws();
+                let expr = match self.parse_expr() {
+                    None => {
+                        return Some(Err(self.get_err(ParseErrorType::NoExpressionAfterMapSpread)))
                     }
-                    Ok(val) => val,
-                },
-            };
-
-            let kv_pair = self.pool.new_map_kv_pair(key, val);
-            match parts {
-                None => {
-                    parts = Some(kv_pair);
+                    Some(expr) => match expr {
+                        Err(err) => {
+                            return Some(Err(err));
+                        }
+                        Ok(expr) => expr,
+                    },
+                };
+                let new_part = self.pool.new_node(AstNode::Spread(expr));
+                match parts {
+                    None => {
+                        parts = Some(new_part);
+                    }
+                    Some(prev_val) => {
+                        parts = Some(self.pool.new_list_node(prev_val, new_part));
+                    }
                 }
-                Some(prev_val) => {
-                    parts = Some(self.pool.new_list_node(prev_val, kv_pair));
+            } else {
+                let key = match self.parse_identifier(false) {
+                    None => {
+                        break;
+                    }
+                    Some(val) => val,
+                };
+                self.parse_ws();
+
+                if !self.parse_str_literal(":") {
+                    return Some(Err(self.get_err(ParseErrorType::NoColonInMapLiteral)));
+                }
+                self.parse_ws();
+
+                let val = match self.parse_expr() {
+                    None => {
+                        return Some(Err(self.get_err(ParseErrorType::NoMapLiteralValue)));
+                    }
+                    Some(val) => match val {
+                        Err(err) => {
+                            return Some(Err(err));
+                        }
+                        Ok(val) => val,
+                    },
+                };
+
+                let kv_pair = self.pool.new_map_kv_pair(key, val);
+                match parts {
+                    None => {
+                        parts = Some(kv_pair);
+                    }
+                    Some(prev_val) => {
+                        parts = Some(self.pool.new_list_node(prev_val, kv_pair));
+                    }
                 }
             }
 
@@ -751,4 +776,5 @@ enum ParseErrorType {
     NoClosingBraceInFormatString,
     IncompleteParse,
     NoExprReverseIndex,
+    NoExpressionAfterMapSpread,
 }
