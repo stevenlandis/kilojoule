@@ -37,7 +37,10 @@ pub enum AstNode<'a> {
     Spread(AstNodePtr),
 }
 
-pub type AstNodePtr = usize;
+#[derive(Debug, Clone, Copy)]
+pub struct AstNodePtr {
+    idx: usize,
+}
 
 pub struct AstNodePool<'a> {
     pub vals: Vec<AstNode<'a>>,
@@ -49,11 +52,13 @@ impl<'a> AstNodePool<'a> {
     }
 
     pub fn get(&self, ptr: AstNodePtr) -> &AstNode {
-        &self.vals[ptr]
+        &self.vals[ptr.idx]
     }
 
     pub fn new_node(&mut self, val: AstNode<'a>) -> AstNodePtr {
-        let ptr = self.vals.len() as AstNodePtr;
+        let ptr = AstNodePtr {
+            idx: self.vals.len(),
+        };
         self.vals.push(val);
         ptr
     }
