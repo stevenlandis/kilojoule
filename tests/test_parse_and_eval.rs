@@ -462,4 +462,9 @@ mod tests {
             json!(["a", "b", "c", "d", "e",]),
         );
     }
+
+    #[test]
+    fn test_list_spread() {
+        assert_json("[0, * [1,2,3], 4]", json!([0, 1, 2, 3, 4]));
+    }
 }

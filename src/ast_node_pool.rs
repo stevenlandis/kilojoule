@@ -34,6 +34,7 @@ pub enum AstNode<'a> {
     ReverseIdx(AstNodePtr),
     SliceAccess(Option<AstNodePtr>, Option<AstNodePtr>),
     Coalesce(AstNodePtr, AstNodePtr),
+    Spread(AstNodePtr),
 }
 
 pub type AstNodePtr = usize;

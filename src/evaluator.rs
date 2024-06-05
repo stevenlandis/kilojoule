@@ -250,15 +250,32 @@ impl Evaluator {
                     parser: &Parser,
                     list: &mut Vec<Val>,
                     node: AstNodePtr,
-                ) {
+                ) -> Result<(), Val> {
                     match parser.get_node(node) {
                         AstNode::ListNode(left, right) => {
-                            helper(this, obj, parser, list, *left);
-                            helper(this, obj, parser, list, *right);
+                            helper(this, obj, parser, list, *left)?;
+                            helper(this, obj, parser, list, *right)?;
+                            Ok(())
+                        }
+                        AstNode::Spread(spread) => {
+                            let spread_list = this.eval(*spread, obj, parser);
+                            match spread_list.get_val() {
+                                ValType::List(spread_list) => {
+                                    for elem in spread_list {
+                                        list.push(elem.clone());
+                                    }
+
+                                    Ok(())
+                                }
+                                _ => {
+                                    return Err(Val::new_err("Can only spread lists"));
+                                }
+                            }
                         }
                         _ => {
                             let elem_val = this.eval(node, obj, parser);
                             list.push(elem_val);
+                            Ok(())
                         }
                     }
                 }
@@ -266,7 +283,12 @@ impl Evaluator {
                 match contents {
                     None => {}
                     Some(contents) => {
-                        helper(self, obj, parser, &mut list, *contents);
+                        match helper(self, obj, parser, &mut list, *contents) {
+                            Ok(_) => {}
+                            Err(err) => {
+                                return err;
+                            }
+                        };
                     }
                 };
 

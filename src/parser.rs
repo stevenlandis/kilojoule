@@ -146,7 +146,15 @@ impl<'a> Parser<'a> {
 
         loop {
             self.parse_ws();
-            let elem = match self.parse_expr() {
+
+            let is_spread = if self.parse_str_literal("*") {
+                self.parse_ws();
+                true
+            } else {
+                false
+            };
+
+            let mut elem = match self.parse_expr() {
                 None => {
                     break;
                 }
@@ -157,6 +165,9 @@ impl<'a> Parser<'a> {
                     Ok(val) => val,
                 },
             };
+            if is_spread {
+                elem = self.pool.new_node(AstNode::Spread(elem));
+            }
             match parts {
                 None => {
                     parts = Some(elem);
