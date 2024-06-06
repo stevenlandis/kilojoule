@@ -7,7 +7,6 @@ The name means nothing and was chosen because it is easy to type and doesn't con
 This tool is heavily inspired by the fantastic [`jq`](https://github.com/jqlang/jq). If you are already familiar with `jq`, here is a short list of differences between the two tools.
 
 - `jq` is primarily focused on processing streams of JSON. `kj` is more focused on text and shell interactions.
-- `kj` does not support streams which simplifies certain interactions.
 
 ### Status
 
@@ -17,14 +16,12 @@ This is a hobby project for me so I might be slow to respond to bugs or feature 
 
 While the intention is to keep the syntax stable, the language will change as it evolves and there are no guarantees that scripts that run today will continue working in the future.
 
-This project isn't released anywhere and the only way to install it is to download the source. I'd mainly like to compile the project as a single static binary before making this more accessible.
+You can build your own version of `kj` by cloning the repo, running `cargo build --release`, and then running the binary at `target/release/kilojoule`. It's a static binary so no need to worry about external dependencies or libraries.
 
-I currently installed `kj` on my system with the following bash function:
+I currently installed `kj` on my system with the following bash alias:
 
 ```sh
-function kj() {
-  /path/to/python/binary /path/to/kilojoule/main.py $@
-}
+alias kj="/path/to/kilojoule/target/release/kilojoule"
 ```
 
 ### Examples
@@ -45,40 +42,44 @@ function kj() {
 # 200
 
 # Map a function over an list
-> kj '[100, 200, 300] | map . + 1'
+> kj '[100, 200, 300] | map(. + 1)'
 # [101, 201, 301]
 
 # Filter elements of a list
-> kj '[1, 2, 3, 4, 5] | filter . > 3'
+> kj '[1, 2, 3, 4, 5] | filter(. > 3)'
 # [4, 5]
 
 # Group elements
-> kj '[1,2,3,1,3,4] | group [., .]'
+> kj '[1,2,3,1,3,4] | group(.)'
 # [
 #   {
 #     "key":1,
-#     "rows":[1,  1]
+#     "vals":[1,  1]
 #   },
 #   {
 #     "key":2,
-#     "rows":[2]
+#     "vals":[2]
 #   },
 #   {
 #     "key":3,
-#     "rows":[3,3]
+#     "vals":[3,3]
 #   },
 #   {
 #     "key":4,
-#     "rows":[4]
+#     "vals":[4]
 #   }
 # ]
 
 # Remove duplicate values
-> kj '[1,2,3,1,3,4] | group [., .key]'
+> kj '[1,2,3,1,3,4] | group(.) | map(.key)'
+# [1, 2, 3, 4]
+
+# Or just use the pre-built unique() function
+> kj '[1,2,3,1,3,4] | unique()'
 # [1, 2, 3, 4]
 
 # Print out directories in the PATH
-> kj '(env).PATH | split ":" | group [., .key] | sort'
+> kj 'env().PATH | split(":") | unique() | sort()'
 # [
 #   "/bin",
 #   "/home/user/.cargo/bin",
@@ -93,20 +94,20 @@ function kj() {
 
 # deduplicate paths in PATH
 # while preserving order of first appearance
-> export PATH=$(kj '(env).PATH | split ":" | group [., .key] | join ":" | out')
+> export PATH=$(kj 'env().PATH | split(":") | unique() | join(":") | bytes()')
 ```
 
 Pipes (`|`) are a critical part of the language because they make it possible to iteratively write queries. Consider the changes required to filter an expression:
 
 ```
-expr | filter .value
-    ^^^^^^^^^^^^^^^^
+expr | filter(.value)
+    ^^^^^^^^^^^^^^^^^
 
 filter(expr, .value)
 ^^^^^^^    ^^^^^^^^^
 
 (filter expr, .value)
-^^^^^^^    ^^^^^^^^^
+^^^^^^^^    ^^^^^^^^^
 
 [elem for elem in expr if elem.value]
 ^^^^^^^^^^^^^^^^^^    ^^^^^^^^^^^^^^^
@@ -116,42 +117,38 @@ Pipes are the only way to avoid having to add characters to the left of the expr
 
 ```sh
 # pipe a shell command into kj
-> ls | kj 'in | lines'
+> ls | kj 'in() | lines()'
 # [
-#   "main.py",
-#   "poetry.lock",
-#   "pyproject.toml",
+#   "Cargo.lock",
+#   "Cargo.toml",
+#   "LICENSE",
 #   "README.md",
 #   "src",
-#   "tests",
-#   "todo.md"
+#   "target",
+#   "tests"
 # ]
 
 # Or call a shell command in kj
-> kj 'exec ["ls"] | lines'
+> kj 'call("ls") | lines()'
 
 # Or pass a kj string into another command
-> kj 'exec ["ls"] | lines | filter isfile | joinlines | exec ["wc", "-l"]'
+> kj 'call("ls") | lines() | filter(len() > 5) | joinlines() | call("wc", "-l")'
 "5\n"
 ```
 
-There are a ton more functions and features so take a look at the tests `tests/test_run_json_query_expr.py` for a fairly comprehensive list of examples.
+There are a ton more functions and features so take a look at the tests `tests/test_parse_and_eval.rs` for a fairly comprehensive list of examples.
 While tests aren't the best form of documentation, they are guaranteed to always be correct.
 
 ### Setup and Testing
 
-This package uses [`poetry`](https://python-poetry.org/) to manage dependencies.
-
-Most features should be thoroughly tested and test can be run with `poetry run pytest`.
+Most features should be tested and test can be run with `cargo test`.
 
 ### Folder Structure
 
 ```
-main.py # entry point for the cli command
 src/
-  parser_generator.py # An LR(1) parser generator
-  parser.py # Definition of the grammar for the language
-  run_json_query_expr.py # Implementation of the VM that runs commands
-  ...
+  main.rs -- The entry point of the executable
+  parser.rs -- The parser
+  val.rs -- The value type representing all objects
 tests/ # All tests go here
 ```
