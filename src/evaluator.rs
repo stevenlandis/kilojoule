@@ -717,7 +717,7 @@ impl Evaluator {
                     let text = self.eval_fcn(parser, obj, "str", args);
                     self.eval_fcn(parser, &text, name, args)
                 }
-                _ => Val::new_err("lines() must be called on a string"),
+                _ => Val::new_err("lines() must be called on a string or bytes"),
             },
             "joinlines" => match obj.get_val() {
                 ValType::List(list) => {
