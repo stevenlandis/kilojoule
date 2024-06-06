@@ -105,6 +105,21 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_at_least_one_ws(&mut self) -> bool {
+        match self.peek(0) {
+            None => {
+                return false;
+            }
+            Some(ch) => {
+                if !Parser::is_whitespace(ch) {
+                    return false;
+                }
+            }
+        }
+        self.parse_ws();
+        true
+    }
+
     fn parse_integer(&mut self) -> Option<AstNodePtr> {
         let mut idx = 0 as usize;
         let mut val = 0 as u64;
@@ -478,6 +493,27 @@ impl<'a> Parser<'a> {
                 self.parse_ws();
                 let mut args_node: Option<AstNodePtr> = None;
                 loop {
+                    let keyword = if self.parse_str_literal(":") {
+                        self.parse_ws();
+                        match self.parse_identifier(false) {
+                            None => {
+                                return Some(Err(
+                                    self.get_err(ParseErrorType::NoIdentifierAfterKeywordArgument)
+                                ));
+                            }
+                            Some(keyword) => {
+                                if !self.parse_at_least_one_ws() {
+                                    return Some(Err(self.get_err(
+                                        ParseErrorType::NoWhitespaceAfterKeywordArgumentKeyword,
+                                    )));
+                                }
+                                Some(keyword)
+                            }
+                        }
+                    } else {
+                        None
+                    };
+
                     match self.parse_expr() {
                         None => {
                             break;
@@ -487,6 +523,12 @@ impl<'a> Parser<'a> {
                                 return Some(Err(err));
                             }
                             Ok(expr) => {
+                                let expr = match keyword {
+                                    None => expr,
+                                    Some(keyword) => {
+                                        self.pool.new_node(AstNode::KeywordArgument(keyword, expr))
+                                    }
+                                };
                                 args_node = Some(match args_node {
                                     None => expr,
                                     Some(args_node) => self.pool.new_list_node(args_node, expr),
@@ -806,4 +848,6 @@ enum ParseErrorType {
     NoExpressionAfterMapSpread,
     NoExprInMapKey,
     NoClosingBracketForMapKey,
+    NoIdentifierAfterKeywordArgument,
+    NoWhitespaceAfterKeywordArgumentKeyword,
 }

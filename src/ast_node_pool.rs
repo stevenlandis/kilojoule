@@ -35,6 +35,7 @@ pub enum AstNode<'a> {
     SliceAccess(Option<AstNodePtr>, Option<AstNodePtr>),
     Coalesce(AstNodePtr, AstNodePtr),
     Spread(AstNodePtr),
+    KeywordArgument(AstNodePtr, AstNodePtr),
 }
 
 #[derive(Debug, Clone, Copy)]

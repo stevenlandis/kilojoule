@@ -973,27 +973,52 @@ impl Evaluator {
                 if args.len() == 0 {
                     return Val::new_err("call() has to be called with at least one argument");
                 }
-                let cmd = self.eval(args[0], obj, parser);
-                let cmd = match cmd.get_val() {
-                    ValType::String(cmd) => cmd.as_str(),
-                    _ => {
-                        return Val::new_err("call() arguments must be strings");
-                    }
-                };
-                let mut cmd = &mut Command::new(cmd);
 
                 let mut arg_strs = Vec::<String>::new();
-                for arg in &args[1..] {
-                    let arg_val = self.eval(*arg, obj, parser);
-                    let arg_str = match arg_val.get_val() {
-                        ValType::String(str) => str,
-                        _ => {
-                            return Val::new_err("call() arguments must be strings");
+                let mut cwd: Option<String> = None;
+                for arg in args {
+                    match parser.get_node(*arg) {
+                        AstNode::KeywordArgument(keyword, val) => {
+                            let keyword = match parser.get_node(*keyword) {
+                                AstNode::SubString(keyword) => *keyword,
+                                _ => panic!(),
+                            };
+                            match keyword {
+                                "cwd" => {
+                                    let cwd_val = self.eval(*val, obj, parser);
+                                    let cwd_val = match cwd_val.get_val() {
+                                        ValType::String(cwd_val) => cwd_val,
+                                        _ => {
+                                            return Val::new_err(
+                                                "In call(), the :env keyword must be a string",
+                                            );
+                                        }
+                                    };
+                                    cwd = Some(cwd_val.clone());
+                                }
+                                _ => return Val::new_err("Unknown keyword passed to call()"),
+                            }
                         }
-                    };
-                    arg_strs.push(arg_str.clone());
+                        _ => {
+                            let arg_val = self.eval(*arg, obj, parser);
+                            let arg_str = match arg_val.get_val() {
+                                ValType::String(str) => str,
+                                _ => {
+                                    return Val::new_err("call() arguments must be strings");
+                                }
+                            };
+                            arg_strs.push(arg_str.clone());
+                        }
+                    }
                 }
-                cmd = cmd.args(arg_strs);
+
+                let mut cmd = &mut Command::new(arg_strs[0].as_str());
+
+                cmd = cmd.args(&arg_strs[1..]);
+
+                if let Some(cwd) = cwd {
+                    cmd = cmd.current_dir(cwd);
+                }
 
                 cmd = cmd.stderr(Stdio::inherit());
                 cmd = cmd.stdout(Stdio::piped());
@@ -1100,6 +1125,10 @@ impl Evaluator {
                     _ => Val::new_err("repeat() must be called with a number"),
                 }
             }
+            "iserr" => match obj.get_val() {
+                ValType::Err(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
