@@ -1,10 +1,11 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::io::Read;
+use std::io::{Read, Write};
 
 use super::ast_node_pool::{AstNode, AstNodePtr};
 use super::parser::Parser;
 use super::val::{OrderedMap, Val, ValType};
+use std::process::{Command, Stdio};
 
 pub struct Evaluator {}
 
@@ -934,22 +935,6 @@ impl Evaluator {
                                 helper(this, results, sub_node_getter, parser, sub_node)?;
                             }
                             Ok(())
-                            // let mut mapped_sub_nodes = Vec::<Val>::with_capacity(sub_nodes.len());
-                            // for sub_node in sub_nodes {
-                            //     mapped_sub_nodes.push(helper(
-                            //         this,
-                            //         results,
-                            //         sub_node_getter,
-                            //         parser,
-                            //         sub_node,
-                            //     ));
-                            // }
-                            // let new_node = Val::new_map(OrderedMap::from_kv_pair_slice(&[
-                            //     (Val::new_str("node"), obj.clone()),
-                            //     (Val::new_str("vals"), Val::new_list(mapped_sub_nodes)),
-                            // ]));
-
-                            // this.eval(mapper, &new_node, parser)
                         }
                         ValType::Err(_) => Err(sub_nodes),
                         _ => Err(Val::new_err(
@@ -968,6 +953,73 @@ impl Evaluator {
                 }
 
                 Val::new_list(results)
+            }
+            "call" => {
+                let input = match obj.get_val() {
+                    ValType::Bytes(input) => Some(input.as_slice()),
+                    ValType::String(str) => Some(str.as_str().as_bytes()),
+                    _ => None,
+                };
+                if args.len() == 0 {
+                    return Val::new_err("call() has to be called with at least one argument");
+                }
+                let cmd = self.eval(args[0], obj, parser);
+                let cmd = match cmd.get_val() {
+                    ValType::String(cmd) => cmd.as_str(),
+                    _ => {
+                        return Val::new_err("call() arguments must be strings");
+                    }
+                };
+                let mut cmd = &mut Command::new(cmd);
+
+                let mut arg_strs = Vec::<String>::new();
+                for arg in &args[1..] {
+                    let arg_val = self.eval(*arg, obj, parser);
+                    let arg_str = match arg_val.get_val() {
+                        ValType::String(str) => str,
+                        _ => {
+                            return Val::new_err("call() arguments must be strings");
+                        }
+                    };
+                    arg_strs.push(arg_str.clone());
+                }
+                cmd = cmd.args(arg_strs);
+
+                cmd = cmd.stderr(Stdio::inherit());
+                cmd = cmd.stdout(Stdio::piped());
+
+                match input {
+                    Some(_) => {
+                        cmd = cmd.stdin(Stdio::piped());
+                    }
+                    None => {
+                        cmd = cmd.stdin(Stdio::null());
+                    }
+                };
+
+                let mut proc = match cmd.spawn() {
+                    Err(_) => return Val::new_err("Unable to start command"),
+                    Ok(proc) => proc,
+                };
+
+                if let Some(input) = input {
+                    match proc.stdin.take().unwrap().write(input) {
+                        Ok(_) => {}
+                        Err(_) => {
+                            return Val::new_err("Unable to write input to command");
+                        }
+                    }
+                }
+
+                let mut output_buf = Vec::<u8>::new();
+                match proc.stdout.take().unwrap().read_to_end(&mut output_buf) {
+                    Ok(_) => {}
+                    Err(_) => {
+                        return Val::new_err("Unable to read output from command");
+                    }
+                }
+
+                Val::new_bytes(output_buf)
             }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
