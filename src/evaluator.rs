@@ -740,14 +740,24 @@ impl Evaluator {
                 _ => Val::new_err("joinlines() must be called on a list"),
             },
             "split" => match obj.get_val() {
-                ValType::String(text) => match self.eval(args[0], obj, parser).get_val() {
-                    ValType::String(split_pattern) => Val::new_list(
-                        text.split(split_pattern)
-                            .map(|elem| Val::new_str(elem))
-                            .collect::<Vec<_>>(),
-                    ),
-                    _ => Val::new_err("split() pattern must be a string"),
-                },
+                ValType::String(text) => {
+                    if args.len() == 0 {
+                        Val::new_list(
+                            text.split_whitespace()
+                                .map(|elem| Val::new_str(elem))
+                                .collect::<Vec<_>>(),
+                        )
+                    } else {
+                        match self.eval(args[0], obj, parser).get_val() {
+                            ValType::String(split_pattern) => Val::new_list(
+                                text.split(split_pattern)
+                                    .map(|elem| Val::new_str(elem))
+                                    .collect::<Vec<_>>(),
+                            ),
+                            _ => Val::new_err("split() pattern must be a string"),
+                        }
+                    }
+                }
                 ValType::Bytes(_) => {
                     let text = self.eval_fcn(parser, obj, "str", args);
                     self.eval_fcn(parser, &text, name, args)

@@ -376,6 +376,11 @@ mod tests {
             json!(["one", "two", "", "three", ""]),
         );
         assert_json("'' | split(',')", json!([""]));
+
+        assert_json(
+            "'stuff     and\n\t\r\n\tthings' | split()",
+            json!(["stuff", "and", "things"]),
+        );
     }
 
     #[test]
