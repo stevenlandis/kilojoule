@@ -493,4 +493,26 @@ mod tests {
         assert_json("2 | range()", json!([0, 1]));
         assert_json("(0 - 100) | range()", json!([]));
     }
+
+    #[test]
+    fn test_zip() {
+        assert_json("zip()", json!([]));
+        assert_json("zip([1,2,3])", json!([[1], [2], [3]]));
+        assert_json(
+            "zip(['a', 'b', 'c'], [1, 2, 3])",
+            json!([["a", 1], ["b", 2], ["c", 3]]),
+        );
+        assert_json(
+            "zip(['a', 'b', 'c', 'd'], [1, 2, 3])",
+            json!([["a", 1], ["b", 2], ["c", 3]]),
+        );
+        assert_json(
+            "zip(['a', 'b', 'c'], [1, 2, 3, 4])",
+            json!([["a", 1], ["b", 2], ["c", 3]]),
+        );
+        assert_json(
+            "zip(['a', 'b', 'c'], [1, 2, 3], ['x', 'y', 'z'])",
+            json!([["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"]]),
+        );
+    }
 }

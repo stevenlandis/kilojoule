@@ -1052,6 +1052,34 @@ impl Evaluator {
                 }
                 _ => Val::new_err("range() must be called with a number"),
             },
+            "zip" => {
+                let arg_vals = args
+                    .iter()
+                    .map(|arg| self.eval(*arg, obj, parser))
+                    .collect::<Vec<_>>();
+                let mut arg_lists = Vec::<&Vec<Val>>::with_capacity(args.len());
+                for arg in &arg_vals {
+                    match arg.get_val() {
+                        ValType::List(vals) => {
+                            arg_lists.push(vals);
+                        }
+                        _ => return Val::new_err("each argument in zip() must be a list"),
+                    }
+                }
+
+                let min_len = arg_lists.iter().map(|list| list.len()).min().unwrap_or(0);
+
+                let mut results = Vec::<Val>::with_capacity(min_len);
+                for idx in 0..min_len {
+                    let temp_list = arg_lists
+                        .iter()
+                        .map(|list| list[idx].clone())
+                        .collect::<Vec<_>>();
+                    results.push(Val::new_list(temp_list));
+                }
+
+                Val::new_list(results)
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
