@@ -1021,6 +1021,27 @@ impl Evaluator {
 
                 Val::new_bytes(output_buf)
             }
+            "range" => match obj.get_val() {
+                ValType::Float64(val) => {
+                    let val = *val;
+                    if val == val.floor() {
+                        let val = val as i64;
+                        if val > 0 {
+                            let val = val as usize;
+                            let mut result = Vec::<Val>::with_capacity(val);
+                            for idx in 0..val {
+                                result.push(Val::new_f64(idx as f64));
+                            }
+                            Val::new_list(result)
+                        } else {
+                            Val::new_list(Vec::new())
+                        }
+                    } else {
+                        Val::new_err("range() must be called with an integer")
+                    }
+                }
+                _ => Val::new_err("range() must be called with a number"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

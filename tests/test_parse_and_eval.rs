@@ -480,4 +480,12 @@ mod tests {
     fn test_map_key_expression() {
         assert_json("{['a']: 1, [21*2]: 2}", json!({"a": 1, "42": 2}));
     }
+
+    #[test]
+    fn test_range() {
+        assert_json("0 | range()", json!([]));
+        assert_json("1 | range()", json!([0]));
+        assert_json("2 | range()", json!([0, 1]));
+        assert_json("(0 - 100) | range()", json!([]));
+    }
 }
