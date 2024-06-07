@@ -231,7 +231,6 @@ impl Val {
                             key.inner_write_str(&mut temp_writer, 0, false)?;
                             let serialized_key =
                                 std::str::from_utf8(temp_writer.as_slice()).unwrap();
-                            println!("Serialized val: {}", serialized_key);
                             write_json_escaped_str(writer, serialized_key)?;
                         }
                     }
