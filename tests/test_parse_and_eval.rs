@@ -515,4 +515,11 @@ mod tests {
             json!([["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"]]),
         );
     }
+
+    #[test]
+    fn test_repeat() {
+        assert_json("42 | repeat(0)", json!([]));
+        assert_json("42 | repeat(1)", json!([42]));
+        assert_json("42 | repeat(3)", json!([42, 42, 42]));
+    }
 }

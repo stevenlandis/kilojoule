@@ -1080,6 +1080,26 @@ impl Evaluator {
 
                 Val::new_list(results)
             }
+            "repeat" => {
+                if args.len() != 1 {
+                    return Val::new_err("repeat() has to be called with one argument");
+                }
+
+                let arg_val = self.eval(args[0], obj, parser);
+                match arg_val.get_val() {
+                    ValType::Float64(val) => {
+                        let val = *val;
+                        if val == val.floor() && val >= 0.0 {
+                            let val = val as usize;
+                            let result = (0..val).map(|_| obj.clone()).collect::<Vec<_>>();
+                            Val::new_list(result)
+                        } else {
+                            Val::new_err("repeat() must be called with a positive integer")
+                        }
+                    }
+                    _ => Val::new_err("repeat() must be called with a number"),
+                }
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
