@@ -279,7 +279,10 @@ mod tests {
         assert_json("false or not true", json!(false));
         assert_json("not 1 > 2 or false", json!(true));
         assert_json("not 1 < 2 or false", json!(false));
-        assert_json("not", json!({"ERROR": "Parse Error"}));
+        assert_json(
+            "not",
+            json!({"ERROR": "Parser error \"NoExprAfterUnaryOperator\" at index 3"}),
+        );
     }
 
     #[test]

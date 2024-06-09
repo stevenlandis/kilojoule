@@ -19,10 +19,7 @@ impl Evaluator {
         match parser.external_parse_expr() {
             None => Val::new_null(),
             Some(ast) => match ast {
-                Err(err) => {
-                    println!("Parse Error: {:?}", err);
-                    Val::new_err("Parse Error")
-                }
+                Err(err) => Val::new_err(err.to_string().as_str()),
                 Ok(ast) => {
                     // for (idx, val) in parser.pool.vals.iter().enumerate() {
                     //     println!("{}: {:?}", idx, val);
