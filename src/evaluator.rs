@@ -1223,6 +1223,72 @@ impl Evaluator {
                 ValType::Err(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
+            "texttable" => match obj.get_val() {
+                ValType::String(_) => {
+                    let lines = self.eval_fcn(parser, obj, "lines", &Vec::new());
+
+                    let split_lines = match lines.get_val() {
+                        ValType::Err(_) => {
+                            return lines;
+                        }
+                        ValType::List(val) => {
+                            if val.len() == 0 {
+                                return Val::new_err("texttable() has to be called on a string with at least one line.");
+                            }
+                            val.iter()
+                                .map(|elem| self.eval_fcn(parser, elem, "split", &Vec::new()))
+                                .collect::<Vec<_>>()
+                        }
+                        _ => panic!(),
+                    };
+                    let split_lines = split_lines
+                        .iter()
+                        .map(|elem| match elem.get_val() {
+                            ValType::List(sub_list) => sub_list,
+                            _ => panic!(),
+                        })
+                        .collect::<Vec<_>>();
+
+                    let col_names = &split_lines[0];
+                    let n_keys = col_names.len();
+                    let null = Val::new_null();
+                    let mut rows = Vec::<Val>::new();
+                    for line in &split_lines[1..] {
+                        let mut map = OrderedMap::new();
+                        for col_idx in 0..n_keys - 1 {
+                            map.insert(
+                                &col_names[col_idx],
+                                if col_idx < line.len() {
+                                    &line[col_idx]
+                                } else {
+                                    &null
+                                },
+                            )
+                        }
+                        if n_keys - 1 < line.len() {
+                            let list_to_join = line[n_keys - 1..]
+                                .iter()
+                                .map(|elem| match elem.get_val() {
+                                    ValType::String(val) => val.as_str(),
+                                    _ => panic!(),
+                                })
+                                .collect::<Vec<_>>();
+                            let joined_line = list_to_join.join(" ");
+                            map.insert(&col_names[n_keys - 1], &Val::new_str(joined_line.as_str()));
+                        } else {
+                            map.insert(&col_names[n_keys - 1], &null);
+                        }
+                        rows.push(Val::new_map(map));
+                    }
+
+                    Val::new_list(rows)
+                }
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn(parser, obj, "str", args);
+                    self.eval_fcn(parser, &text, name, args)
+                }
+                _ => Val::new_err("texttable() must be called on a string"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

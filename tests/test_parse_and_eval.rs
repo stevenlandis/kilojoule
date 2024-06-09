@@ -552,4 +552,16 @@ mod tests {
         assert_json("42 | repeat(1)", json!([42]));
         assert_json("42 | repeat(3)", json!([42, 42, 42]));
     }
+
+    #[test]
+    fn test_texttable() {
+        assert_json(
+            "'key0 key1  key2\na b c\na\na b c d' | texttable()",
+            json!([
+                {"key0": "a", "key1": "b", "key2": "c"},
+                {"key0": "a", "key1": null, "key2": null},
+                {"key0": "a", "key1": "b", "key2": "c d"},
+            ]),
+        )
+    }
 }
