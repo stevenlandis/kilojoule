@@ -678,6 +678,17 @@ impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
         #[derive(Clone)]
         enum Op {
+            Unary(UnaryOp),
+            Binary(BinaryOp),
+        }
+
+        #[derive(Clone)]
+        enum UnaryOp {
+            Not,
+        }
+
+        #[derive(Clone)]
+        enum BinaryOp {
             Pipe,
             Coalesce,
             Or,
@@ -701,6 +712,7 @@ impl<'a> Parser<'a> {
             Coalesce,
             Or,
             And,
+            Not,
             Equality,
             Add,
             Multiply,
@@ -716,47 +728,73 @@ impl<'a> Parser<'a> {
         fn reduce_for_op_order(stack: &mut Vec<Node>, parser: &mut Parser, order: OpOrder) {
             // normal reduction
             // [a | b + c] |
-            while stack.len() >= 3 {
-                if let (Node::Expr(left), Node::Op(temp_op, temp_order), Node::Expr(right)) = (
-                    &stack[stack.len() - 3],
-                    &stack[stack.len() - 2],
-                    &stack[stack.len() - 1],
-                ) {
+            while stack.len() > 1 {
+                if let (Node::Op(temp_op, temp_order), Node::Expr(right)) =
+                    (&stack[stack.len() - 2], &stack[stack.len() - 1])
+                {
                     let temp_order = *temp_order;
-                    let left = *left;
                     let right = *right;
                     if temp_order >= order {
-                        let new_expr = match temp_op {
-                            Op::Pipe => parser.pool.new_pipe(left, right),
-                            Op::Coalesce => parser.pool.new_node(AstNode::Coalesce(left, right)),
-                            Op::Or => parser.pool.new_or(left, right),
-                            Op::And => parser.pool.new_and(left, right),
-                            Op::Equals => parser.pool.new_node(AstNode::Equals(left, right)),
-                            Op::NotEquals => parser.pool.new_node(AstNode::NotEquals(left, right)),
-                            Op::LessThan => parser.pool.new_node(AstNode::LessThan(left, right)),
-                            Op::LessThanOrEqual => {
-                                parser.pool.new_node(AstNode::LessThanOrEqual(left, right))
+                        match temp_op {
+                            Op::Unary(temp_op) => {
+                                let new_expr = match temp_op {
+                                    UnaryOp::Not => parser.pool.new_node(AstNode::Not(right)),
+                                };
+                                stack.pop();
+                                stack.pop();
+                                stack.push(Node::Expr(new_expr));
                             }
-                            Op::GreaterThan => {
-                                parser.pool.new_node(AstNode::GreaterThan(left, right))
+                            Op::Binary(temp_op) => {
+                                if let Node::Expr(left) = &stack[stack.len() - 3] {
+                                    let left = *left;
+                                    let new_expr = match temp_op {
+                                        BinaryOp::Pipe => parser.pool.new_pipe(left, right),
+                                        BinaryOp::Coalesce => {
+                                            parser.pool.new_node(AstNode::Coalesce(left, right))
+                                        }
+                                        BinaryOp::Or => parser.pool.new_or(left, right),
+                                        BinaryOp::And => parser.pool.new_and(left, right),
+                                        BinaryOp::Equals => {
+                                            parser.pool.new_node(AstNode::Equals(left, right))
+                                        }
+                                        BinaryOp::NotEquals => {
+                                            parser.pool.new_node(AstNode::NotEquals(left, right))
+                                        }
+                                        BinaryOp::LessThan => {
+                                            parser.pool.new_node(AstNode::LessThan(left, right))
+                                        }
+                                        BinaryOp::LessThanOrEqual => parser
+                                            .pool
+                                            .new_node(AstNode::LessThanOrEqual(left, right)),
+                                        BinaryOp::GreaterThan => {
+                                            parser.pool.new_node(AstNode::GreaterThan(left, right))
+                                        }
+                                        BinaryOp::GreaterThanOrEqual => parser
+                                            .pool
+                                            .new_node(AstNode::GreaterThanOrEqual(left, right)),
+                                        BinaryOp::Add => parser.pool.new_add(left, right),
+                                        BinaryOp::Subtract => parser.pool.new_subtract(left, right),
+                                        BinaryOp::Multiply => {
+                                            parser.pool.new_node(AstNode::Multiply(left, right))
+                                        }
+                                        BinaryOp::Divide => {
+                                            parser.pool.new_node(AstNode::Divide(left, right))
+                                        }
+                                    };
+                                    stack.pop();
+                                    stack.pop();
+                                    stack.pop();
+                                    stack.push(Node::Expr(new_expr));
+                                } else {
+                                    panic!();
+                                }
                             }
-                            Op::GreaterThanOrEqual => parser
-                                .pool
-                                .new_node(AstNode::GreaterThanOrEqual(left, right)),
-                            Op::Add => parser.pool.new_add(left, right),
-                            Op::Subtract => parser.pool.new_subtract(left, right),
-                            Op::Multiply => parser.pool.new_node(AstNode::Multiply(left, right)),
-                            Op::Divide => parser.pool.new_node(AstNode::Divide(left, right)),
                         };
-                        stack.pop();
-                        stack.pop();
-                        stack.pop();
-                        stack.push(Node::Expr(new_expr));
                     } else {
                         break;
                     }
                 } else {
-                    break;
+                    panic!()
                 }
             }
         }
@@ -765,8 +803,23 @@ impl<'a> Parser<'a> {
             stack: &mut Vec<Node>,
             parser: &mut Parser,
         ) -> Option<Result<(), ParseError>> {
+            let mut has_unary_op = false;
+
+            loop {
+                if parser.parse_str_literal("not") {
+                    parser.parse_ws();
+                    stack.push(Node::Op(Op::Unary(UnaryOp::Not), OpOrder::Not));
+                    has_unary_op = true;
+                } else {
+                    break;
+                }
+            }
+
             let expr = match parser.parse_base_expr_with_accesses() {
                 None => {
+                    if has_unary_op {
+                        return Some(Err(parser.get_err(ParseErrorType::NoExprAfterUnaryOperator)));
+                    }
                     return None;
                 }
                 Some(expr) => match expr {
@@ -795,40 +848,40 @@ impl<'a> Parser<'a> {
         loop {
             self.parse_ws();
             if let Some((next_op, next_order)) = if self.parse_str_literal("|") {
-                Some((Op::Pipe, OpOrder::Pipe))
+                Some((BinaryOp::Pipe, OpOrder::Pipe))
             } else if self.parse_str_literal("??") {
-                Some((Op::Coalesce, OpOrder::Coalesce))
+                Some((BinaryOp::Coalesce, OpOrder::Coalesce))
             } else if self.parse_str_literal("or") {
-                Some((Op::Or, OpOrder::Or))
+                Some((BinaryOp::Or, OpOrder::Or))
             } else if self.parse_str_literal("and") {
-                Some((Op::And, OpOrder::And))
+                Some((BinaryOp::And, OpOrder::And))
             } else if self.parse_str_literal("==") {
-                Some((Op::Equals, OpOrder::Equality))
+                Some((BinaryOp::Equals, OpOrder::Equality))
             } else if self.parse_str_literal("!=") {
-                Some((Op::NotEquals, OpOrder::Equality))
+                Some((BinaryOp::NotEquals, OpOrder::Equality))
             } else if self.parse_str_literal("<=") {
-                Some((Op::LessThanOrEqual, OpOrder::Equality))
+                Some((BinaryOp::LessThanOrEqual, OpOrder::Equality))
             } else if self.parse_str_literal("<") {
-                Some((Op::LessThan, OpOrder::Equality))
+                Some((BinaryOp::LessThan, OpOrder::Equality))
             } else if self.parse_str_literal(">=") {
-                Some((Op::GreaterThanOrEqual, OpOrder::Equality))
+                Some((BinaryOp::GreaterThanOrEqual, OpOrder::Equality))
             } else if self.parse_str_literal(">") {
-                Some((Op::GreaterThan, OpOrder::Equality))
+                Some((BinaryOp::GreaterThan, OpOrder::Equality))
             } else if self.parse_str_literal("+") {
-                Some((Op::Add, OpOrder::Add))
+                Some((BinaryOp::Add, OpOrder::Add))
             } else if self.parse_str_literal("-") {
-                Some((Op::Subtract, OpOrder::Add))
+                Some((BinaryOp::Subtract, OpOrder::Add))
             } else if self.parse_str_literal("*") {
-                Some((Op::Multiply, OpOrder::Multiply))
+                Some((BinaryOp::Multiply, OpOrder::Multiply))
             } else if self.parse_str_literal("/") {
-                Some((Op::Divide, OpOrder::Multiply))
+                Some((BinaryOp::Divide, OpOrder::Multiply))
             } else {
                 break;
             } {
                 self.parse_ws();
 
                 reduce_for_op_order(&mut stack, self, next_order);
-                stack.push(Node::Op(next_op, next_order));
+                stack.push(Node::Op(Op::Binary(next_op), next_order));
 
                 match parse_base_expr(&mut stack, self) {
                     None => {
@@ -885,4 +938,5 @@ enum ParseErrorType {
     NoClosingBracketForMapKey,
     NoIdentifierAfterKeywordArgument,
     NoWhitespaceAfterKeywordArgumentKeyword,
+    NoExprAfterUnaryOperator,
 }

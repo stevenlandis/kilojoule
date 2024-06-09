@@ -270,6 +270,19 @@ mod tests {
     }
 
     #[test]
+    fn test_not() {
+        assert_json("not false", json!(true));
+        assert_json("not true", json!(false));
+        assert_json("not not false", json!(false));
+        assert_json("not not true", json!(true));
+        assert_json("false or not false", json!(true));
+        assert_json("false or not true", json!(false));
+        assert_json("not 1 > 2 or false", json!(true));
+        assert_json("not 1 < 2 or false", json!(false));
+        assert_json("not", json!({"ERROR": "Parse Error"}));
+    }
+
+    #[test]
     fn test_filter() {
         assert_json(
             "[1, 2, 3, 4, 5, 6] | filter(. < 3 or . > 4)",

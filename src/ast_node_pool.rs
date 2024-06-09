@@ -15,6 +15,7 @@ pub enum AstNode<'a> {
     GreaterThanOrEqual(AstNodePtr, AstNodePtr),
     Or(AstNodePtr, AstNodePtr),
     And(AstNodePtr, AstNodePtr),
+    Not(AstNodePtr),
     Add(AstNodePtr, AstNodePtr),
     Subtract(AstNodePtr, AstNodePtr),
     Multiply(AstNodePtr, AstNodePtr),

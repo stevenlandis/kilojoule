@@ -128,6 +128,16 @@ impl Evaluator {
                 "Right side of OR has to be a boolean",
                 |left, right| left && right,
             ),
+            AstNode::Not(expr) => {
+                let left_val = match self.eval_bool(*expr, obj, parser) {
+                    None => {
+                        return Val::new_err("\"not\" operator has to be called on a boolean");
+                    }
+                    Some(val) => val,
+                };
+
+                Val::new_bool(!left_val)
+            }
             AstNode::Equals(left, right) => {
                 let left_val = self.eval(*left, obj, parser);
                 let right_val = self.eval(*right, obj, parser);
