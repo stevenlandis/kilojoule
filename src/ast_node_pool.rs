@@ -6,7 +6,8 @@ pub enum AstNode<'a> {
     Bool(bool),
     Pipe(AstNodePtr, AstNodePtr),
     Dot,
-    Access(AstNodePtr),
+    // Access(AstNodePtr),
+    AccessChain(AstNodePtr, AstNodePtr),
     Equals(AstNodePtr, AstNodePtr),
     NotEquals(AstNodePtr, AstNodePtr),
     LessThan(AstNodePtr, AstNodePtr),
@@ -90,9 +91,9 @@ impl<'a> AstNodePool<'a> {
         self.new_node(AstNode::Dot)
     }
 
-    pub fn new_access(&mut self, accessor: AstNodePtr) -> AstNodePtr {
-        self.new_node(AstNode::Access(accessor))
-    }
+    // pub fn new_access(&mut self, accessor: AstNodePtr) -> AstNodePtr {
+    //     self.new_node(AstNode::Access(accessor))
+    // }
 
     pub fn new_or(&mut self, left: AstNodePtr, right: AstNodePtr) -> AstNodePtr {
         self.new_node(AstNode::Or(left, right))

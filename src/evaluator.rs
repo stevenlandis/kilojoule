@@ -408,74 +408,151 @@ impl Evaluator {
 
                 Val::new_str(std::str::from_utf8(buffer.as_slice()).unwrap())
             }
-            AstNode::Access(expr) => match obj.get_val() {
-                ValType::Map(map) => {
-                    if let AstNode::ReverseIdx(_) = parser.get_node(*expr) {
-                        return Val::new_err("Maps cannot be accessed with a reverse index");
-                    }
-
-                    let key_val = match parser.get_node(*expr) {
-                        AstNode::SubString(key) => Val::new_str(key),
-                        _ => self.eval(*expr, obj, parser),
-                    };
-
-                    match map.get(&key_val) {
-                        None => Val::new_null(),
-                        Some(val) => val,
-                    }
+            AstNode::AccessChain(expr, accessor) => {
+                let val_to_access = self.eval(*expr, obj, parser);
+                if let ValType::Err(_) = val_to_access.get_val() {
+                    return val_to_access;
                 }
-                ValType::List(list) => match parser.get_node(*expr) {
-                    AstNode::SliceAccess(start, end) => {
-                        let start_idx = match start {
-                            None => 0,
-                            Some(start_expr) => {
-                                match self.eval_list_access(obj, *start_expr, parser) {
-                                    Err(err) => {
-                                        return err;
-                                    }
-                                    Ok((start_idx, is_rev)) => {
-                                        if is_rev {
-                                            list.len().saturating_sub(start_idx)
-                                        } else {
-                                            start_idx.min(list.len())
+
+                match val_to_access.get_val() {
+                    ValType::Map(map) => {
+                        if let AstNode::ReverseIdx(_) = parser.get_node(*accessor) {
+                            return Val::new_err("Maps cannot be accessed with a reverse index");
+                        }
+
+                        let key_val = match parser.get_node(*accessor) {
+                            AstNode::SubString(key) => Val::new_str(key),
+                            _ => self.eval(*accessor, obj, parser),
+                        };
+
+                        match map.get(&key_val) {
+                            None => Val::new_null(),
+                            Some(val) => val,
+                        }
+                    }
+                    ValType::List(list) => match parser.get_node(*accessor) {
+                        AstNode::SliceAccess(start, end) => {
+                            let start_idx = match start {
+                                None => 0,
+                                Some(start_expr) => {
+                                    match self.eval_list_access(obj, *start_expr, parser) {
+                                        Err(err) => {
+                                            return err;
+                                        }
+                                        Ok((start_idx, is_rev)) => {
+                                            if is_rev {
+                                                list.len().saturating_sub(start_idx)
+                                            } else {
+                                                start_idx.min(list.len())
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        };
-                        let end_idx = match end {
-                            None => list.len(),
-                            Some(end_expr) => match self.eval_list_access(obj, *end_expr, parser) {
-                                Err(err) => {
-                                    return err;
-                                }
-                                Ok((end_idx, is_rev)) => {
-                                    if is_rev {
-                                        list.len().saturating_sub(end_idx)
-                                    } else {
-                                        end_idx.min(list.len())
+                            };
+                            let end_idx = match end {
+                                None => list.len(),
+                                Some(end_expr) => {
+                                    match self.eval_list_access(obj, *end_expr, parser) {
+                                        Err(err) => {
+                                            return err;
+                                        }
+                                        Ok((end_idx, is_rev)) => {
+                                            if is_rev {
+                                                list.len().saturating_sub(end_idx)
+                                            } else {
+                                                end_idx.min(list.len())
+                                            }
+                                        }
                                     }
                                 }
-                            },
-                        };
-                        let end_idx = end_idx.max(start_idx);
-                        Val::new_list(list[start_idx..end_idx].to_vec())
-                    }
-                    _ => match self.eval_list_access(obj, *expr, parser) {
-                        Err(err) => err,
-                        Ok((idx, is_rev)) => {
-                            if idx < list.len() {
-                                let idx = if is_rev { list.len() - idx - 1 } else { idx };
-                                list[idx].clone()
-                            } else {
-                                Val::new_err("List access out of bounds")
-                            }
+                            };
+                            let end_idx = end_idx.max(start_idx);
+                            Val::new_list(list[start_idx..end_idx].to_vec())
                         }
+                        _ => match self.eval_list_access(obj, *accessor, parser) {
+                            Err(err) => err,
+                            Ok((idx, is_rev)) => {
+                                if idx < list.len() {
+                                    let idx = if is_rev { list.len() - idx - 1 } else { idx };
+                                    list[idx].clone()
+                                } else {
+                                    Val::new_err("List access out of bounds")
+                                }
+                            }
+                        },
                     },
-                },
-                ValType::Null => obj.clone(),
-                _ => Val::new_err("Invalid access"),
-            },
+                    ValType::Null => obj.clone(),
+                    _ => Val::new_err("Invalid access"),
+                }
+            }
+            // AstNode::Access(expr) => match obj.get_val() {
+            //     ValType::Map(map) => {
+            //         if let AstNode::ReverseIdx(_) = parser.get_node(*expr) {
+            //             return Val::new_err("Maps cannot be accessed with a reverse index");
+            //         }
+
+            //         let key_val = match parser.get_node(*expr) {
+            //             AstNode::SubString(key) => Val::new_str(key),
+            //             _ => self.eval(*expr, obj, parser),
+            //         };
+
+            //         match map.get(&key_val) {
+            //             None => Val::new_null(),
+            //             Some(val) => val,
+            //         }
+            //     }
+            //     ValType::List(list) => match parser.get_node(*expr) {
+            //         AstNode::SliceAccess(start, end) => {
+            //             let start_idx = match start {
+            //                 None => 0,
+            //                 Some(start_expr) => {
+            //                     match self.eval_list_access(obj, *start_expr, parser) {
+            //                         Err(err) => {
+            //                             return err;
+            //                         }
+            //                         Ok((start_idx, is_rev)) => {
+            //                             if is_rev {
+            //                                 list.len().saturating_sub(start_idx)
+            //                             } else {
+            //                                 start_idx.min(list.len())
+            //                             }
+            //                         }
+            //                     }
+            //                 }
+            //             };
+            //             let end_idx = match end {
+            //                 None => list.len(),
+            //                 Some(end_expr) => match self.eval_list_access(obj, *end_expr, parser) {
+            //                     Err(err) => {
+            //                         return err;
+            //                     }
+            //                     Ok((end_idx, is_rev)) => {
+            //                         if is_rev {
+            //                             list.len().saturating_sub(end_idx)
+            //                         } else {
+            //                             end_idx.min(list.len())
+            //                         }
+            //                     }
+            //                 },
+            //             };
+            //             let end_idx = end_idx.max(start_idx);
+            //             Val::new_list(list[start_idx..end_idx].to_vec())
+            //         }
+            //         _ => match self.eval_list_access(obj, *expr, parser) {
+            //             Err(err) => err,
+            //             Ok((idx, is_rev)) => {
+            //                 if idx < list.len() {
+            //                     let idx = if is_rev { list.len() - idx - 1 } else { idx };
+            //                     list[idx].clone()
+            //                 } else {
+            //                     Val::new_err("List access out of bounds")
+            //                 }
+            //             }
+            //         },
+            //     },
+            //     ValType::Null => obj.clone(),
+            //     _ => Val::new_err("Invalid access"),
+            // },
             AstNode::Bool(val) => Val::new_bool(*val),
             AstNode::FcnCall { name, args } => {
                 let name = match parser.get_node(*name) {

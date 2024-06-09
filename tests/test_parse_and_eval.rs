@@ -68,6 +68,12 @@ mod tests {
     }
 
     #[test]
+    fn test_access_expression_scope() {
+        assert_json("[[1,2,3,4], 3] | .[0][:.[1]]", json!([1, 2, 3]));
+        assert_json("[[1,2,3,4], 2] | .[0][:.[1]]", json!([1, 2]));
+    }
+
+    #[test]
     fn string_literals() {
         assert_json(r#" '' "#, json!(""));
         assert_json(r#" 'string' "#, json!("string"));

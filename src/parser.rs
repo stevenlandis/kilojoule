@@ -428,7 +428,7 @@ impl<'a> Parser<'a> {
                     Ok(expr) => expr,
                 },
             };
-            expr = self.pool.new_pipe(expr, accessor);
+            expr = self.pool.new_node(AstNode::AccessChain(expr, accessor));
         }
 
         Some(Ok(expr))
@@ -439,8 +439,7 @@ impl<'a> Parser<'a> {
             let mut expr = self.pool.new_dot();
             self.parse_ws();
             if let Some(iden) = self.parse_identifier(true) {
-                let access = self.pool.new_access(iden);
-                expr = self.pool.new_pipe(expr, access);
+                expr = self.pool.new_node(AstNode::AccessChain(expr, iden));
             }
             return Some(Ok(expr));
         }
@@ -603,7 +602,7 @@ impl<'a> Parser<'a> {
                 Some(val) => val,
             };
 
-            Some(Ok(self.pool.new_access(identifier)))
+            Some(Ok(identifier))
         } else if self.parse_str_literal("[") {
             self.parse_ws();
 
@@ -650,7 +649,7 @@ impl<'a> Parser<'a> {
                 ));
             }
 
-            Some(Ok(self.pool.new_node(AstNode::Access(access_expr))))
+            Some(Ok(access_expr))
         } else {
             None
         }
