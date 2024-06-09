@@ -676,21 +676,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
-        let expr = match self.parse_base_expr_with_accesses() {
-            None => {
-                return None;
-            }
-            Some(expr) => match expr {
-                Err(err) => {
-                    return Some(Err(err));
-                }
-                Ok(expr) => expr,
-            },
-        };
-
         #[derive(Clone)]
         enum Op {
-            Base,
             Pipe,
             Coalesce,
             Or,
@@ -717,51 +704,92 @@ impl<'a> Parser<'a> {
             Equality,
             Add,
             Multiply,
-            Base,
         }
 
-        struct OpStack {
-            stack: Vec<(Op, AstNodePtr, OpOrder)>,
+        enum Node {
+            Expr(AstNodePtr),
+            Op(Op, OpOrder),
         }
 
-        impl OpStack {
-            fn reduce_for_op_order(&mut self, pool: &mut AstNodePool, order: OpOrder) {
-                while self.stack.len() >= 2 && self.stack[self.stack.len() - 1].2 >= order {
-                    let t0 = self.stack.pop().unwrap();
-                    let t1 = self.stack.pop().unwrap();
-                    let left = t1.1;
-                    let right = t0.1;
-                    self.stack.push((
-                        t1.0,
-                        match t0.0 {
-                            Op::Pipe => pool.new_pipe(left, right),
-                            Op::Coalesce => pool.new_node(AstNode::Coalesce(left, right)),
-                            Op::Or => pool.new_or(left, right),
-                            Op::And => pool.new_and(left, right),
-                            Op::Equals => pool.new_node(AstNode::Equals(left, right)),
-                            Op::NotEquals => pool.new_node(AstNode::NotEquals(left, right)),
-                            Op::LessThan => pool.new_node(AstNode::LessThan(left, right)),
+        let mut stack = Vec::<Node>::new();
+
+        fn reduce_for_op_order(stack: &mut Vec<Node>, parser: &mut Parser, order: OpOrder) {
+            // normal reduction
+            // [a | b + c] |
+            while stack.len() >= 3 {
+                if let (Node::Expr(left), Node::Op(temp_op, temp_order), Node::Expr(right)) = (
+                    &stack[stack.len() - 3],
+                    &stack[stack.len() - 2],
+                    &stack[stack.len() - 1],
+                ) {
+                    let temp_order = *temp_order;
+                    let left = *left;
+                    let right = *right;
+                    if temp_order >= order {
+                        let new_expr = match temp_op {
+                            Op::Pipe => parser.pool.new_pipe(left, right),
+                            Op::Coalesce => parser.pool.new_node(AstNode::Coalesce(left, right)),
+                            Op::Or => parser.pool.new_or(left, right),
+                            Op::And => parser.pool.new_and(left, right),
+                            Op::Equals => parser.pool.new_node(AstNode::Equals(left, right)),
+                            Op::NotEquals => parser.pool.new_node(AstNode::NotEquals(left, right)),
+                            Op::LessThan => parser.pool.new_node(AstNode::LessThan(left, right)),
                             Op::LessThanOrEqual => {
-                                pool.new_node(AstNode::LessThanOrEqual(left, right))
+                                parser.pool.new_node(AstNode::LessThanOrEqual(left, right))
                             }
-                            Op::GreaterThan => pool.new_node(AstNode::GreaterThan(left, right)),
-                            Op::GreaterThanOrEqual => {
-                                pool.new_node(AstNode::GreaterThanOrEqual(left, right))
+                            Op::GreaterThan => {
+                                parser.pool.new_node(AstNode::GreaterThan(left, right))
                             }
-                            Op::Add => pool.new_add(left, right),
-                            Op::Subtract => pool.new_subtract(left, right),
-                            Op::Multiply => pool.new_node(AstNode::Multiply(left, right)),
-                            Op::Divide => pool.new_node(AstNode::Divide(left, right)),
-                            Op::Base => panic!(),
-                        },
-                        t1.2,
-                    ));
+                            Op::GreaterThanOrEqual => parser
+                                .pool
+                                .new_node(AstNode::GreaterThanOrEqual(left, right)),
+                            Op::Add => parser.pool.new_add(left, right),
+                            Op::Subtract => parser.pool.new_subtract(left, right),
+                            Op::Multiply => parser.pool.new_node(AstNode::Multiply(left, right)),
+                            Op::Divide => parser.pool.new_node(AstNode::Divide(left, right)),
+                        };
+                        stack.pop();
+                        stack.pop();
+                        stack.pop();
+                        stack.push(Node::Expr(new_expr));
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
                 }
             }
         }
 
-        let mut stack = OpStack {
-            stack: vec![(Op::Base, expr, OpOrder::Base)],
+        fn parse_base_expr(
+            stack: &mut Vec<Node>,
+            parser: &mut Parser,
+        ) -> Option<Result<(), ParseError>> {
+            let expr = match parser.parse_base_expr_with_accesses() {
+                None => {
+                    return None;
+                }
+                Some(expr) => match expr {
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
+                    Ok(expr) => expr,
+                },
+            };
+            stack.push(Node::Expr(expr));
+            Some(Ok(()))
+        }
+
+        match parse_base_expr(&mut stack, self) {
+            None => {
+                return None;
+            }
+            Some(expr) => match expr {
+                Err(err) => {
+                    return Some(Err(err));
+                }
+                Ok(_) => {}
+            },
         };
 
         loop {
@@ -798,7 +826,11 @@ impl<'a> Parser<'a> {
                 break;
             } {
                 self.parse_ws();
-                let next_expr = match self.parse_base_expr_with_accesses() {
+
+                reduce_for_op_order(&mut stack, self, next_order);
+                stack.push(Node::Op(next_op, next_order));
+
+                match parse_base_expr(&mut stack, self) {
                     None => {
                         return Some(Err(self.get_err(ParseErrorType::NoExprAfterOperator)));
                     }
@@ -806,18 +838,21 @@ impl<'a> Parser<'a> {
                         Err(err) => {
                             return Some(Err(err));
                         }
-                        Ok(expr) => expr,
+                        Ok(_) => {}
                     },
                 };
-
-                stack.reduce_for_op_order(&mut self.pool, next_order);
-                stack.stack.push((next_op, next_expr, next_order));
             }
         }
 
-        stack.reduce_for_op_order(&mut self.pool, OpOrder::End);
+        reduce_for_op_order(&mut stack, self, OpOrder::End);
 
-        Some(Ok(stack.stack.pop().unwrap().1))
+        assert!(stack.len() == 1);
+
+        if let Node::Expr(expr) = stack.pop().unwrap() {
+            Some(Ok(expr))
+        } else {
+            panic!();
+        }
     }
 }
 
