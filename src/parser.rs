@@ -685,6 +685,7 @@ impl<'a> Parser<'a> {
         #[derive(Clone)]
         enum UnaryOp {
             Not,
+            Negative,
         }
 
         #[derive(Clone)]
@@ -716,6 +717,7 @@ impl<'a> Parser<'a> {
             Equality,
             Add,
             Multiply,
+            Negative,
         }
 
         enum Node {
@@ -739,6 +741,9 @@ impl<'a> Parser<'a> {
                             Op::Unary(temp_op) => {
                                 let new_expr = match temp_op {
                                     UnaryOp::Not => parser.pool.new_node(AstNode::Not(right)),
+                                    UnaryOp::Negative => {
+                                        parser.pool.new_node(AstNode::Negative(right))
+                                    }
                                 };
                                 stack.pop();
                                 stack.pop();
@@ -809,6 +814,10 @@ impl<'a> Parser<'a> {
                 if parser.parse_str_literal("not") {
                     parser.parse_ws();
                     stack.push(Node::Op(Op::Unary(UnaryOp::Not), OpOrder::Not));
+                    has_unary_op = true;
+                } else if parser.parse_str_literal("-") {
+                    parser.parse_ws();
+                    stack.push(Node::Op(Op::Unary(UnaryOp::Negative), OpOrder::Negative));
                     has_unary_op = true;
                 } else {
                     break;

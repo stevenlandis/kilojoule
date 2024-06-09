@@ -300,6 +300,14 @@ mod tests {
     }
 
     #[test]
+    fn test_negative() {
+        assert_json("-100", json!(-100));
+        assert_json("1 + -100", json!(-99));
+        assert_json("--100", json!(100));
+        assert_json("4 * -3", json!(-12));
+    }
+
+    #[test]
     fn test_sum() {
         assert_json("[1,2,3,4] | sum()", json!(10));
         assert_json("[] | sum()", json!(0));

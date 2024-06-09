@@ -216,6 +216,16 @@ impl Evaluator {
                     Val::new_f64(left_val / right_val)
                 }
             }
+            AstNode::Negative(expr) => {
+                let val = self.eval(*expr, obj, parser);
+                let val = match val.get_val() {
+                    ValType::Float64(val) => *val,
+                    _ => {
+                        return Val::new_err("Negative expression must be a number");
+                    }
+                };
+                Val::new_f64(-val)
+            }
             AstNode::Integer(val) => Val::new_f64(*val as f64),
             AstNode::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
