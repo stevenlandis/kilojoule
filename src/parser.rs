@@ -435,6 +435,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_base_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        match self.parse_let_expr() {
+            None => {}
+            Some(expr) => match expr {
+                Err(err) => return Some(Err(err)),
+                Ok(expr) => return Some(Ok(expr)),
+            },
+        }
+
         if self.parse_str_literal(".") {
             let mut expr = self.pool.new_dot();
             self.parse_ws();
@@ -675,6 +683,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        self.inner_parse_expr(true)
+    }
+
+    fn inner_parse_expr(&mut self, allow_pipe: bool) -> Option<Result<AstNodePtr, ParseError>> {
         #[derive(Clone)]
         enum Op {
             Unary(UnaryOp),
@@ -855,7 +867,7 @@ impl<'a> Parser<'a> {
 
         loop {
             self.parse_ws();
-            if let Some((next_op, next_order)) = if self.parse_str_literal("|") {
+            if let Some((next_op, next_order)) = if allow_pipe && self.parse_str_literal("|") {
                 Some((BinaryOp::Pipe, OpOrder::Pipe))
             } else if self.parse_str_literal("??") {
                 Some((BinaryOp::Coalesce, OpOrder::Coalesce))
@@ -915,6 +927,36 @@ impl<'a> Parser<'a> {
             panic!();
         }
     }
+
+    fn parse_let_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+        if !self.parse_str_literal("let") {
+            return None;
+        }
+        self.parse_ws();
+
+        let identifier = match self.parse_identifier(true) {
+            None => return Some(Err(self.get_err(ParseErrorType::NoIdentifierInLetStmt))),
+            Some(res) => res,
+        };
+        self.parse_ws();
+
+        if !self.parse_str_literal("=") {
+            return Some(Err(self.get_err(ParseErrorType::NoEqualsInLetStmt)));
+        }
+        self.parse_ws();
+
+        let expr = match self.inner_parse_expr(false) {
+            None => return Some(Err(self.get_err(ParseErrorType::NoExprInLetStmt))),
+            Some(expr) => match expr {
+                Err(err) => return Some(Err(err)),
+                Ok(expr) => expr,
+            },
+        };
+
+        Some(Ok(self
+            .pool
+            .new_node(AstNode::LetStmt { identifier, expr })))
+    }
 }
 
 #[derive(Debug)]
@@ -953,4 +995,7 @@ enum ParseErrorType {
     NoIdentifierAfterKeywordArgument,
     NoWhitespaceAfterKeywordArgumentKeyword,
     NoExprAfterUnaryOperator,
+    NoIdentifierInLetStmt,
+    NoEqualsInLetStmt,
+    NoExprInLetStmt,
 }

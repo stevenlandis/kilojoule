@@ -7,14 +7,13 @@ use super::parser::Parser;
 use super::val::{OrderedMap, Val, ValType};
 use std::process::{Command, Stdio};
 
-pub struct Evaluator {}
+pub struct EvalCtx {
+    variables: HashMap<String, Val>,
+    val: Val,
+}
 
-impl Evaluator {
-    pub fn new() -> Self {
-        Evaluator {}
-    }
-
-    pub fn parse_and_eval(&mut self, text: &str) -> Val {
+impl EvalCtx {
+    pub fn parse_and_eval(text: &str) -> Val {
         let mut parser = Parser::new(text);
         match parser.external_parse_expr() {
             None => Val::new_null(),
@@ -25,14 +24,18 @@ impl Evaluator {
                     //     println!("{}: {:?}", idx, val);
                     // }
                     let val = Val::new_null();
-                    self.eval(ast, &val, &parser)
+                    let ctx = EvalCtx {
+                        variables: HashMap::new(),
+                        val,
+                    };
+                    ctx.eval(ast, &parser).val
                 }
             },
         }
     }
 
-    fn eval_bool(&mut self, node: AstNodePtr, obj: &Val, parser: &Parser) -> Option<bool> {
-        let val = self.eval(node, obj, parser);
+    fn eval_bool(&self, node: AstNodePtr, parser: &Parser) -> Option<bool> {
+        let val = self.eval(node, parser).val;
         match val.get_val() {
             ValType::Bool(val) => Some(*val),
             _ => None,
@@ -40,8 +43,7 @@ impl Evaluator {
     }
 
     fn eval_bool_expr(
-        &mut self,
-        obj: &Val,
+        &self,
         parser: &Parser,
         left: AstNodePtr,
         right: AstNodePtr,
@@ -49,13 +51,13 @@ impl Evaluator {
         right_err: &str,
         callback: impl Fn(bool, bool) -> bool,
     ) -> Val {
-        let left_val = match self.eval_bool(left, obj, parser) {
+        let left_val = match self.eval_bool(left, parser) {
             None => {
                 return Val::new_err(left_err);
             }
             Some(val) => val,
         };
-        let right_val = match self.eval_bool(right, obj, parser) {
+        let right_val = match self.eval_bool(right, parser) {
             None => {
                 return Val::new_err(right_err);
             }
@@ -66,8 +68,7 @@ impl Evaluator {
     }
 
     fn eval_f64_expr(
-        &mut self,
-        obj: &Val,
+        &self,
         parser: &Parser,
         left: AstNodePtr,
         right: AstNodePtr,
@@ -75,14 +76,14 @@ impl Evaluator {
         right_err: &str,
         callback: impl Fn(f64, f64) -> f64,
     ) -> Val {
-        let left_val = self.eval(left, obj, parser);
+        let left_val = self.eval(left, parser).val;
         let left_val = match left_val.get_val() {
             ValType::Float64(val) => *val,
             _ => {
                 return Val::new_err(left_err);
             }
         };
-        let right_val = self.eval(right, obj, parser);
+        let right_val = self.eval(right, parser).val;
         let right_val = match right_val.get_val() {
             ValType::Float64(val) => *val,
             _ => {
@@ -92,164 +93,169 @@ impl Evaluator {
         Val::new_f64(callback(left_val, right_val))
     }
 
-    fn eval(&mut self, node: AstNodePtr, obj: &Val, parser: &Parser) -> Val {
+    fn with_val(&self, val: Val) -> EvalCtx {
+        EvalCtx {
+            variables: self.variables.clone(),
+            val,
+        }
+    }
+
+    fn eval(&self, node: AstNodePtr, parser: &Parser) -> EvalCtx {
         match parser.get_node(node) {
-            AstNode::Null => Val::new_null(),
+            AstNode::Null => self.with_val(Val::new_null()),
             AstNode::Pipe(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                self.eval(*right, &left_val, parser)
+                let left_val = self.eval(*left, parser);
+                left_val.eval(*right, parser)
             }
             AstNode::Coalesce(left, right) => {
-                let left = self.eval(*left, obj, parser);
-                match &left.get_val() {
-                    ValType::Null => self.eval(*right, obj, parser),
+                let left = self.eval(*left, parser);
+                match &left.val.get_val() {
+                    ValType::Null => self.eval(*right, parser),
                     _ => left,
                 }
             }
-            AstNode::Dot => obj.clone(),
-            AstNode::Or(left, right) => self.eval_bool_expr(
-                obj,
+            AstNode::Dot => self.with_val(self.val.clone()),
+            AstNode::Or(left, right) => self.with_val(self.eval_bool_expr(
                 parser,
                 *left,
                 *right,
                 "Left side of OR has to be a boolean",
                 "Right side of OR has to be a boolean",
                 |left, right| left || right,
-            ),
-            AstNode::And(left, right) => self.eval_bool_expr(
-                obj,
+            )),
+            AstNode::And(left, right) => self.with_val(self.eval_bool_expr(
                 parser,
                 *left,
                 *right,
                 "Left side of OR has to be a boolean",
                 "Right side of OR has to be a boolean",
                 |left, right| left && right,
-            ),
+            )),
             AstNode::Not(expr) => {
-                let left_val = match self.eval_bool(*expr, obj, parser) {
+                let left_val = match self.eval_bool(*expr, parser) {
                     None => {
-                        return Val::new_err("\"not\" operator has to be called on a boolean");
+                        return self.with_val(Val::new_err(
+                            "\"not\" operator has to be called on a boolean",
+                        ));
                     }
                     Some(val) => val,
                 };
 
-                Val::new_bool(!left_val)
+                self.with_val(Val::new_bool(!left_val))
             }
             AstNode::Equals(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let right_val = self.eval(*right, obj, parser);
-                Val::new_bool(left_val == right_val)
+                let left_val = self.eval(*left, parser);
+                let right_val = self.eval(*right, parser);
+                self.with_val(Val::new_bool(left_val.val == right_val.val))
             }
             AstNode::NotEquals(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let right_val = self.eval(*right, obj, parser);
-                Val::new_bool(left_val != right_val)
+                let left_val = self.eval(*left, parser);
+                let right_val = self.eval(*right, parser);
+                self.with_val(Val::new_bool(left_val.val != right_val.val))
             }
             AstNode::LessThan(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let right_val = self.eval(*right, obj, parser);
-                Val::new_bool(left_val < right_val)
+                let left_val = self.eval(*left, parser);
+                let right_val = self.eval(*right, parser);
+                self.with_val(Val::new_bool(left_val.val < right_val.val))
             }
             AstNode::LessThanOrEqual(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let right_val = self.eval(*right, obj, parser);
-                Val::new_bool(left_val <= right_val)
+                let left_val = self.eval(*left, parser);
+                let right_val = self.eval(*right, parser);
+                self.with_val(Val::new_bool(left_val.val <= right_val.val))
             }
             AstNode::GreaterThan(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let right_val = self.eval(*right, obj, parser);
-                Val::new_bool(left_val > right_val)
+                let left_val = self.eval(*left, parser);
+                let right_val = self.eval(*right, parser);
+                self.with_val(Val::new_bool(left_val.val > right_val.val))
             }
             AstNode::GreaterThanOrEqual(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
-                let right_val = self.eval(*right, obj, parser);
-                Val::new_bool(left_val >= right_val)
+                let left_val = self.eval(*left, parser);
+                let right_val = self.eval(*right, parser);
+                self.with_val(Val::new_bool(left_val.val >= right_val.val))
             }
-            AstNode::Add(left, right) => self.eval_f64_expr(
-                obj,
+            AstNode::Add(left, right) => self.with_val(self.eval_f64_expr(
                 parser,
                 *left,
                 *right,
                 "Left side of addition has to be a float",
                 "Right side of addition has to be a float",
                 |left, right| left + right,
-            ),
-            AstNode::Subtract(left, right) => self.eval_f64_expr(
-                obj,
+            )),
+            AstNode::Subtract(left, right) => self.with_val(self.eval_f64_expr(
                 parser,
                 *left,
                 *right,
                 "Left side of subtraction has to be a float",
                 "Right side of subtraction has to be a float",
                 |left, right| left - right,
-            ),
-            AstNode::Multiply(left, right) => self.eval_f64_expr(
-                obj,
+            )),
+            AstNode::Multiply(left, right) => self.with_val(self.eval_f64_expr(
                 parser,
                 *left,
                 *right,
                 "Left side of multiplication has to be a float",
                 "Right side of multiplication has to be a float",
                 |left, right| left * right,
-            ),
+            )),
             AstNode::Divide(left, right) => {
-                let left_val = self.eval(*left, obj, parser);
+                let left_val = self.eval(*left, parser).val;
                 let left_val = match left_val.get_val() {
                     ValType::Float64(val) => *val,
                     _ => {
-                        return Val::new_err("Left side of division has to be a float");
+                        return self
+                            .with_val(Val::new_err("Left side of division has to be a float"));
                     }
                 };
-                let right_val = self.eval(*right, obj, parser);
+                let right_val = self.eval(*right, parser).val;
                 let right_val = match right_val.get_val() {
                     ValType::Float64(val) => *val,
                     _ => {
-                        return Val::new_err("Right side of division has to be a float");
+                        return self
+                            .with_val(Val::new_err("Right side of division has to be a float"));
                     }
                 };
                 if right_val == 0.0 {
-                    Val::new_err("divide by zero")
+                    self.with_val(Val::new_err("divide by zero"))
                 } else {
-                    Val::new_f64(left_val / right_val)
+                    self.with_val(Val::new_f64(left_val / right_val))
                 }
             }
             AstNode::Negative(expr) => {
-                let val = self.eval(*expr, obj, parser);
+                let val = self.eval(*expr, parser).val;
                 let val = match val.get_val() {
                     ValType::Float64(val) => *val,
                     _ => {
-                        return Val::new_err("Negative expression must be a number");
+                        return self.with_val(Val::new_err("Negative expression must be a number"));
                     }
                 };
-                Val::new_f64(-val)
+                self.with_val(Val::new_f64(-val))
             }
-            AstNode::Integer(val) => Val::new_f64(*val as f64),
+            AstNode::Integer(val) => self.with_val(Val::new_f64(*val as f64)),
             AstNode::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
                 fn helper(
-                    this: &mut Evaluator,
-                    obj: &Val,
+                    this: &EvalCtx,
                     parser: &Parser,
                     map: &mut OrderedMap,
                     node: AstNodePtr,
                 ) -> Result<(), Val> {
                     match parser.get_node(node) {
                         AstNode::ListNode(left, right) => {
-                            helper(this, obj, parser, map, *left)?;
-                            helper(this, obj, parser, map, *right)?;
+                            helper(this, parser, map, *left)?;
+                            helper(this, parser, map, *right)?;
                             Ok(())
                         }
                         AstNode::MapKeyValPair { key, val } => {
                             let key_obj = match parser.get_node(*key) {
                                 AstNode::SubString(key_name) => Val::new_str(key_name),
-                                _ => this.eval(*key, obj, parser),
+                                _ => this.eval(*key, parser).val,
                             };
-                            let val_obj = this.eval(*val, obj, parser);
+                            let val_obj = this.eval(*val, parser).val;
                             map.insert(&key_obj, &val_obj);
                             Ok(())
                         }
                         AstNode::Spread(spread) => {
-                            let spread_val = this.eval(*spread, obj, parser);
+                            let spread_val = this.eval(*spread, parser).val;
                             match spread_val.get_val() {
                                 ValType::Map(spread_val) => {
                                     for (key, val) in spread_val.get_kv_pair_slice() {
@@ -269,33 +275,32 @@ impl Evaluator {
                 match contents {
                     None => {}
                     Some(contents) => {
-                        match helper(self, obj, parser, &mut map, *contents) {
+                        match helper(self, parser, &mut map, *contents) {
                             Ok(_) => {}
-                            Err(err) => return err,
+                            Err(err) => return self.with_val(err),
                         };
                     }
                 };
 
-                Val::new_map(map)
+                self.with_val(Val::new_map(map))
             }
             AstNode::ListLiteral(contents) => {
                 let mut list = Vec::<Val>::new();
 
                 fn helper(
-                    this: &mut Evaluator,
-                    obj: &Val,
+                    this: &EvalCtx,
                     parser: &Parser,
                     list: &mut Vec<Val>,
                     node: AstNodePtr,
                 ) -> Result<(), Val> {
                     match parser.get_node(node) {
                         AstNode::ListNode(left, right) => {
-                            helper(this, obj, parser, list, *left)?;
-                            helper(this, obj, parser, list, *right)?;
+                            helper(this, parser, list, *left)?;
+                            helper(this, parser, list, *right)?;
                             Ok(())
                         }
                         AstNode::Spread(spread) => {
-                            let spread_list = this.eval(*spread, obj, parser);
+                            let spread_list = this.eval(*spread, parser).val;
                             match spread_list.get_val() {
                                 ValType::List(spread_list) => {
                                     for elem in spread_list {
@@ -310,7 +315,7 @@ impl Evaluator {
                             }
                         }
                         _ => {
-                            let elem_val = this.eval(node, obj, parser);
+                            let elem_val = this.eval(node, parser).val;
                             list.push(elem_val);
                             Ok(())
                         }
@@ -320,30 +325,24 @@ impl Evaluator {
                 match contents {
                     None => {}
                     Some(contents) => {
-                        match helper(self, obj, parser, &mut list, *contents) {
+                        match helper(self, parser, &mut list, *contents) {
                             Ok(_) => {}
                             Err(err) => {
-                                return err;
+                                return self.with_val(err);
                             }
                         };
                     }
                 };
 
-                Val::new_list(list)
+                self.with_val(Val::new_list(list))
             }
             AstNode::FormatString(contents) => {
                 let mut buffer = Vec::<u8>::new();
-                fn helper(
-                    this: &mut Evaluator,
-                    obj: &Val,
-                    parser: &Parser,
-                    buffer: &mut Vec<u8>,
-                    node: AstNodePtr,
-                ) {
+                fn helper(this: &EvalCtx, parser: &Parser, buffer: &mut Vec<u8>, node: AstNodePtr) {
                     match parser.get_node(node) {
                         AstNode::ListNode(left, right) => {
-                            helper(this, obj, parser, buffer, *left);
-                            helper(this, obj, parser, buffer, *right);
+                            helper(this, parser, buffer, *left);
+                            helper(this, parser, buffer, *right);
                         }
                         AstNode::SubString(text) => {
                             let text_bytes = text.as_bytes();
@@ -386,13 +385,13 @@ impl Evaluator {
                             }
                         }
                         _ => {
-                            let elem_val = this.eval(node, obj, parser);
+                            let elem_val = this.eval(node, parser).val;
                             match elem_val.get_val() {
                                 ValType::String(sub_text) => {
                                     buffer.extend(sub_text.as_bytes());
                                 }
                                 _ => {
-                                    this.write_val(elem_val, buffer, false).unwrap();
+                                    EvalCtx::write_val(elem_val, buffer, false).unwrap();
                                 }
                             }
                         }
@@ -402,32 +401,36 @@ impl Evaluator {
                 match contents {
                     None => {}
                     Some(contents) => {
-                        helper(self, obj, parser, &mut buffer, *contents);
+                        helper(self, parser, &mut buffer, *contents);
                     }
                 };
 
-                Val::new_str(std::str::from_utf8(buffer.as_slice()).unwrap())
+                self.with_val(Val::new_str(
+                    std::str::from_utf8(buffer.as_slice()).unwrap(),
+                ))
             }
             AstNode::AccessChain(expr, accessor) => {
-                let val_to_access = self.eval(*expr, obj, parser);
+                let val_to_access = self.eval(*expr, parser).val;
                 if let ValType::Err(_) = val_to_access.get_val() {
-                    return val_to_access;
+                    return self.with_val(val_to_access);
                 }
 
                 match val_to_access.get_val() {
                     ValType::Map(map) => {
                         if let AstNode::ReverseIdx(_) = parser.get_node(*accessor) {
-                            return Val::new_err("Maps cannot be accessed with a reverse index");
+                            return self.with_val(Val::new_err(
+                                "Maps cannot be accessed with a reverse index",
+                            ));
                         }
 
                         let key_val = match parser.get_node(*accessor) {
                             AstNode::SubString(key) => Val::new_str(key),
-                            _ => self.eval(*accessor, obj, parser),
+                            _ => self.eval(*accessor, parser).val,
                         };
 
                         match map.get(&key_val) {
-                            None => Val::new_null(),
-                            Some(val) => val,
+                            None => self.with_val(Val::new_null()),
+                            Some(val) => self.with_val(val),
                         }
                     }
                     ValType::List(list) => match parser.get_node(*accessor) {
@@ -435,9 +438,9 @@ impl Evaluator {
                             let start_idx = match start {
                                 None => 0,
                                 Some(start_expr) => {
-                                    match self.eval_list_access(obj, *start_expr, parser) {
+                                    match self.eval_list_access(*start_expr, parser) {
                                         Err(err) => {
-                                            return err;
+                                            return self.with_val(err);
                                         }
                                         Ok((start_idx, is_rev)) => {
                                             if is_rev {
@@ -451,109 +454,39 @@ impl Evaluator {
                             };
                             let end_idx = match end {
                                 None => list.len(),
-                                Some(end_expr) => {
-                                    match self.eval_list_access(obj, *end_expr, parser) {
-                                        Err(err) => {
-                                            return err;
-                                        }
-                                        Ok((end_idx, is_rev)) => {
-                                            if is_rev {
-                                                list.len().saturating_sub(end_idx)
-                                            } else {
-                                                end_idx.min(list.len())
-                                            }
+                                Some(end_expr) => match self.eval_list_access(*end_expr, parser) {
+                                    Err(err) => {
+                                        return self.with_val(err);
+                                    }
+                                    Ok((end_idx, is_rev)) => {
+                                        if is_rev {
+                                            list.len().saturating_sub(end_idx)
+                                        } else {
+                                            end_idx.min(list.len())
                                         }
                                     }
-                                }
+                                },
                             };
                             let end_idx = end_idx.max(start_idx);
-                            Val::new_list(list[start_idx..end_idx].to_vec())
+                            self.with_val(Val::new_list(list[start_idx..end_idx].to_vec()))
                         }
-                        _ => match self.eval_list_access(obj, *accessor, parser) {
-                            Err(err) => err,
+                        _ => match self.eval_list_access(*accessor, parser) {
+                            Err(err) => self.with_val(err),
                             Ok((idx, is_rev)) => {
                                 if idx < list.len() {
                                     let idx = if is_rev { list.len() - idx - 1 } else { idx };
-                                    list[idx].clone()
+                                    self.with_val(list[idx].clone())
                                 } else {
-                                    Val::new_err("List access out of bounds")
+                                    self.with_val(Val::new_err("List access out of bounds"))
                                 }
                             }
                         },
                     },
-                    ValType::Null => obj.clone(),
-                    _ => Val::new_err("Invalid access"),
+                    ValType::Null => self.with_val(self.val.clone()),
+                    _ => self.with_val(Val::new_err("Invalid access")),
                 }
             }
-            // AstNode::Access(expr) => match obj.get_val() {
-            //     ValType::Map(map) => {
-            //         if let AstNode::ReverseIdx(_) = parser.get_node(*expr) {
-            //             return Val::new_err("Maps cannot be accessed with a reverse index");
-            //         }
-
-            //         let key_val = match parser.get_node(*expr) {
-            //             AstNode::SubString(key) => Val::new_str(key),
-            //             _ => self.eval(*expr, obj, parser),
-            //         };
-
-            //         match map.get(&key_val) {
-            //             None => Val::new_null(),
-            //             Some(val) => val,
-            //         }
-            //     }
-            //     ValType::List(list) => match parser.get_node(*expr) {
-            //         AstNode::SliceAccess(start, end) => {
-            //             let start_idx = match start {
-            //                 None => 0,
-            //                 Some(start_expr) => {
-            //                     match self.eval_list_access(obj, *start_expr, parser) {
-            //                         Err(err) => {
-            //                             return err;
-            //                         }
-            //                         Ok((start_idx, is_rev)) => {
-            //                             if is_rev {
-            //                                 list.len().saturating_sub(start_idx)
-            //                             } else {
-            //                                 start_idx.min(list.len())
-            //                             }
-            //                         }
-            //                     }
-            //                 }
-            //             };
-            //             let end_idx = match end {
-            //                 None => list.len(),
-            //                 Some(end_expr) => match self.eval_list_access(obj, *end_expr, parser) {
-            //                     Err(err) => {
-            //                         return err;
-            //                     }
-            //                     Ok((end_idx, is_rev)) => {
-            //                         if is_rev {
-            //                             list.len().saturating_sub(end_idx)
-            //                         } else {
-            //                             end_idx.min(list.len())
-            //                         }
-            //                     }
-            //                 },
-            //             };
-            //             let end_idx = end_idx.max(start_idx);
-            //             Val::new_list(list[start_idx..end_idx].to_vec())
-            //         }
-            //         _ => match self.eval_list_access(obj, *expr, parser) {
-            //             Err(err) => err,
-            //             Ok((idx, is_rev)) => {
-            //                 if idx < list.len() {
-            //                     let idx = if is_rev { list.len() - idx - 1 } else { idx };
-            //                     list[idx].clone()
-            //                 } else {
-            //                     Val::new_err("List access out of bounds")
-            //                 }
-            //             }
-            //         },
-            //     },
-            //     ValType::Null => obj.clone(),
-            //     _ => Val::new_err("Invalid access"),
-            // },
-            AstNode::Bool(val) => Val::new_bool(*val),
+            AstNode::Bool(val) => self.with_val(Val::new_bool(*val)),
             AstNode::FcnCall { name, args } => {
                 let name = match parser.get_node(*name) {
                     AstNode::SubString(name) => *name,
@@ -581,27 +514,42 @@ impl Evaluator {
                 match args {
                     None => {}
                     Some(args) => {
-                        helper(obj, parser, &mut args_vec, *args);
+                        helper(&self.val, parser, &mut args_vec, *args);
                     }
                 };
 
-                self.eval_fcn(parser, obj, name, &args_vec)
+                self.with_val(self.eval_fcn(parser, name, &args_vec))
             }
+            AstNode::LetStmt { identifier, expr } => {
+                let identifier = match parser.get_node(*identifier) {
+                    AstNode::SubString(identifier) => *identifier,
+                    _ => panic!(),
+                };
+
+                let val = self.eval(*expr, parser).val;
+                let mut variables = self.variables.clone();
+
+                variables.insert(identifier.to_string(), val);
+
+                EvalCtx {
+                    variables,
+                    val: self.val.clone(),
+                }
+            }
+            AstNode::SubString(identifier) => match self.variables.get(*identifier) {
+                None => self.with_val(Val::new_err("undefined variable access")),
+                Some(val) => self.with_val(val.clone()),
+            },
             _ => panic!("Unimplemented {:?}", parser.get_node(node)),
         }
     }
 
-    fn eval_list_access(
-        &mut self,
-        obj: &Val,
-        expr: AstNodePtr,
-        parser: &Parser,
-    ) -> Result<(usize, bool), Val> {
+    fn eval_list_access(&self, expr: AstNodePtr, parser: &Parser) -> Result<(usize, bool), Val> {
         let (is_rev, idx_expr) = match parser.get_node(expr) {
             AstNode::ReverseIdx(rev_expr) => (true, *rev_expr),
             _ => (false, expr),
         };
-        let idx = self.eval(idx_expr, obj, parser);
+        let idx = self.eval(idx_expr, parser).val;
         match idx.get_val() {
             ValType::Float64(num) => {
                 let num = *num;
@@ -621,7 +569,6 @@ impl Evaluator {
     }
 
     pub fn write_val(
-        &self,
         val: Val,
         writer: &mut impl std::io::Write,
         use_indent: bool,
@@ -632,19 +579,13 @@ impl Evaluator {
         }
     }
 
-    pub fn eval_fcn(
-        &mut self,
-        parser: &Parser,
-        obj: &Val,
-        name: &str,
-        args: &Vec<AstNodePtr>,
-    ) -> Val {
+    pub fn eval_fcn(&self, parser: &Parser, name: &str, args: &Vec<AstNodePtr>) -> Val {
         match name {
             "len" => {
                 if args.len() != 0 {
                     return Val::new_err("len() must be called with 0 arguments.");
                 }
-                match obj.get_val() {
+                match self.val.get_val() {
                     ValType::List(val) => Val::new_f64(val.len() as f64),
                     ValType::Map(val) => Val::new_f64(val.len() as f64),
                     ValType::Bytes(val) => Val::new_f64(val.len() as f64),
@@ -658,11 +599,11 @@ impl Evaluator {
                 if args.len() != 1 {
                     return Val::new_err("map() must be called with 1 argument.");
                 }
-                match obj.get_val() {
+                match self.val.get_val() {
                     ValType::List(val) => {
                         let mut result = Vec::<Val>::with_capacity(val.len());
                         for elem in val {
-                            result.push(self.eval(args[0], &elem, parser));
+                            result.push(self.with_val(elem.clone()).eval(args[0], parser).val);
                         }
                         Val::new_list(result)
                     }
@@ -674,13 +615,17 @@ impl Evaluator {
                     return Val::new_err("group() must be called with one argument");
                 }
 
-                match obj.get_val() {
+                match self.val.get_val() {
                     ValType::List(val) => {
                         let mut groups = Vec::<(Val, Vec<Val>)>::new();
                         let mut key_to_group_idx = HashMap::<Val, usize>::new();
 
                         for elem in val {
-                            let key_val = self.eval(args[0], elem, parser);
+                            let ctx = EvalCtx {
+                                variables: self.variables.clone(),
+                                val: elem.clone(),
+                            };
+                            let key_val = ctx.eval(args[0], parser).val;
                             match key_to_group_idx.entry(key_val.clone()) {
                                 Entry::Occupied(entry) => {
                                     groups[*entry.get()].1.push(elem.clone());
@@ -704,7 +649,7 @@ impl Evaluator {
                     _ => Val::new_err("group() must be called on a list"),
                 }
             }
-            "unique" => match obj.get_val() {
+            "unique" => match self.val.get_val() {
                 ValType::List(val) => {
                     let mut result = Vec::<Val>::new();
                     let mut reached_vals = HashSet::<Val>::new();
@@ -721,7 +666,7 @@ impl Evaluator {
                 if args.len() > 1 {
                     return Val::new_err("sort() must be called with zero or one arguments");
                 }
-                match obj.get_val() {
+                match self.val.get_val() {
                     ValType::List(val) => {
                         let mut values = val.clone();
                         let sort_expr = if args.len() == 1 { Some(args[0]) } else { None };
@@ -730,8 +675,13 @@ impl Evaluator {
                                 values.sort();
                             }
                             Some(sort_expr) => {
-                                values
-                                    .sort_by_cached_key(|elem| self.eval(sort_expr, elem, parser));
+                                values.sort_by_cached_key(|elem| {
+                                    let ctx = EvalCtx {
+                                        variables: self.variables.clone(),
+                                        val: elem.clone(),
+                                    };
+                                    ctx.eval(sort_expr, parser).val
+                                });
                             }
                         }
 
@@ -740,7 +690,7 @@ impl Evaluator {
                     _ => Val::new_err("sort() must be called on a list"),
                 }
             }
-            "reverse" => match obj.get_val() {
+            "reverse" => match self.val.get_val() {
                 ValType::List(val) => {
                     let mut val = val.clone();
                     val.reverse();
@@ -752,11 +702,12 @@ impl Evaluator {
                 if args.len() != 1 {
                     return Val::new_err("filter() must be called with one argument");
                 }
-                match obj.get_val() {
+                match self.val.get_val() {
                     ValType::List(val) => {
                         let mut result = Vec::<Val>::new();
                         for elem in val {
-                            let filter_val = self.eval(args[0], &elem, parser);
+                            let ctx = self.with_val(elem.clone());
+                            let filter_val = ctx.eval(args[0], parser).val;
                             match filter_val.get_val() {
                                 ValType::Bool(bool_val) => {
                                     if *bool_val {
@@ -772,7 +723,7 @@ impl Evaluator {
                     _ => Val::new_err("filter() must be called on a list"),
                 }
             }
-            "sum" => match &obj.get_val() {
+            "sum" => match self.val.get_val() {
                 ValType::List(list) => {
                     let mut total: f64 = 0.0;
                     for elem in list {
@@ -791,7 +742,7 @@ impl Evaluator {
                 }
                 _ => Val::new_err("sum() has to be called on a list"),
             },
-            "lines" => match obj.get_val() {
+            "lines" => match self.val.get_val() {
                 ValType::String(val) => {
                     let mut lines = val
                         .split("\n")
@@ -808,12 +759,12 @@ impl Evaluator {
                     Val::new_list(lines)
                 }
                 ValType::Bytes(_) => {
-                    let text = self.eval_fcn(parser, obj, "str", args);
-                    self.eval_fcn(parser, &text, name, args)
+                    let text = self.eval_fcn(parser, "str", args);
+                    self.with_val(text).eval_fcn(parser, name, args)
                 }
                 _ => Val::new_err("lines() must be called on a string or bytes"),
             },
-            "joinlines" => match obj.get_val() {
+            "joinlines" => match self.val.get_val() {
                 ValType::List(list) => {
                     let mut result = String::new();
                     for elem in list {
@@ -833,7 +784,7 @@ impl Evaluator {
                 }
                 _ => Val::new_err("joinlines() must be called on a list"),
             },
-            "split" => match obj.get_val() {
+            "split" => match self.val.get_val() {
                 ValType::String(text) => {
                     if args.len() == 0 {
                         Val::new_list(
@@ -842,7 +793,7 @@ impl Evaluator {
                                 .collect::<Vec<_>>(),
                         )
                     } else {
-                        match self.eval(args[0], obj, parser).get_val() {
+                        match self.eval(args[0], parser).val.get_val() {
                             ValType::String(split_pattern) => Val::new_list(
                                 text.split(split_pattern)
                                     .map(|elem| Val::new_str(elem))
@@ -853,14 +804,14 @@ impl Evaluator {
                     }
                 }
                 ValType::Bytes(_) => {
-                    let text = self.eval_fcn(parser, obj, "str", args);
-                    self.eval_fcn(parser, &text, name, args)
+                    let text = self.eval_fcn(parser, "str", args);
+                    self.with_val(text).eval_fcn(parser, name, args)
                 }
                 _ => Val::new_err("split() must be called on a string"),
             },
-            "join" => match &obj.get_val() {
+            "join" => match self.val.get_val() {
                 ValType::List(elems) => {
-                    let joiner = self.eval(args[0], obj, parser);
+                    let joiner = self.eval(args[0], parser).val;
                     let joiner = match joiner.get_val() {
                         ValType::String(joiner) => joiner.as_str(),
                         _ => return Val::new_err("join() pattern must be a string"),
@@ -890,20 +841,20 @@ impl Evaluator {
                 std::io::stdin().read_to_end(&mut buffer).unwrap();
                 return Val::new_bytes(buffer);
             }
-            "str" => match obj.get_val() {
+            "str" => match self.val.get_val() {
                 ValType::Bytes(bytes) => match std::str::from_utf8(bytes) {
                     Ok(str) => Val::new_str(str),
                     Err(_) => Val::new_err("Unable to decode bytes as utf8 string."),
                 },
                 _ => Val::new_err("str() must be called on bytes"),
             },
-            "bytes" => match obj.get_val() {
+            "bytes" => match self.val.get_val() {
                 ValType::String(text) => {
                     Val::new_bytes(text.as_bytes().iter().cloned().collect::<Vec<_>>())
                 }
                 _ => Val::new_err("bytes() must be called on str"),
             },
-            "read" => match obj.get_val() {
+            "read" => match self.val.get_val() {
                 ValType::String(file_path) => {
                     let mut buffer = Vec::<u8>::new();
                     match std::fs::File::open(file_path) {
@@ -922,36 +873,36 @@ impl Evaluator {
                     .collect::<Vec<_>>();
                 Val::new_map(OrderedMap::from_kv_pair_slice(kv_pairs.as_slice()))
             }
-            "fromjson" => match obj.get_val() {
+            "fromjson" => match self.val.get_val() {
                 ValType::String(val) => Val::from_json_str(val.as_str()),
                 ValType::Bytes(_) => {
-                    let text = self.eval_fcn(parser, obj, "str", args);
-                    self.eval_fcn(parser, &text, name, args)
+                    let text = self.eval_fcn(parser, "str", args);
+                    self.with_val(text).eval_fcn(parser, name, args)
                 }
                 _ => Val::new_err("fromjson() must be called on a string"),
             },
-            "keys" => match &obj.get_val() {
+            "keys" => match self.val.get_val() {
                 ValType::Map(map) => {
                     let keys = map.keys();
                     Val::new_list(keys)
                 }
                 _ => Val::new_err("keys() must be called on a map"),
             },
-            "values" => match &obj.get_val() {
+            "values" => match self.val.get_val() {
                 ValType::Map(map) => {
                     let values = map.values();
                     Val::new_list(values)
                 }
                 _ => Val::new_err("values() must be called on a map"),
             },
-            "items" => match &obj.get_val() {
+            "items" => match self.val.get_val() {
                 ValType::Map(map) => {
                     let items = map.items();
                     Val::new_list(items)
                 }
                 _ => Val::new_err("entries() must be called on a map"),
             },
-            "fromitems" => match &obj.get_val() {
+            "fromitems" => match self.val.get_val() {
                 ValType::List(val) => {
                     let key_name = Val::new_str("key");
                     let val_name = Val::new_str("val");
@@ -986,38 +937,36 @@ impl Evaluator {
                 let mapper = args[1];
 
                 fn helper(
-                    this: &mut Evaluator,
+                    this: &EvalCtx,
                     sub_node_getter: AstNodePtr,
                     mapper: AstNodePtr,
                     parser: &Parser,
-                    obj: &Val,
                 ) -> Val {
-                    let sub_nodes = this.eval(sub_node_getter, obj, parser);
+                    let sub_nodes = this.eval(sub_node_getter, parser).val;
                     match sub_nodes.get_val() {
                         ValType::List(sub_nodes) => {
                             let mut mapped_sub_nodes = Vec::<Val>::with_capacity(sub_nodes.len());
                             for sub_node in sub_nodes {
                                 mapped_sub_nodes.push(helper(
-                                    this,
+                                    &this.with_val(sub_node.clone()),
                                     sub_node_getter,
                                     mapper,
                                     parser,
-                                    sub_node,
                                 ));
                             }
                             let new_node = Val::new_map(OrderedMap::from_kv_pair_slice(&[
-                                (Val::new_str("node"), obj.clone()),
+                                (Val::new_str("node"), this.val.clone()),
                                 (Val::new_str("vals"), Val::new_list(mapped_sub_nodes)),
                             ]));
 
-                            this.eval(mapper, &new_node, parser)
+                            this.with_val(new_node).eval(mapper, parser).val
                         }
                         ValType::Err(_) => sub_nodes,
                         _ => Val::new_err("mapper function in recursivemap() must return a list"),
                     }
                 }
 
-                helper(self, sub_node_getter, mapper, parser, obj)
+                helper(self, sub_node_getter, mapper, parser)
             }
             "recursiveflatten" => {
                 if args.len() != 1 {
@@ -1025,18 +974,22 @@ impl Evaluator {
                 }
 
                 fn helper(
-                    this: &mut Evaluator,
+                    this: &EvalCtx,
                     results: &mut Vec<Val>,
                     sub_node_getter: AstNodePtr,
                     parser: &Parser,
-                    obj: &Val,
                 ) -> Result<(), Val> {
-                    results.push(obj.clone());
-                    let sub_nodes = this.eval(sub_node_getter, obj, parser);
+                    results.push(this.val.clone());
+                    let sub_nodes = this.eval(sub_node_getter, parser).val;
                     match sub_nodes.get_val() {
                         ValType::List(sub_nodes) => {
                             for sub_node in sub_nodes {
-                                helper(this, results, sub_node_getter, parser, sub_node)?;
+                                helper(
+                                    &this.with_val(sub_node.clone()),
+                                    results,
+                                    sub_node_getter,
+                                    parser,
+                                )?;
                             }
                             Ok(())
                         }
@@ -1049,7 +1002,7 @@ impl Evaluator {
 
                 let sub_node_getter = args[0];
                 let mut results = Vec::<Val>::new();
-                match helper(self, &mut results, sub_node_getter, parser, obj) {
+                match helper(self, &mut results, sub_node_getter, parser) {
                     Ok(_) => {}
                     Err(err) => {
                         return err;
@@ -1059,7 +1012,7 @@ impl Evaluator {
                 Val::new_list(results)
             }
             "call" => {
-                let input = match obj.get_val() {
+                let input = match self.val.get_val() {
                     ValType::Bytes(input) => Some(input.as_slice()),
                     ValType::String(str) => Some(str.as_str().as_bytes()),
                     _ => None,
@@ -1079,7 +1032,7 @@ impl Evaluator {
                             };
                             match keyword {
                                 "cwd" => {
-                                    let cwd_val = self.eval(*val, obj, parser);
+                                    let cwd_val = self.eval(*val, parser).val;
                                     let cwd_val = match cwd_val.get_val() {
                                         ValType::String(cwd_val) => cwd_val,
                                         _ => {
@@ -1094,7 +1047,7 @@ impl Evaluator {
                             }
                         }
                         _ => {
-                            let arg_val = self.eval(*arg, obj, parser);
+                            let arg_val = self.eval(*arg, parser).val;
                             let arg_str = match arg_val.get_val() {
                                 ValType::String(str) => str,
                                 _ => {
@@ -1150,7 +1103,7 @@ impl Evaluator {
 
                 Val::new_bytes(output_buf)
             }
-            "range" => match obj.get_val() {
+            "range" => match self.val.get_val() {
                 ValType::Float64(val) => {
                     let val = *val;
                     if val == val.floor() {
@@ -1174,7 +1127,7 @@ impl Evaluator {
             "zip" => {
                 let arg_vals = args
                     .iter()
-                    .map(|arg| self.eval(*arg, obj, parser))
+                    .map(|arg| self.eval(*arg, parser).val)
                     .collect::<Vec<_>>();
                 let mut arg_lists = Vec::<&Vec<Val>>::with_capacity(args.len());
                 for arg in &arg_vals {
@@ -1204,13 +1157,13 @@ impl Evaluator {
                     return Val::new_err("repeat() has to be called with one argument");
                 }
 
-                let arg_val = self.eval(args[0], obj, parser);
+                let arg_val = self.eval(args[0], parser).val;
                 match arg_val.get_val() {
                     ValType::Float64(val) => {
                         let val = *val;
                         if val == val.floor() && val >= 0.0 {
                             let val = val as usize;
-                            let result = (0..val).map(|_| obj.clone()).collect::<Vec<_>>();
+                            let result = (0..val).map(|_| self.val.clone()).collect::<Vec<_>>();
                             Val::new_list(result)
                         } else {
                             Val::new_err("repeat() must be called with a positive integer")
@@ -1219,13 +1172,13 @@ impl Evaluator {
                     _ => Val::new_err("repeat() must be called with a number"),
                 }
             }
-            "iserr" => match obj.get_val() {
+            "iserr" => match self.val.get_val() {
                 ValType::Err(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "texttable" => match obj.get_val() {
+            "texttable" => match self.val.get_val() {
                 ValType::String(_) => {
-                    let lines = self.eval_fcn(parser, obj, "lines", &Vec::new());
+                    let lines = self.eval_fcn(parser, "lines", &Vec::new());
 
                     let split_lines = match lines.get_val() {
                         ValType::Err(_) => {
@@ -1236,7 +1189,13 @@ impl Evaluator {
                                 return Val::new_err("texttable() has to be called on a string with at least one line.");
                             }
                             val.iter()
-                                .map(|elem| self.eval_fcn(parser, elem, "split", &Vec::new()))
+                                .map(|elem| {
+                                    self.with_val(elem.clone()).eval_fcn(
+                                        parser,
+                                        "split",
+                                        &Vec::new(),
+                                    )
+                                })
                                 .collect::<Vec<_>>()
                         }
                         _ => panic!(),
@@ -1284,8 +1243,8 @@ impl Evaluator {
                     Val::new_list(rows)
                 }
                 ValType::Bytes(_) => {
-                    let text = self.eval_fcn(parser, obj, "str", args);
-                    self.eval_fcn(parser, &text, name, args)
+                    let text = self.eval_fcn(parser, "str", args);
+                    self.with_val(text).eval_fcn(parser, name, args)
                 }
                 _ => Val::new_err("texttable() must be called on a string"),
             },

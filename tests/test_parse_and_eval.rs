@@ -4,17 +4,14 @@ mod tests {
     use serde_json::json;
 
     fn base_parse_and_eval(expr: &str) -> (Vec<u8>, Vec<u8>) {
-        let mut evaluator = Evaluator::new();
-        let result = evaluator.parse_and_eval(expr);
+        let result = EvalCtx::parse_and_eval(expr);
 
         let mut out0 = Vec::<u8>::new();
-        evaluator
-            .write_val(result.clone(), &mut out0, true)
-            .unwrap();
+        EvalCtx::write_val(result.clone(), &mut out0, true).unwrap();
 
         // make sure output is valid json when indent=false
         let mut out1 = Vec::<u8>::new();
-        evaluator.write_val(result, &mut out1, false).unwrap();
+        EvalCtx::write_val(result, &mut out1, false).unwrap();
 
         return (out0, out1);
     }
@@ -563,5 +560,11 @@ mod tests {
                 {"key0": "a", "key1": "b", "key2": "c d"},
             ]),
         )
+    }
+
+    #[test]
+    fn test_assign() {
+        assert_json("100 | let a = 4 | . + a + 7", json!(111));
+        assert_json("let a = 1 | ([] | map(let a = 2) | a)", json!(1))
     }
 }

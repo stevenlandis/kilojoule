@@ -39,6 +39,10 @@ pub enum AstNode<'a> {
     Coalesce(AstNodePtr, AstNodePtr),
     Spread(AstNodePtr),
     KeywordArgument(AstNodePtr, AstNodePtr),
+    LetStmt {
+        identifier: AstNodePtr,
+        expr: AstNodePtr,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -90,10 +94,6 @@ impl<'a> AstNodePool<'a> {
     pub fn new_dot(&mut self) -> AstNodePtr {
         self.new_node(AstNode::Dot)
     }
-
-    // pub fn new_access(&mut self, accessor: AstNodePtr) -> AstNodePtr {
-    //     self.new_node(AstNode::Access(accessor))
-    // }
 
     pub fn new_or(&mut self, left: AstNodePtr, right: AstNodePtr) -> AstNodePtr {
         self.new_node(AstNode::Or(left, right))
