@@ -572,4 +572,13 @@ mod tests {
         assert_json("100 | let a = 4 | . + a + 7", json!(111));
         assert_json("let a = 1 | ([] | map(let a = 2) | a)", json!(1))
     }
+
+    #[test]
+    fn test_flatten() {
+        assert_json(
+            "[[1,2], [3,4,5], [], [6]] | flatten()",
+            json!([1, 2, 3, 4, 5, 6]),
+        );
+        assert_json("[]", json!([]));
+    }
 }

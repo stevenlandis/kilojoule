@@ -1248,6 +1248,26 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("texttable() must be called on a string"),
             },
+            "flatten" => match self.val.get_val() {
+                ValType::List(lists) => {
+                    let mut result = Vec::<Val>::new();
+                    for list in lists {
+                        match list.get_val() {
+                            ValType::List(elems) => {
+                                for elem in elems {
+                                    result.push(elem.clone());
+                                }
+                            }
+                            _ => {
+                                return Val::new_err("flatten() must be called on a list of lists")
+                            }
+                        }
+                    }
+
+                    Val::new_list(result)
+                }
+                _ => Val::new_err("flatten() must be called on a list"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
