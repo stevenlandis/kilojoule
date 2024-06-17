@@ -2,6 +2,7 @@
 pub enum AstNode<'a> {
     Null,
     SubString(&'a str),
+    Identifier(&'a str),
     Integer(u64),
     Bool(bool),
     Pipe(AstNodePtr, AstNodePtr),
@@ -73,10 +74,6 @@ impl<'a> AstNodePool<'a> {
 
     pub fn new_null(&mut self) -> AstNodePtr {
         self.new_node(AstNode::Null)
-    }
-
-    pub fn new_identifier(&mut self, text: &'a str) -> AstNodePtr {
-        self.new_node(AstNode::SubString(text))
     }
 
     pub fn new_integer(&mut self, val: u64) -> AstNodePtr {

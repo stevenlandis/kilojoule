@@ -247,7 +247,7 @@ impl EvalCtx {
                         }
                         AstNode::MapKeyValPair { key, val } => {
                             let key_obj = match parser.get_node(*key) {
-                                AstNode::SubString(key_name) => Val::new_str(key_name),
+                                AstNode::Identifier(key_name) => Val::new_str(key_name),
                                 _ => this.eval(*key, parser).val,
                             };
                             let val_obj = this.eval(*val, parser).val;
@@ -424,7 +424,7 @@ impl EvalCtx {
                         }
 
                         let key_val = match parser.get_node(*accessor) {
-                            AstNode::SubString(key) => Val::new_str(key),
+                            AstNode::Identifier(key) => Val::new_str(key),
                             _ => self.eval(*accessor, parser).val,
                         };
 
@@ -489,7 +489,7 @@ impl EvalCtx {
             AstNode::Bool(val) => self.with_val(Val::new_bool(*val)),
             AstNode::FcnCall { name, args } => {
                 let name = match parser.get_node(*name) {
-                    AstNode::SubString(name) => *name,
+                    AstNode::Identifier(name) => *name,
                     _ => panic!(),
                 };
 
@@ -522,7 +522,7 @@ impl EvalCtx {
             }
             AstNode::LetStmt { identifier, expr } => {
                 let identifier = match parser.get_node(*identifier) {
-                    AstNode::SubString(identifier) => *identifier,
+                    AstNode::Identifier(identifier) => *identifier,
                     _ => panic!(),
                 };
 
@@ -536,7 +536,7 @@ impl EvalCtx {
                     val: self.val.clone(),
                 }
             }
-            AstNode::SubString(identifier) => match self.variables.get(*identifier) {
+            AstNode::Identifier(identifier) => match self.variables.get(*identifier) {
                 None => self.with_val(Val::new_err("undefined variable access")),
                 Some(val) => self.with_val(val.clone()),
             },
@@ -1027,7 +1027,7 @@ impl EvalCtx {
                     match parser.get_node(*arg) {
                         AstNode::KeywordArgument(keyword, val) => {
                             let keyword = match parser.get_node(*keyword) {
-                                AstNode::SubString(keyword) => *keyword,
+                                AstNode::Identifier(keyword) => *keyword,
                                 _ => panic!(),
                             };
                             match keyword {

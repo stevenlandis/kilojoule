@@ -148,6 +148,11 @@ mod tests {
     }
 
     #[test]
+    fn test_variable_in_f_string() {
+        assert_json("let a = 42 | 'a is {a}'", json!("a is 42"))
+    }
+
+    #[test]
     fn test_len() {
         assert_json("[1,2,3] | len()", json!(3));
         assert_json("{a: 1, b: 2, c: 3, d: 4} | len()", json!(4));

@@ -86,7 +86,7 @@ impl<'a> Parser<'a> {
         }
 
         self.idx += idx;
-        Some(self.pool.new_identifier(iden_str))
+        Some(self.pool.new_node(AstNode::Identifier(iden_str)))
     }
 
     fn parse_ws(&mut self) {
@@ -306,12 +306,12 @@ impl<'a> Parser<'a> {
     }
 
     fn get_substring(&mut self, start_offset: usize, end_offset: usize) -> AstNodePtr {
-        self.pool.new_identifier(
+        self.pool.new_node(AstNode::SubString(
             std::str::from_utf8(
                 &self.text.as_bytes()[self.idx + start_offset..self.idx + end_offset],
             )
             .unwrap(),
-        )
+        ))
     }
 
     fn parse_format_string(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
