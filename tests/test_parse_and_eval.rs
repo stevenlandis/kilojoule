@@ -528,22 +528,22 @@ mod tests {
 
     #[test]
     fn test_zip() {
-        assert_json("zip()", json!([]));
-        assert_json("zip([1,2,3])", json!([[1], [2], [3]]));
+        assert_json("[] | zip()", json!([]));
+        assert_json("[[1,2,3]] | zip()", json!([[1], [2], [3]]));
         assert_json(
-            "zip(['a', 'b', 'c'], [1, 2, 3])",
+            "[['a', 'b', 'c'], [1, 2, 3]] | zip()",
             json!([["a", 1], ["b", 2], ["c", 3]]),
         );
         assert_json(
-            "zip(['a', 'b', 'c', 'd'], [1, 2, 3])",
+            "[['a', 'b', 'c', 'd'], [1, 2, 3]] | zip()",
             json!([["a", 1], ["b", 2], ["c", 3]]),
         );
         assert_json(
-            "zip(['a', 'b', 'c'], [1, 2, 3, 4])",
+            "[['a', 'b', 'c'], [1, 2, 3, 4]] | zip()",
             json!([["a", 1], ["b", 2], ["c", 3]]),
         );
         assert_json(
-            "zip(['a', 'b', 'c'], [1, 2, 3], ['x', 'y', 'z'])",
+            "[['a', 'b', 'c'], [1, 2, 3], ['x', 'y', 'z']] | zip()",
             json!([["a", 1, "x"], ["b", 2, "y"], ["c", 3, "z"]]),
         );
     }

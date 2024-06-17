@@ -1125,12 +1125,15 @@ impl EvalCtx {
                 _ => Val::new_err("range() must be called with a number"),
             },
             "zip" => {
-                let arg_vals = args
-                    .iter()
-                    .map(|arg| self.eval(*arg, parser).val)
-                    .collect::<Vec<_>>();
+                if args.len() != 0 {
+                    return Val::new_err("zip() must be called with zero arguments");
+                }
+                let arg_vals = match self.val.get_val() {
+                    ValType::List(vals) => vals,
+                    _ => return Val::new_err("zip() must be called on a list"),
+                };
                 let mut arg_lists = Vec::<&Vec<Val>>::with_capacity(args.len());
-                for arg in &arg_vals {
+                for arg in arg_vals {
                     match arg.get_val() {
                         ValType::List(vals) => {
                             arg_lists.push(vals);
