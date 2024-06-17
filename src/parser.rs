@@ -967,7 +967,7 @@ pub struct ParseError {
 
 impl ParseError {
     pub fn to_string(&self) -> String {
-        format!("Parser error \"{:?}\" at index {}", self.typ, self.idx)
+        format!("Parser error '{:?}' at index {}", self.typ, self.idx)
     }
 }
 
