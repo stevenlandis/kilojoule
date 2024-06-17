@@ -1271,6 +1271,43 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("flatten() must be called on a list"),
             },
+            "fromcsv" => {
+                let mut reader = match self.val.get_val() {
+                    ValType::Bytes(bytes) => csv::Reader::from_reader(bytes.as_slice()),
+                    ValType::String(val) => csv::Reader::from_reader(val.as_bytes()),
+                    _ => return Val::new_err("fromcsv() must be called on string or bytes"),
+                };
+
+                let mut lines = Vec::<Val>::new();
+
+                if reader.has_headers() {
+                    match reader.headers() {
+                        Err(_) => return Val::new_err("fromcsv() is unable to read csv"),
+                        Ok(record) => {
+                            let mut line = Vec::<Val>::new();
+                            for elem in record.iter() {
+                                line.push(Val::new_str(elem));
+                            }
+                            lines.push(Val::new_list(line));
+                        }
+                    }
+                }
+
+                for record in reader.records() {
+                    let mut line = Vec::<Val>::new();
+                    match record {
+                        Err(_) => return Val::new_err("fromcsv() is unable to read csv"),
+                        Ok(record) => {
+                            for elem in record.iter() {
+                                line.push(Val::new_str(elem));
+                            }
+                        }
+                    }
+                    lines.push(Val::new_list(line))
+                }
+
+                Val::new_list(lines)
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
