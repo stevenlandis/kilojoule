@@ -585,4 +585,28 @@ mod tests {
         );
         assert_json("[]", json!([]));
     }
+
+    #[test]
+    fn test_is_type() {
+        assert_json("1/0 | iserr()", json!(true));
+        assert_json("1 | iserr()", json!(false));
+
+        assert_json("1 | isnumber()", json!(true));
+        assert_json("null | isnumber()", json!(false));
+
+        assert_json("false | isbool()", json!(true));
+        assert_json("null | isbool()", json!(false));
+
+        assert_json("'string' | isstring()", json!(true));
+        assert_json("null | isstring()", json!(false));
+
+        assert_json("[] | islist()", json!(true));
+        assert_json("null | islist()", json!(false));
+
+        assert_json("{} | ismap()", json!(true));
+        assert_json("null | ismap()", json!(false));
+
+        assert_json("'' | bytes() | isbytes()", json!(true));
+        assert_json("null | ismap()", json!(false));
+    }
 }

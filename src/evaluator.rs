@@ -1187,6 +1187,30 @@ impl EvalCtx {
                 ValType::Err(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
+            "isnumber" => match self.val.get_val() {
+                ValType::Float64(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
+            "isbool" => match self.val.get_val() {
+                ValType::Bool(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
+            "isstring" => match self.val.get_val() {
+                ValType::String(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
+            "islist" => match self.val.get_val() {
+                ValType::List(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
+            "ismap" => match self.val.get_val() {
+                ValType::Map(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
+            "isbytes" => match self.val.get_val() {
+                ValType::Bytes(_) => Val::new_bool(true),
+                _ => Val::new_bool(false),
+            },
             "texttable" => match self.val.get_val() {
                 ValType::String(_) => {
                     let lines = self.eval_fcn(parser, "lines", &Vec::new());
