@@ -4,14 +4,14 @@ mod tests {
     use serde_json::json;
 
     fn base_parse_and_eval(expr: &str) -> (Vec<u8>, Vec<u8>) {
-        let result = EvalCtx::parse_and_eval(expr);
+        let result = EvalCtx::new().parse_and_eval(expr).val;
 
         let mut out0 = Vec::<u8>::new();
-        EvalCtx::write_val(result.clone(), &mut out0, true).unwrap();
+        EvalCtx::write_val(&result, &mut out0, true).unwrap();
 
         // make sure output is valid json when indent=false
         let mut out1 = Vec::<u8>::new();
-        EvalCtx::write_val(result, &mut out1, false).unwrap();
+        EvalCtx::write_val(&result, &mut out1, false).unwrap();
 
         return (out0, out1);
     }

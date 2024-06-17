@@ -9,26 +9,28 @@ use std::process::{Command, Stdio};
 
 pub struct EvalCtx {
     variables: HashMap<String, Val>,
-    val: Val,
+    pub val: Val,
 }
 
 impl EvalCtx {
-    pub fn parse_and_eval(text: &str) -> Val {
+    pub fn new() -> Self {
+        EvalCtx {
+            variables: HashMap::new(),
+            val: Val::new_null(),
+        }
+    }
+
+    pub fn parse_and_eval(&self, text: &str) -> EvalCtx {
         let mut parser = Parser::new(text);
         match parser.external_parse_expr() {
-            None => Val::new_null(),
+            None => self.with_val(Val::new_null()),
             Some(ast) => match ast {
-                Err(err) => Val::new_err(err.to_string().as_str()),
+                Err(err) => self.with_val(Val::new_err(err.to_string().as_str())),
                 Ok(ast) => {
                     // for (idx, val) in parser.pool.vals.iter().enumerate() {
                     //     println!("{}: {:?}", idx, val);
                     // }
-                    let val = Val::new_null();
-                    let ctx = EvalCtx {
-                        variables: HashMap::new(),
-                        val,
-                    };
-                    ctx.eval(ast, &parser).val
+                    self.eval(ast, &parser)
                 }
             },
         }
@@ -391,7 +393,7 @@ impl EvalCtx {
                                     buffer.extend(sub_text.as_bytes());
                                 }
                                 _ => {
-                                    EvalCtx::write_val(elem_val, buffer, false).unwrap();
+                                    EvalCtx::write_val(&elem_val, buffer, false).unwrap();
                                 }
                             }
                         }
@@ -569,7 +571,7 @@ impl EvalCtx {
     }
 
     pub fn write_val(
-        val: Val,
+        val: &Val,
         writer: &mut impl std::io::Write,
         use_indent: bool,
     ) -> std::io::Result<()> {

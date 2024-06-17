@@ -7,6 +7,6 @@ fn main() {
         return;
     }
     let query = args.nth(1).unwrap();
-    let result = EvalCtx::parse_and_eval(query.as_str());
-    let _ = EvalCtx::write_val(result, &mut std::io::stdout(), true);
+    let result = EvalCtx::new().parse_and_eval(query.as_str()).val;
+    let _ = EvalCtx::write_val(&result, &mut std::io::stdout(), true);
 }
