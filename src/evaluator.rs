@@ -1316,6 +1316,42 @@ impl EvalCtx {
 
                 Val::new_list(lines)
             }
+            "tocsv" => {
+                let mut buffer = Vec::<u8>::new();
+                let mut writer = csv::Writer::from_writer(&mut buffer);
+                match self.val.get_val() {
+                    ValType::List(rows) => {
+                        for row in rows {
+                            let mut record = csv::StringRecord::new();
+                            match row.get_val() {
+                                ValType::List(row) => {
+                                    for elem in row {
+                                        match elem.get_val() {
+                                            ValType::String(val) => record.push_field(val),
+                                            _ => {
+                                                let mut buf = Vec::<u8>::new();
+                                                elem.write_to_str(&mut buf, 0, false).unwrap();
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Val::new_err(
+                                        "tocsv() must be called on a list of lists",
+                                    )
+                                }
+                            }
+
+                            writer.write_record(record.iter()).unwrap();
+                        }
+                    }
+                    _ => return Val::new_err("tocsv() must be called on a list"),
+                }
+
+                drop(writer);
+
+                Val::new_bytes(buffer)
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
