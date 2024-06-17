@@ -257,7 +257,10 @@ impl Val {
     }
 
     pub fn from_json_str(json_str: &str) -> Self {
-        let value: serde_json::Value = serde_json::from_str(json_str).unwrap();
+        let value: serde_json::Value = match serde_json::from_str(json_str) {
+            Ok(value) => value,
+            Err(_) => return Val::new_err("unable to parse JSON"),
+        };
 
         fn helper(node: &serde_json::Value) -> Val {
             match node {
