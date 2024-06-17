@@ -920,13 +920,21 @@ impl EvalCtx {
                                 };
                                 (key, val)
                             }
-                            _ => return Val::new_err("entries() must be called on a list of maps"),
+                            ValType::List(elems) => {
+                                if elems.len() != 2 {
+                                    return Val::new_err("fromitems() lists must have 2 elements");
+                                }
+                                (elems[0].clone(), elems[1].clone())
+                            }
+                            _ => {
+                                return Val::new_err("fromitems() must be called on a list of maps")
+                            }
                         };
                         kv_pairs.push(kv_pair);
                     }
                     Val::new_map(OrderedMap::from_kv_pair_slice(kv_pairs.as_slice()))
                 }
-                _ => Val::new_err("entries() must be called on a map"),
+                _ => Val::new_err("fromitems() must be called on a map"),
             },
             "recursivemap" => {
                 if args.len() != 2 {

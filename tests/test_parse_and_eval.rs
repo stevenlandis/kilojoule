@@ -454,6 +454,10 @@ mod tests {
                 {"a": 1, "b": 2, "c": 3}
             ),
         );
+        assert_json(
+            "[['a', 1], ['b', 2]] | fromitems()",
+            json!({"a": 1, "b": 2}),
+        );
     }
 
     #[test]
