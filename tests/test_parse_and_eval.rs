@@ -325,6 +325,18 @@ mod tests {
     }
 
     #[test]
+    fn test_min() {
+        assert_json("[1,2,3,4] | min()", json!(1));
+        assert_json("[] | min()", json!(null));
+    }
+
+    #[test]
+    fn test_max() {
+        assert_json("[1,2,3,4] | max()", json!(4));
+        assert_json("[] | max()", json!(null));
+    }
+
+    #[test]
     fn test_list_access() {
         assert_json("[1,2,3,4,5] | .[1]", json!(2));
         assert_json("[1,2,3,4,5] | [.[/0], .[/1], .[/4]]", json!([5, 4, 1]));

@@ -744,6 +744,58 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("sum() has to be called on a list"),
             },
+            "min" => match self.val.get_val() {
+                ValType::List(list) => {
+                    let mut has_val = false;
+                    let mut total: f64 = f64::MAX;
+                    for elem in list {
+                        match elem.get_val() {
+                            ValType::Float64(val) => {
+                                total = total.min(*val);
+                                has_val = true;
+                            }
+                            _ => {
+                                return Val::new_err(
+                                    "min() can only be called on a list of numbers",
+                                )
+                            }
+                        }
+                    }
+
+                    if has_val {
+                        Val::new_f64(total)
+                    } else {
+                        Val::new_null()
+                    }
+                }
+                _ => Val::new_err("min() has to be called on a list"),
+            },
+            "max" => match self.val.get_val() {
+                ValType::List(list) => {
+                    let mut has_val = false;
+                    let mut total: f64 = f64::MIN;
+                    for elem in list {
+                        match elem.get_val() {
+                            ValType::Float64(val) => {
+                                total = total.max(*val);
+                                has_val = true;
+                            }
+                            _ => {
+                                return Val::new_err(
+                                    "max() can only be called on a list of numbers",
+                                )
+                            }
+                        }
+                    }
+
+                    if has_val {
+                        Val::new_f64(total)
+                    } else {
+                        Val::new_null()
+                    }
+                }
+                _ => Val::new_err("max() has to be called on a list"),
+            },
             "lines" => match self.val.get_val() {
                 ValType::String(val) => {
                     let mut lines = val
