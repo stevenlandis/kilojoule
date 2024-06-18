@@ -422,6 +422,7 @@ impl<'a> Parser<'a> {
         };
 
         loop {
+            self.parse_ws();
             let accessor = match self.parse_access() {
                 None => {
                     break;

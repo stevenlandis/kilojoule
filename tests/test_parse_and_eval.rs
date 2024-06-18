@@ -56,7 +56,7 @@ mod tests {
 
     #[test]
     fn test_chained_access() {
-        assert_json("{a: {b: {c: 42}}}.a.b.c", json!(42));
+        assert_json("{a: {b: {c: 42}}} . a . b . c", json!(42));
         assert_json("{a: {b: {c: 42}}} | .a.b.c", json!(42));
         assert_json("{a: {b: {c: 42}}}['a']['b']['c']", json!(42));
         assert_json("{a: {b: {c: 42}}} | .['a']['b']['c']", json!(42));
