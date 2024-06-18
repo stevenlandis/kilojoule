@@ -253,6 +253,11 @@ impl<'a> Parser<'a> {
                         return Some(Err(self.get_err(ParseErrorType::NoClosingBracketForMapKey)));
                     }
                     key
+                } else if let Some(f_string) = self.parse_format_string() {
+                    match f_string {
+                        Err(err) => return Some(Err(err)),
+                        Ok(f_string) => f_string,
+                    }
                 } else {
                     match self.parse_identifier(false) {
                         None => {

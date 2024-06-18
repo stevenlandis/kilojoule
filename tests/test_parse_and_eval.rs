@@ -523,6 +523,11 @@ mod tests {
     }
 
     #[test]
+    fn test_map_f_string_key_expression() {
+        assert_json("42 | {'a': 1, 'b{.}': 2}", json!({"a": 1, "b42": 2}));
+    }
+
+    #[test]
     fn test_range() {
         assert_json("0 | range()", json!([]));
         assert_json("1 | range()", json!([0]));
