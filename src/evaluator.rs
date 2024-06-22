@@ -1430,6 +1430,15 @@ impl EvalCtx {
 
                 Val::new_bytes(buffer)
             }
+            "catch" => {
+                if args.len() != 1 {
+                    return Val::new_err("catch() must be called with one argument");
+                }
+                match self.val.get_val() {
+                    ValType::Err(_) => self.eval(args[0], parser).val,
+                    _ => self.val.clone(),
+                }
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

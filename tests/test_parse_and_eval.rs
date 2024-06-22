@@ -626,4 +626,9 @@ mod tests {
         assert_json("'' | bytes() | isbytes()", json!(true));
         assert_json("null | ismap()", json!(false));
     }
+
+    #[test]
+    fn test_catch() {
+        assert_json("[42, 1/0] | map(catch(100))", json!([42, 100]))
+    }
 }
