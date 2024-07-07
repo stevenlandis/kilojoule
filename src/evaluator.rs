@@ -799,6 +799,58 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("max() has to be called on a list"),
             },
+            "any" => {
+                if args.len() != 0 {
+                    return Val::new_err("any() must be called with 0 arguments");
+                }
+
+                match self.val.get_val() {
+                    ValType::List(val) => {
+                        for elem in val {
+                            match elem.get_val() {
+                                ValType::Bool(elem) => {
+                                    if *elem {
+                                        return Val::new_bool(true);
+                                    }
+                                }
+                                _ => {
+                                    return Val::new_err(
+                                        "any() must be called on a list of booleans",
+                                    )
+                                }
+                            }
+                        }
+                        return Val::new_bool(false);
+                    }
+                    _ => return Val::new_err("any() must be called on a list"),
+                }
+            }
+            "all" => {
+                if args.len() != 0 {
+                    return Val::new_err("all() must be called with 0 arguments");
+                }
+
+                match self.val.get_val() {
+                    ValType::List(val) => {
+                        for elem in val {
+                            match elem.get_val() {
+                                ValType::Bool(elem) => {
+                                    if !*elem {
+                                        return Val::new_bool(false);
+                                    }
+                                }
+                                _ => {
+                                    return Val::new_err(
+                                        "all() must be called on a list of booleans",
+                                    )
+                                }
+                            }
+                        }
+                        return Val::new_bool(true);
+                    }
+                    _ => return Val::new_err("all() must be called on a list"),
+                }
+            }
             "lines" => match self.val.get_val() {
                 ValType::String(val) => {
                     let mut lines = val

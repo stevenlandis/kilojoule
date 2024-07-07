@@ -337,6 +337,27 @@ mod tests {
     }
 
     #[test]
+    fn test_any() {
+        assert_json("[] | any()", json!(false));
+        assert_json("[false] | any()", json!(false));
+        assert_json("[false, false] | any()", json!(false));
+        assert_json("[false, true] | any()", json!(true));
+        assert_json("[true, false] | any()", json!(true));
+        assert_json("[true, true] | any()", json!(true));
+    }
+
+    #[test]
+    fn test_all() {
+        assert_json("[] | all()", json!(true));
+        assert_json("[false] | all()", json!(false));
+        assert_json("[true] | all()", json!(true));
+        assert_json("[false, false] | all()", json!(false));
+        assert_json("[false, true] | all()", json!(false));
+        assert_json("[true, false] | all()", json!(false));
+        assert_json("[true, true] | all()", json!(true));
+    }
+
+    #[test]
     fn test_list_access() {
         assert_json("[1,2,3,4,5] | .[1]", json!(2));
         assert_json("[1,2,3,4,5] | [.[/0], .[/1], .[/4]]", json!([5, 4, 1]));
