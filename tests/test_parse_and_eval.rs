@@ -568,10 +568,23 @@ mod tests {
 
     #[test]
     fn test_range() {
-        assert_json("0 | range()", json!([]));
-        assert_json("1 | range()", json!([0]));
-        assert_json("2 | range()", json!([0, 1]));
-        assert_json("(0 - 100) | range()", json!([]));
+        assert_json("range(0)", json!([]));
+        assert_json("range(1)", json!([0]));
+        assert_json("range(2)", json!([0, 1]));
+        assert_json("range(-2)", json!([0, -1]));
+
+        assert_json("range(1, 4)", json!([1, 2, 3]));
+        assert_json("range(4, 1)", json!([4, 3, 2]));
+        assert_json("range(1, 1)", json!([]));
+
+        assert_json("range(:step 3, 1, 10)", json!([1, 4, 7]));
+        assert_json("range(1, :step 3, 10)", json!([1, 4, 7]));
+        assert_json("range(1, 10, :step 3)", json!([1, 4, 7]));
+
+        assert_json("range(-1, -10, :step -3)", json!([-1, -4, -7]));
+
+        assert_json("range(1, 4, :step -1)", json!([]));
+        assert_json("range(4, 1, :step 1)", json!([]));
     }
 
     #[test]

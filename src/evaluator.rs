@@ -44,6 +44,20 @@ impl EvalCtx {
         }
     }
 
+    fn eval_i64(&self, node: &AstNode) -> Option<i64> {
+        let val = self.eval(node).val;
+        match val.get_val() {
+            ValType::Float64(val) => {
+                if *val == val.trunc() {
+                    Some(*val as i64)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn eval_bool_expr(
         &self,
         left: &AstNode,
@@ -533,7 +547,7 @@ impl EvalCtx {
         match idx.get_val() {
             ValType::Float64(num) => {
                 let num = *num;
-                if num == num.floor() && num >= 0.0 {
+                if num == num.trunc() && num >= 0.0 {
                     let num = num as usize;
                     if is_rev {
                         Ok((num, is_rev))
@@ -1206,27 +1220,102 @@ impl EvalCtx {
 
                 Val::new_bytes(output_buf)
             }
-            "range" => match self.val.get_val() {
-                ValType::Float64(val) => {
-                    let val = *val;
-                    if val == val.floor() {
-                        let val = val as i64;
-                        if val > 0 {
-                            let val = val as usize;
-                            let mut result = Vec::<Val>::with_capacity(val);
-                            for idx in 0..val {
-                                result.push(Val::new_f64(idx as f64));
+            "range" => {
+                let mut step: Option<i64> = None;
+                let mut first_idx: Option<i64> = None;
+                let mut second_idx: Option<i64> = None;
+                for arg in args {
+                    match arg.get_type() {
+                        AstNodeType::KeywordArgument(keyword, stmt) => {
+                            let keyword = match keyword.get_type() {
+                                AstNodeType::Identifier(keyword) => keyword,
+                                _ => panic!(),
+                            };
+                            if keyword == "step" {
+                                step =
+                                    match self.eval_i64(stmt) {
+                                        None => return Val::new_err(
+                                            ":step keyword argument in range() must be an integer",
+                                        ),
+                                        Some(step) => Some(step),
+                                    };
+                            } else {
+                                return Val::new_err("Invalid keyword argument in range()");
                             }
-                            Val::new_list(result)
-                        } else {
-                            Val::new_list(Vec::new())
                         }
-                    } else {
-                        Val::new_err("range() must be called with an integer")
+                        _ => {
+                            match first_idx {
+                                None => {
+                                    first_idx = match self.eval_i64(arg) {
+                                        None => {
+                                            return Val::new_err(
+                                                "first argument in range() must be an integer",
+                                            )
+                                        }
+                                        Some(idx) => Some(idx),
+                                    };
+                                }
+                                Some(_) => {
+                                    match second_idx {
+                                        None => {
+                                            second_idx = match self.eval_i64(arg) {
+                                                None => return Val::new_err(
+                                                    "second argument in range() must be an integer",
+                                                ),
+                                                Some(idx) => Some(idx),
+                                            };
+                                        }
+                                        Some(_) => return Val::new_err(
+                                            "range() cannot be called with more than 2 arguments",
+                                        ),
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                _ => Val::new_err("range() must be called with a number"),
-            },
+
+                let (start, end) = match first_idx {
+                    None => {
+                        return Val::new_err("range() must be called with at least one argument")
+                    }
+                    Some(first_idx) => match second_idx {
+                        None => (0, first_idx),
+                        Some(second_idx) => (first_idx, second_idx),
+                    },
+                };
+                let step = match step {
+                    None => {
+                        if start <= end {
+                            1
+                        } else {
+                            -1
+                        }
+                    }
+                    Some(step) => step,
+                };
+
+                if step == 0 {
+                    return Val::new_err(":step keyword argument in range() cannot be zero.");
+                }
+
+                let mut result = Vec::<Val>::new();
+                if step > 0 {
+                    let mut idx = start;
+                    while idx < end {
+                        result.push(Val::new_f64(idx as f64));
+                        idx += step;
+                    }
+                } else {
+                    let mut idx = start;
+                    while idx > end {
+                        result.push(Val::new_f64(idx as f64));
+                        idx += step;
+                    }
+                }
+
+                Val::new_list(result)
+            }
             "zip" => {
                 if args.len() != 0 {
                     return Val::new_err("zip() must be called with zero arguments");
@@ -1267,7 +1356,7 @@ impl EvalCtx {
                 match arg_val.get_val() {
                     ValType::Float64(val) => {
                         let val = *val;
-                        if val == val.floor() && val >= 0.0 {
+                        if val == val.trunc() && val >= 0.0 {
                             let val = val as usize;
                             let result = (0..val).map(|_| self.val.clone()).collect::<Vec<_>>();
                             Val::new_list(result)
