@@ -864,7 +864,7 @@ impl EvalCtx {
                     Val::new_list(lines)
                 }
                 ValType::Bytes(_) => {
-                    let text = self.eval_fcn("str", args);
+                    let text = self.eval_fcn("str", &vec![]);
                     self.with_val(text).eval_fcn(name, args)
                 }
                 _ => Val::new_err("lines() must be called on a string or bytes"),
