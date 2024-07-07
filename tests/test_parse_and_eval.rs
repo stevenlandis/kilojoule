@@ -643,4 +643,17 @@ mod tests {
         assert_json("{a: 1} | has('a')", json!(true));
         assert_json("{a: 1} | has('b')", json!(false));
     }
+
+    #[test]
+    fn test_map_keys() {
+        assert_json(
+            "{a: 1, b: 2} | map_keys('key_{.}')",
+            json!({"key_a": 1, "key_b": 2}),
+        );
+    }
+
+    #[test]
+    fn test_map_values() {
+        assert_json("{a: 1, b: 2} | map_values(.*10)", json!({"a": 10, "b": 20}));
+    }
 }

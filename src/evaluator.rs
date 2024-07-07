@@ -609,6 +609,9 @@ impl EvalCtx {
                         }
                         Val::new_list(result)
                     }
+                    ValType::Map(_) => Val::new_err(
+                        "map() must be called on a list. Consider using map_keys() or map_values()",
+                    ),
                     _ => Val::new_err("map() must be called on a list"),
                 }
             }
@@ -1465,6 +1468,42 @@ impl EvalCtx {
                         Val::new_bool(val.has(&key))
                     }
                     _ => return Val::new_err("has() must be called on a map"),
+                }
+            }
+            "map_keys" => {
+                if args.len() != 1 {
+                    return Val::new_err("map_keys() must be called with 1 argument");
+                }
+
+                match self.val.get_val() {
+                    ValType::Map(val) => {
+                        let mut result = OrderedMap::new();
+                        for (key, val) in val.get_kv_pair_slice() {
+                            let new_key = self.with_val(key.clone()).eval(args[0], parser).val;
+                            result.insert(&new_key, val);
+                        }
+
+                        Val::new_map(result)
+                    }
+                    _ => return Val::new_err("map_keys() must be called on a map"),
+                }
+            }
+            "map_values" => {
+                if args.len() != 1 {
+                    return Val::new_err("map_values() must be called with 1 argument");
+                }
+
+                match self.val.get_val() {
+                    ValType::Map(val) => {
+                        let mut result = OrderedMap::new();
+                        for (key, val) in val.get_kv_pair_slice() {
+                            let new_val = self.with_val(val.clone()).eval(args[0], parser).val;
+                            result.insert(key, &new_val);
+                        }
+
+                        Val::new_map(result)
+                    }
+                    _ => return Val::new_err("map_values() must be called on a map"),
                 }
             }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
