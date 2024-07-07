@@ -132,7 +132,7 @@ Pipes are the only way to avoid having to add characters to the left of the expr
 > kj 'call("ls") | lines()'
 
 # Or pass a kj string into another command
-> kj 'call("ls") | lines() | filter(len() > 5) | joinlines() | call("wc", "-l")'
+> kj 'call("ls") | lines() | filter(len() > 5) | join_lines() | call("wc", "-l")'
 "5\n"
 ```
 

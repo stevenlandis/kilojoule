@@ -821,7 +821,7 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("lines() must be called on a string or bytes"),
             },
-            "joinlines" => match self.val.get_val() {
+            "join_lines" => match self.val.get_val() {
                 ValType::List(list) => {
                     let mut result = String::new();
                     for elem in list {
@@ -832,14 +832,14 @@ impl EvalCtx {
                             }
                             _ => {
                                 return Val::new_err(
-                                    "joinlines() must be called on a list of strings",
+                                    "join_lines() must be called on a list of strings",
                                 )
                             }
                         }
                     }
                     Val::new_str(result.as_str())
                 }
-                _ => Val::new_err("joinlines() must be called on a list"),
+                _ => Val::new_err("join_lines() must be called on a list"),
             },
             "split" => match self.val.get_val() {
                 ValType::String(text) => {
@@ -930,13 +930,13 @@ impl EvalCtx {
                     .collect::<Vec<_>>();
                 Val::new_map(OrderedMap::from_kv_pair_slice(kv_pairs.as_slice()))
             }
-            "fromjson" => match self.val.get_val() {
+            "from_json" => match self.val.get_val() {
                 ValType::String(val) => Val::from_json_str(val.as_str()),
                 ValType::Bytes(_) => {
                     let text = self.eval_fcn(parser, "str", args);
                     self.with_val(text).eval_fcn(parser, name, args)
                 }
-                _ => Val::new_err("fromjson() must be called on a string"),
+                _ => Val::new_err("from_json() must be called on a string"),
             },
             "keys" => match self.val.get_val() {
                 ValType::Map(map) => {
@@ -959,7 +959,7 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("entries() must be called on a map"),
             },
-            "fromitems" => match self.val.get_val() {
+            "from_items" => match self.val.get_val() {
                 ValType::List(val) => {
                     let key_name = Val::new_str("key");
                     let val_name = Val::new_str("val");
@@ -979,23 +979,25 @@ impl EvalCtx {
                             }
                             ValType::List(elems) => {
                                 if elems.len() != 2 {
-                                    return Val::new_err("fromitems() lists must have 2 elements");
+                                    return Val::new_err("from_items() lists must have 2 elements");
                                 }
                                 (elems[0].clone(), elems[1].clone())
                             }
                             _ => {
-                                return Val::new_err("fromitems() must be called on a list of maps")
+                                return Val::new_err(
+                                    "from_items() must be called on a list of maps",
+                                )
                             }
                         };
                         kv_pairs.push(kv_pair);
                     }
                     Val::new_map(OrderedMap::from_kv_pair_slice(kv_pairs.as_slice()))
                 }
-                _ => Val::new_err("fromitems() must be called on a map"),
+                _ => Val::new_err("from_items() must be called on a map"),
             },
-            "recursivemap" => {
+            "recursive_map" => {
                 if args.len() != 2 {
-                    return Val::new_err("recursivemap() must be called with 2 arguments.");
+                    return Val::new_err("recursive_map() must be called with 2 arguments.");
                 }
 
                 let sub_node_getter = args[0];
@@ -1027,15 +1029,15 @@ impl EvalCtx {
                             this.with_val(new_node).eval(mapper, parser).val
                         }
                         ValType::Err(_) => sub_nodes,
-                        _ => Val::new_err("mapper function in recursivemap() must return a list"),
+                        _ => Val::new_err("mapper function in recursive_map() must return a list"),
                     }
                 }
 
                 helper(self, sub_node_getter, mapper, parser)
             }
-            "recursiveflatten" => {
+            "recursive_flatten" => {
                 if args.len() != 1 {
-                    return Val::new_err("recursiveflatten must be called with 1 argument.");
+                    return Val::new_err("recursive_flatten must be called with 1 argument.");
                 }
 
                 fn helper(
@@ -1060,7 +1062,7 @@ impl EvalCtx {
                         }
                         ValType::Err(_) => Err(sub_nodes),
                         _ => Err(Val::new_err(
-                            "mapper function in recursiveflatten() must return a list",
+                            "mapper function in recursive_flatten() must return a list",
                         )),
                     }
                 }
@@ -1240,35 +1242,35 @@ impl EvalCtx {
                     _ => Val::new_err("repeat() must be called with a number"),
                 }
             }
-            "iserr" => match self.val.get_val() {
+            "is_err" => match self.val.get_val() {
                 ValType::Err(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "isnumber" => match self.val.get_val() {
+            "is_number" => match self.val.get_val() {
                 ValType::Float64(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "isbool" => match self.val.get_val() {
+            "is_bool" => match self.val.get_val() {
                 ValType::Bool(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "isstring" => match self.val.get_val() {
+            "is_string" => match self.val.get_val() {
                 ValType::String(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "islist" => match self.val.get_val() {
+            "is_list" => match self.val.get_val() {
                 ValType::List(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "ismap" => match self.val.get_val() {
+            "is_map" => match self.val.get_val() {
                 ValType::Map(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "isbytes" => match self.val.get_val() {
+            "is_bytes" => match self.val.get_val() {
                 ValType::Bytes(_) => Val::new_bool(true),
                 _ => Val::new_bool(false),
             },
-            "texttable" => match self.val.get_val() {
+            "from_text_table" => match self.val.get_val() {
                 ValType::String(_) => {
                     let lines = self.eval_fcn(parser, "lines", &Vec::new());
 
@@ -1278,7 +1280,7 @@ impl EvalCtx {
                         }
                         ValType::List(val) => {
                             if val.len() == 0 {
-                                return Val::new_err("texttable() has to be called on a string with at least one line.");
+                                return Val::new_err("from_text_table() has to be called on a string with at least one line.");
                             }
                             val.iter()
                                 .map(|elem| {
@@ -1338,7 +1340,7 @@ impl EvalCtx {
                     let text = self.eval_fcn(parser, "str", args);
                     self.with_val(text).eval_fcn(parser, name, args)
                 }
-                _ => Val::new_err("texttable() must be called on a string"),
+                _ => Val::new_err("from_text_table() must be called on a string"),
             },
             "flatten" => match self.val.get_val() {
                 ValType::List(lists) => {
@@ -1360,18 +1362,18 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("flatten() must be called on a list"),
             },
-            "fromcsv" => {
+            "from_csv" => {
                 let mut reader = match self.val.get_val() {
                     ValType::Bytes(bytes) => csv::Reader::from_reader(bytes.as_slice()),
                     ValType::String(val) => csv::Reader::from_reader(val.as_bytes()),
-                    _ => return Val::new_err("fromcsv() must be called on string or bytes"),
+                    _ => return Val::new_err("from_csv() must be called on string or bytes"),
                 };
 
                 let mut lines = Vec::<Val>::new();
 
                 if reader.has_headers() {
                     match reader.headers() {
-                        Err(_) => return Val::new_err("fromcsv() is unable to read csv"),
+                        Err(_) => return Val::new_err("from_csv() is unable to read csv"),
                         Ok(record) => {
                             let mut line = Vec::<Val>::new();
                             for elem in record.iter() {
@@ -1385,7 +1387,7 @@ impl EvalCtx {
                 for record in reader.records() {
                     let mut line = Vec::<Val>::new();
                     match record {
-                        Err(_) => return Val::new_err("fromcsv() is unable to read csv"),
+                        Err(_) => return Val::new_err("from_csv() is unable to read csv"),
                         Ok(record) => {
                             for elem in record.iter() {
                                 line.push(Val::new_str(elem));
@@ -1397,7 +1399,7 @@ impl EvalCtx {
 
                 Val::new_list(lines)
             }
-            "tocsv" => {
+            "to_csv" => {
                 let mut buffer = Vec::<u8>::new();
                 let mut writer = csv::Writer::from_writer(&mut buffer);
                 match self.val.get_val() {
@@ -1418,7 +1420,7 @@ impl EvalCtx {
                                 }
                                 _ => {
                                     return Val::new_err(
-                                        "tocsv() must be called on a list of lists",
+                                        "to_csv() must be called on a list of lists",
                                     )
                                 }
                             }
@@ -1426,7 +1428,7 @@ impl EvalCtx {
                             writer.write_record(record.iter()).unwrap();
                         }
                     }
-                    _ => return Val::new_err("tocsv() must be called on a list"),
+                    _ => return Val::new_err("to_csv() must be called on a list"),
                 }
 
                 drop(writer);

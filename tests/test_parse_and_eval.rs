@@ -461,13 +461,13 @@ mod tests {
             ]),
         );
         assert_json(
-            "{a: 1, b: 2, c: 3} | items() | fromitems()",
+            "{a: 1, b: 2, c: 3} | items() | from_items()",
             json!(
                 {"a": 1, "b": 2, "c": 3}
             ),
         );
         assert_json(
-            "[['a', 1], ['b', 2]] | fromitems()",
+            "[['a', 1], ['b', 2]] | from_items()",
             json!({"a": 1, "b": 2}),
         );
     }
@@ -489,7 +489,7 @@ mod tests {
         }"#;
 
         assert_json(
-            format!("{} | recursivemap(.children, {{name2: .node.name, count: .vals | len(), children2: .vals}})", mock_recursive_obj).as_str(),
+            format!("{} | recursive_map(.children, {{name2: .node.name, count: .vals | len(), children2: .vals}})", mock_recursive_obj).as_str(),
         json!({
             "name2": "a",
             "count": 2,
@@ -508,7 +508,7 @@ mod tests {
 
         assert_json(
             format!(
-                "{} | recursiveflatten(.children) | map(.name)",
+                "{} | recursive_flatten(.children) | map(.name)",
                 mock_recursive_obj
             )
             .as_str(),
@@ -577,9 +577,9 @@ mod tests {
     }
 
     #[test]
-    fn test_texttable() {
+    fn test_from_text_table() {
         assert_json(
-            "'key0 key1  key2\na b c\na\na b c d' | texttable()",
+            "'key0 key1  key2\na b c\na\na b c d' | from_text_table()",
             json!([
                 {"key0": "a", "key1": "b", "key2": "c"},
                 {"key0": "a", "key1": null, "key2": null},
@@ -605,26 +605,26 @@ mod tests {
 
     #[test]
     fn test_is_type() {
-        assert_json("1/0 | iserr()", json!(true));
-        assert_json("1 | iserr()", json!(false));
+        assert_json("1/0 | is_err()", json!(true));
+        assert_json("1 | is_err()", json!(false));
 
-        assert_json("1 | isnumber()", json!(true));
-        assert_json("null | isnumber()", json!(false));
+        assert_json("1 | is_number()", json!(true));
+        assert_json("null | is_number()", json!(false));
 
-        assert_json("false | isbool()", json!(true));
-        assert_json("null | isbool()", json!(false));
+        assert_json("false | is_bool()", json!(true));
+        assert_json("null | is_bool()", json!(false));
 
-        assert_json("'string' | isstring()", json!(true));
-        assert_json("null | isstring()", json!(false));
+        assert_json("'string' | is_string()", json!(true));
+        assert_json("null | is_string()", json!(false));
 
-        assert_json("[] | islist()", json!(true));
-        assert_json("null | islist()", json!(false));
+        assert_json("[] | is_list()", json!(true));
+        assert_json("null | is_list()", json!(false));
 
-        assert_json("{} | ismap()", json!(true));
-        assert_json("null | ismap()", json!(false));
+        assert_json("{} | is_map()", json!(true));
+        assert_json("null | is_map()", json!(false));
 
-        assert_json("'' | bytes() | isbytes()", json!(true));
-        assert_json("null | ismap()", json!(false));
+        assert_json("'' | bytes() | is_bytes()", json!(true));
+        assert_json("null | is_map()", json!(false));
     }
 
     #[test]
