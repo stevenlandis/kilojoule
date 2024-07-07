@@ -782,8 +782,15 @@ impl EvalCtx {
                 _ => Val::new_err("max() has to be called on a list"),
             },
             "any" => {
-                if args.len() != 0 {
-                    return Val::new_err("any() must be called with 0 arguments");
+                if args.len() != 0 && args.len() != 1 {
+                    return Val::new_err("any() must be called with 0 or 1 arguments");
+                }
+
+                if args.len() == 1 {
+                    return self
+                        .eval(&AstNode::new_fcn_call("map", &[&args[0]]))
+                        .eval(&AstNode::new_fcn_call("any", &[]))
+                        .val;
                 }
 
                 match self.val.get_val() {
@@ -808,8 +815,15 @@ impl EvalCtx {
                 }
             }
             "all" => {
-                if args.len() != 0 {
-                    return Val::new_err("all() must be called with 0 arguments");
+                if args.len() != 0 && args.len() != 1 {
+                    return Val::new_err("all() must be called with 0 or 1 arguments");
+                }
+
+                if args.len() == 1 {
+                    return self
+                        .eval(&AstNode::new_fcn_call("map", &[&args[0]]))
+                        .eval(&AstNode::new_fcn_call("all", &[]))
+                        .val;
                 }
 
                 match self.val.get_val() {

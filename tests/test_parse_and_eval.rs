@@ -344,6 +344,9 @@ mod tests {
         assert_json("[false, true] | any()", json!(true));
         assert_json("[true, false] | any()", json!(true));
         assert_json("[true, true] | any()", json!(true));
+
+        assert_json("[1,2,3] | any(. == 2)", json!(true));
+        assert_json("[1,2,3] | any(. == 42)", json!(false));
     }
 
     #[test]
@@ -355,6 +358,9 @@ mod tests {
         assert_json("[false, true] | all()", json!(false));
         assert_json("[true, false] | all()", json!(false));
         assert_json("[true, true] | all()", json!(true));
+
+        assert_json("[1,2,3] | all(. < 4)", json!(true));
+        assert_json("[1,2,3] | all(. < 3)", json!(false));
     }
 
     #[test]
