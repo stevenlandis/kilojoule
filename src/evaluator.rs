@@ -240,6 +240,7 @@ impl EvalCtx {
                 self.with_val(Val::new_f64(-val))
             }
             AstNodeType::Integer(val) => self.with_val(Val::new_f64(*val as f64)),
+            AstNodeType::Float64(val) => self.with_val(Val::new_f64(*val)),
             AstNodeType::MapLiteral(contents) => {
                 let mut map = OrderedMap::new();
                 fn helper(this: &EvalCtx, map: &mut OrderedMap, node: &AstNode) -> Result<(), Val> {

@@ -21,6 +21,7 @@ pub enum AstNodeType {
     SubString(String),
     Identifier(String),
     Integer(u64),
+    Float64(f64),
     Bool(bool),
     Pipe(AstNode, AstNode),
     Dot,

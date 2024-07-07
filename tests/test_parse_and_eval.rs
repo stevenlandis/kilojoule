@@ -71,6 +71,12 @@ mod tests {
     }
 
     #[test]
+    fn test_number_literals() {
+        assert_json("1", json!(1));
+        assert_json("1.5", json!(1.5));
+    }
+
+    #[test]
     fn string_literals() {
         assert_json(r#" '' "#, json!(""));
         assert_json(r#" 'string' "#, json!("string"));

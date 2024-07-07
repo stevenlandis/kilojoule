@@ -49,14 +49,14 @@ impl<'a> Parser<'a> {
         };
 
         let mut idx: usize = 1;
-        'outer: loop {
+        loop {
             match self.peek(idx) {
                 None => {
-                    break 'outer;
+                    break;
                 }
                 Some(cn) => {
                     if !Parser::is_alpha_underscore_numeric(cn) {
-                        break 'outer;
+                        break;
                     }
                 }
             };
@@ -81,14 +81,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_ws(&mut self) {
-        'outer: loop {
+        loop {
             match self.peek(0) {
                 None => {
-                    break 'outer;
+                    break;
                 }
                 Some(ch) => {
                     if !Parser::is_whitespace(ch) {
-                        break 'outer;
+                        break;
                     }
                 }
             }
@@ -111,20 +111,20 @@ impl<'a> Parser<'a> {
         true
     }
 
-    fn parse_integer(&mut self) -> Option<AstNode> {
+    fn parse_integer(&mut self) -> Option<u64> {
         let mut idx = 0 as usize;
         let mut val = 0 as u64;
-        'outer: loop {
+        loop {
             match self.peek(idx) {
                 None => {
-                    break 'outer;
+                    break;
                 }
                 Some(ch) => {
                     if Parser::is_numeric(ch) {
                         val *= 10;
                         val += (ch - ('0' as u8)) as u64;
                     } else {
-                        break 'outer;
+                        break;
                     }
                 }
             }
@@ -136,7 +136,34 @@ impl<'a> Parser<'a> {
         }
         self.idx += idx;
 
-        Some(AstNode::new(AstNodeType::Integer(val)))
+        Some(val)
+    }
+
+    fn parse_number(&mut self) -> Option<Result<AstNode, ParseError>> {
+        let int_part = match self.parse_integer() {
+            None => return None,
+            Some(integer_part) => integer_part,
+        };
+
+        self.parse_ws();
+        if self.parse_str_literal(".") {
+            self.parse_ws();
+
+            match self.parse_integer() {
+                None => Some(Err(
+                    self.get_err(ParseErrorType::MissingFractionPartInFloatLiteral)
+                )),
+                Some(fraction_part) => {
+                    let serialized_number = format!("{}.{}", int_part, fraction_part);
+
+                    let float = serialized_number.parse::<f64>().unwrap();
+
+                    Some(Ok(AstNode::new(AstNodeType::Float64(float))))
+                }
+            }
+        } else {
+            Some(Ok(AstNode::new(AstNodeType::Integer(int_part))))
+        }
     }
 
     fn get_err(&self, typ: ParseErrorType) -> ParseError {
@@ -476,9 +503,16 @@ impl<'a> Parser<'a> {
             return Some(result);
         }
 
-        if let Some(expr) = self.parse_integer() {
-            return Some(Ok(expr));
+        match self.parse_number() {
+            None => {}
+            Some(expr) => match expr {
+                Err(err) => return Some(Err(err)),
+                Ok(expr) => return Some(Ok(expr)),
+            },
         }
+        // if let Some(expr) = self.parse_number() {
+        //     return Some(Ok(expr));
+        // }
         if self.parse_str_literal("null") {
             return Some(Ok(AstNode::new(AstNodeType::Null)));
         }
@@ -1001,4 +1035,5 @@ enum ParseErrorType {
     NoIdentifierInLetStmt,
     NoEqualsInLetStmt,
     NoExprInLetStmt,
+    MissingFractionPartInFloatLiteral,
 }
