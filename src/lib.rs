@@ -1,4 +1,4 @@
-mod ast_node_pool;
+mod ast_node;
 mod evaluator;
 mod parser;
 mod run_repl;

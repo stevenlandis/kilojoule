@@ -1,22 +1,13 @@
-use super::ast_node_pool::{AstNode, AstNodePool, AstNodePtr};
+use super::ast_node::{AstNode, AstNodeType};
 
 pub struct Parser<'a> {
     text: &'a str,
-    pub pool: AstNodePool<'a>,
     idx: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(text: &'a str) -> Self {
-        Parser {
-            text,
-            pool: AstNodePool::new(),
-            idx: 0,
-        }
-    }
-
-    pub fn get_node(&self, node: AstNodePtr) -> &AstNode {
-        self.pool.get(node)
+        Parser { text, idx: 0 }
     }
 
     fn peek(&self, n: usize) -> Option<u8> {
@@ -43,7 +34,7 @@ impl<'a> Parser<'a> {
         val == (' ' as u8) || val == ('\n' as u8) || val == ('\t' as u8) || val == ('\r' as u8)
     }
 
-    fn parse_identifier(&mut self, exclude_keywords: bool) -> Option<AstNodePtr> {
+    fn parse_identifier(&mut self, exclude_keywords: bool) -> Option<AstNode> {
         match self.peek(0) {
             None => {
                 return None;
@@ -86,7 +77,7 @@ impl<'a> Parser<'a> {
         }
 
         self.idx += idx;
-        Some(self.pool.new_node(AstNode::Identifier(iden_str)))
+        Some(AstNode::new(AstNodeType::Identifier(iden_str.to_string())))
     }
 
     fn parse_ws(&mut self) {
@@ -120,7 +111,7 @@ impl<'a> Parser<'a> {
         true
     }
 
-    fn parse_integer(&mut self) -> Option<AstNodePtr> {
+    fn parse_integer(&mut self) -> Option<AstNode> {
         let mut idx = 0 as usize;
         let mut val = 0 as u64;
         'outer: loop {
@@ -145,19 +136,19 @@ impl<'a> Parser<'a> {
         }
         self.idx += idx;
 
-        Some(self.pool.new_integer(val))
+        Some(AstNode::new(AstNodeType::Integer(val)))
     }
 
     fn get_err(&self, typ: ParseErrorType) -> ParseError {
         ParseError { idx: self.idx, typ }
     }
 
-    fn parse_list_literal(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_list_literal(&mut self) -> Option<Result<AstNode, ParseError>> {
         if !self.parse_str_literal("[") {
             return None;
         }
 
-        let mut parts: Option<AstNodePtr> = None;
+        let mut parts: Option<AstNode> = None;
 
         loop {
             self.parse_ws();
@@ -181,14 +172,14 @@ impl<'a> Parser<'a> {
                 },
             };
             if is_spread {
-                elem = self.pool.new_node(AstNode::Spread(elem));
+                elem = AstNode::new(AstNodeType::Spread(elem));
             }
             match parts {
                 None => {
                     parts = Some(elem);
                 }
                 Some(prev_val) => {
-                    parts = Some(self.pool.new_list_node(prev_val, elem));
+                    parts = Some(AstNode::new(AstNodeType::ListNode(prev_val, elem)));
                 }
             }
 
@@ -203,15 +194,15 @@ impl<'a> Parser<'a> {
             return Some(Err(self.get_err(ParseErrorType::NoListLiteralEndingBracket)));
         }
 
-        Some(Ok(self.pool.new_list_literal(parts)))
+        Some(Ok(AstNode::new(AstNodeType::ListLiteral(parts))))
     }
 
-    fn parse_map_literal(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_map_literal(&mut self) -> Option<Result<AstNode, ParseError>> {
         if !self.parse_str_literal("{") {
             return None;
         }
 
-        let mut parts: Option<AstNodePtr> = None;
+        let mut parts: Option<AstNode> = None;
 
         loop {
             self.parse_ws();
@@ -229,13 +220,13 @@ impl<'a> Parser<'a> {
                         Ok(expr) => expr,
                     },
                 };
-                let new_part = self.pool.new_node(AstNode::Spread(expr));
+                let new_part = AstNode::new(AstNodeType::Spread(expr));
                 match parts {
                     None => {
                         parts = Some(new_part);
                     }
                     Some(prev_val) => {
-                        parts = Some(self.pool.new_list_node(prev_val, new_part));
+                        parts = Some(AstNode::new(AstNodeType::ListNode(prev_val, new_part)));
                     }
                 }
             } else {
@@ -285,13 +276,13 @@ impl<'a> Parser<'a> {
                     },
                 };
 
-                let kv_pair = self.pool.new_map_kv_pair(key, val);
+                let kv_pair = AstNode::new(AstNodeType::MapKeyValPair { key, val });
                 match parts {
                     None => {
                         parts = Some(kv_pair);
                     }
                     Some(prev_val) => {
-                        parts = Some(self.pool.new_list_node(prev_val, kv_pair));
+                        parts = Some(AstNode::new(AstNodeType::ListNode(prev_val, kv_pair)));
                     }
                 }
             }
@@ -307,19 +298,20 @@ impl<'a> Parser<'a> {
             return Some(Err(self.get_err(ParseErrorType::NoMapLiteralEndingBrace)));
         }
 
-        Some(Ok(self.pool.new_map_literal(parts)))
+        Some(Ok(AstNode::new(AstNodeType::MapLiteral(parts))))
     }
 
-    fn get_substring(&mut self, start_offset: usize, end_offset: usize) -> AstNodePtr {
-        self.pool.new_node(AstNode::SubString(
+    fn get_substring(&mut self, start_offset: usize, end_offset: usize) -> AstNode {
+        AstNode::new(AstNodeType::SubString(
             std::str::from_utf8(
                 &self.text.as_bytes()[self.idx + start_offset..self.idx + end_offset],
             )
-            .unwrap(),
+            .unwrap()
+            .to_string(),
         ))
     }
 
-    fn parse_format_string(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_format_string(&mut self) -> Option<Result<AstNode, ParseError>> {
         if let Some(result) = self.inner_parse_format_string('\'' as u8) {
             return Some(result);
         }
@@ -331,16 +323,13 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn inner_parse_format_string(
-        &mut self,
-        quote_char: u8,
-    ) -> Option<Result<AstNodePtr, ParseError>> {
+    fn inner_parse_format_string(&mut self, quote_char: u8) -> Option<Result<AstNode, ParseError>> {
         if self.peek(0) != Some(quote_char) {
             return None;
         }
         self.idx += 1;
 
-        let mut parts: Option<AstNodePtr> = None;
+        let mut parts: Option<AstNode> = None;
 
         let mut idx = 0 as usize;
         loop {
@@ -356,7 +345,7 @@ impl<'a> Parser<'a> {
                                 parts = Some(part);
                             }
                             Some(prev) => {
-                                parts = Some(self.pool.new_list_node(prev, part));
+                                parts = Some(AstNode::new(AstNodeType::ListNode(prev, part)));
                             }
                         }
 
@@ -384,7 +373,7 @@ impl<'a> Parser<'a> {
                                     parts = Some(part);
                                 }
                                 Some(prev) => {
-                                    parts = Some(self.pool.new_list_node(prev, part));
+                                    parts = Some(AstNode::new(AstNodeType::ListNode(prev, part)));
                                 }
                             }
 
@@ -407,10 +396,10 @@ impl<'a> Parser<'a> {
 
         self.idx += idx + 1;
 
-        Some(Ok(self.pool.new_format_string(parts)))
+        Some(Ok(AstNode::new(AstNodeType::FormatString(parts))))
     }
 
-    fn parse_base_expr_with_accesses(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_base_expr_with_accesses(&mut self) -> Option<Result<AstNode, ParseError>> {
         let mut expr = match self.parse_base_expr() {
             None => return None,
             Some(expr) => match expr {
@@ -434,13 +423,13 @@ impl<'a> Parser<'a> {
                     Ok(expr) => expr,
                 },
             };
-            expr = self.pool.new_node(AstNode::AccessChain(expr, accessor));
+            expr = AstNode::new(AstNodeType::AccessChain(expr, accessor));
         }
 
         Some(Ok(expr))
     }
 
-    fn parse_base_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_base_expr(&mut self) -> Option<Result<AstNode, ParseError>> {
         match self.parse_let_expr() {
             None => {}
             Some(expr) => match expr {
@@ -450,10 +439,10 @@ impl<'a> Parser<'a> {
         }
 
         if self.parse_str_literal(".") {
-            let mut expr = self.pool.new_dot();
+            let mut expr = AstNode::new(AstNodeType::Dot);
             self.parse_ws();
             if let Some(iden) = self.parse_identifier(true) {
-                expr = self.pool.new_node(AstNode::AccessChain(expr, iden));
+                expr = AstNode::new(AstNodeType::AccessChain(expr, iden));
             }
             return Some(Ok(expr));
         }
@@ -491,20 +480,20 @@ impl<'a> Parser<'a> {
             return Some(Ok(expr));
         }
         if self.parse_str_literal("null") {
-            return Some(Ok(self.pool.new_null()));
+            return Some(Ok(AstNode::new(AstNodeType::Null)));
         }
         if self.parse_str_literal("true") {
-            return Some(Ok(self.pool.new_bool(true)));
+            return Some(Ok(AstNode::new(AstNodeType::Bool(true))));
         }
         if self.parse_str_literal("false") {
-            return Some(Ok(self.pool.new_bool(false)));
+            return Some(Ok(AstNode::new(AstNodeType::Bool(false))));
         }
         if let Some(expr) = self.parse_identifier(true) {
             self.parse_ws();
             if self.parse_str_literal("(") {
                 // This is a function call
                 self.parse_ws();
-                let mut args_node: Option<AstNodePtr> = None;
+                let mut args_node: Option<AstNode> = None;
                 loop {
                     let keyword = if self.parse_str_literal(":") {
                         self.parse_ws();
@@ -539,12 +528,14 @@ impl<'a> Parser<'a> {
                                 let expr = match keyword {
                                     None => expr,
                                     Some(keyword) => {
-                                        self.pool.new_node(AstNode::KeywordArgument(keyword, expr))
+                                        AstNode::new(AstNodeType::KeywordArgument(keyword, expr))
                                     }
                                 };
                                 args_node = Some(match args_node {
                                     None => expr,
-                                    Some(args_node) => self.pool.new_list_node(args_node, expr),
+                                    Some(args_node) => {
+                                        AstNode::new(AstNodeType::ListNode(args_node, expr))
+                                    }
                                 })
                             }
                         },
@@ -558,7 +549,10 @@ impl<'a> Parser<'a> {
                 }
 
                 if self.parse_str_literal(")") {
-                    return Some(Ok(self.pool.new_fcn_call(expr, args_node)));
+                    return Some(Ok(AstNode::new(AstNodeType::FcnCall {
+                        name: expr,
+                        args: args_node,
+                    })));
                 } else {
                     return Some(Err(self.get_err(ParseErrorType::NoClosingParenFcnCall)));
                 }
@@ -591,14 +585,14 @@ impl<'a> Parser<'a> {
         return true;
     }
 
-    fn parse_access_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_access_expr(&mut self) -> Option<Result<AstNode, ParseError>> {
         if self.parse_str_literal("/") {
             self.parse_ws();
             match self.parse_expr() {
                 None => Some(Err(self.get_err(ParseErrorType::NoExprReverseIndex))),
                 Some(expr) => match expr {
                     Err(err) => Some(Err(err)),
-                    Ok(expr) => Some(Ok(self.pool.new_node(AstNode::ReverseIdx(expr)))),
+                    Ok(expr) => Some(Ok(AstNode::new(AstNodeType::ReverseIdx(expr)))),
                 },
             }
         } else {
@@ -606,7 +600,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_access(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_access(&mut self) -> Option<Result<AstNode, ParseError>> {
         if self.parse_str_literal(".") {
             self.parse_ws();
             let identifier = match self.parse_identifier(true) {
@@ -644,8 +638,7 @@ impl<'a> Parser<'a> {
                     },
                 };
                 self.parse_ws();
-                self.pool
-                    .new_node(AstNode::SliceAccess(start_expr, end_expr))
+                AstNode::new(AstNodeType::SliceAccess(start_expr, end_expr))
             } else {
                 match start_expr {
                     None => {
@@ -669,10 +662,10 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn external_parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    pub fn external_parse_expr(&mut self) -> Option<Result<AstNode, ParseError>> {
         self.parse_ws();
         let expr = match self.parse_expr() {
-            None => self.pool.new_null(),
+            None => AstNode::new(AstNodeType::Null),
             Some(expr) => match expr {
                 Err(err) => {
                     return Some(Err(err));
@@ -688,11 +681,11 @@ impl<'a> Parser<'a> {
         Some(Ok(expr))
     }
 
-    fn parse_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_expr(&mut self) -> Option<Result<AstNode, ParseError>> {
         self.inner_parse_expr(true)
     }
 
-    fn inner_parse_expr(&mut self, allow_pipe: bool) -> Option<Result<AstNodePtr, ParseError>> {
+    fn inner_parse_expr(&mut self, allow_pipe: bool) -> Option<Result<AstNode, ParseError>> {
         #[derive(Clone)]
         enum Op {
             Unary(UnaryOp),
@@ -738,13 +731,13 @@ impl<'a> Parser<'a> {
         }
 
         enum Node {
-            Expr(AstNodePtr),
+            Expr(AstNode),
             Op(Op, OpOrder),
         }
 
         let mut stack = Vec::<Node>::new();
 
-        fn reduce_for_op_order(stack: &mut Vec<Node>, parser: &mut Parser, order: OpOrder) {
+        fn reduce_for_op_order(stack: &mut Vec<Node>, order: OpOrder) {
             // normal reduction
             // [a | b + c] |
             while stack.len() > 1 {
@@ -752,15 +745,13 @@ impl<'a> Parser<'a> {
                     (&stack[stack.len() - 2], &stack[stack.len() - 1])
                 {
                     let temp_order = *temp_order;
-                    let right = *right;
+                    let right = right.clone();
                     if temp_order >= order {
                         match temp_op {
                             Op::Unary(temp_op) => {
                                 let new_expr = match temp_op {
-                                    UnaryOp::Not => parser.pool.new_node(AstNode::Not(right)),
-                                    UnaryOp::Negative => {
-                                        parser.pool.new_node(AstNode::Negative(right))
-                                    }
+                                    UnaryOp::Not => AstNode::new(AstNodeType::Not(right)),
+                                    UnaryOp::Negative => AstNode::new(AstNodeType::Negative(right)),
                                 };
                                 stack.pop();
                                 stack.pop();
@@ -768,39 +759,47 @@ impl<'a> Parser<'a> {
                             }
                             Op::Binary(temp_op) => {
                                 if let Node::Expr(left) = &stack[stack.len() - 3] {
-                                    let left = *left;
+                                    let left = left.clone();
                                     let new_expr = match temp_op {
-                                        BinaryOp::Pipe => parser.pool.new_pipe(left, right),
-                                        BinaryOp::Coalesce => {
-                                            parser.pool.new_node(AstNode::Coalesce(left, right))
+                                        BinaryOp::Pipe => {
+                                            AstNode::new(AstNodeType::Pipe(left, right))
                                         }
-                                        BinaryOp::Or => parser.pool.new_or(left, right),
-                                        BinaryOp::And => parser.pool.new_and(left, right),
+                                        BinaryOp::Coalesce => {
+                                            AstNode::new(AstNodeType::Coalesce(left, right))
+                                        }
+                                        BinaryOp::Or => AstNode::new(AstNodeType::Or(left, right)),
+                                        BinaryOp::And => {
+                                            AstNode::new(AstNodeType::And(left, right))
+                                        }
                                         BinaryOp::Equals => {
-                                            parser.pool.new_node(AstNode::Equals(left, right))
+                                            AstNode::new(AstNodeType::Equals(left, right))
                                         }
                                         BinaryOp::NotEquals => {
-                                            parser.pool.new_node(AstNode::NotEquals(left, right))
+                                            AstNode::new(AstNodeType::NotEquals(left, right))
                                         }
                                         BinaryOp::LessThan => {
-                                            parser.pool.new_node(AstNode::LessThan(left, right))
+                                            AstNode::new(AstNodeType::LessThan(left, right))
                                         }
-                                        BinaryOp::LessThanOrEqual => parser
-                                            .pool
-                                            .new_node(AstNode::LessThanOrEqual(left, right)),
+                                        BinaryOp::LessThanOrEqual => {
+                                            AstNode::new(AstNodeType::LessThanOrEqual(left, right))
+                                        }
                                         BinaryOp::GreaterThan => {
-                                            parser.pool.new_node(AstNode::GreaterThan(left, right))
+                                            AstNode::new(AstNodeType::GreaterThan(left, right))
                                         }
-                                        BinaryOp::GreaterThanOrEqual => parser
-                                            .pool
-                                            .new_node(AstNode::GreaterThanOrEqual(left, right)),
-                                        BinaryOp::Add => parser.pool.new_add(left, right),
-                                        BinaryOp::Subtract => parser.pool.new_subtract(left, right),
+                                        BinaryOp::GreaterThanOrEqual => AstNode::new(
+                                            AstNodeType::GreaterThanOrEqual(left, right),
+                                        ),
+                                        BinaryOp::Add => {
+                                            AstNode::new(AstNodeType::Add(left, right))
+                                        }
+                                        BinaryOp::Subtract => {
+                                            AstNode::new(AstNodeType::Subtract(left, right))
+                                        }
                                         BinaryOp::Multiply => {
-                                            parser.pool.new_node(AstNode::Multiply(left, right))
+                                            AstNode::new(AstNodeType::Multiply(left, right))
                                         }
                                         BinaryOp::Divide => {
-                                            parser.pool.new_node(AstNode::Divide(left, right))
+                                            AstNode::new(AstNodeType::Divide(left, right))
                                         }
                                     };
                                     stack.pop();
@@ -906,7 +905,7 @@ impl<'a> Parser<'a> {
             } {
                 self.parse_ws();
 
-                reduce_for_op_order(&mut stack, self, next_order);
+                reduce_for_op_order(&mut stack, next_order);
                 stack.push(Node::Op(Op::Binary(next_op), next_order));
 
                 match parse_base_expr(&mut stack, self) {
@@ -923,7 +922,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        reduce_for_op_order(&mut stack, self, OpOrder::End);
+        reduce_for_op_order(&mut stack, OpOrder::End);
 
         assert!(stack.len() == 1);
 
@@ -934,7 +933,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_let_expr(&mut self) -> Option<Result<AstNodePtr, ParseError>> {
+    fn parse_let_expr(&mut self) -> Option<Result<AstNode, ParseError>> {
         if !self.parse_str_literal("let") {
             return None;
         }
@@ -959,9 +958,7 @@ impl<'a> Parser<'a> {
             },
         };
 
-        Some(Ok(self
-            .pool
-            .new_node(AstNode::LetStmt { identifier, expr })))
+        Some(Ok(AstNode::new(AstNodeType::LetStmt { identifier, expr })))
     }
 }
 
