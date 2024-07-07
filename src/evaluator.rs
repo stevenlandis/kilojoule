@@ -1454,6 +1454,19 @@ impl EvalCtx {
                     self.eval(args[2], parser).val
                 }
             }
+            "has" => {
+                if args.len() != 1 {
+                    return Val::new_err("has() must be called with 1 argument");
+                }
+
+                match self.val.get_val() {
+                    ValType::Map(val) => {
+                        let key = self.eval(args[0], parser).val;
+                        Val::new_bool(val.has(&key))
+                    }
+                    _ => return Val::new_err("has() must be called on a map"),
+                }
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

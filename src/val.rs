@@ -544,6 +544,10 @@ impl OrderedMap {
             })
             .collect()
     }
+
+    pub fn has(&self, key: &Val) -> bool {
+        self.key_to_idx.contains_key(key)
+    }
 }
 
 impl PartialEq for OrderedMap {

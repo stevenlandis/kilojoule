@@ -637,4 +637,10 @@ mod tests {
         assert_json("if(true, 1, 2)", json!(1));
         assert_json("if(false, 1, 2)", json!(2));
     }
+
+    #[test]
+    fn test_has() {
+        assert_json("{a: 1} | has('a')", json!(true));
+        assert_json("{a: 1} | has('b')", json!(false));
+    }
 }
