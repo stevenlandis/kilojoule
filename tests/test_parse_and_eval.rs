@@ -631,4 +631,10 @@ mod tests {
     fn test_catch() {
         assert_json("[42, 1/0] | map(catch(100))", json!([42, 100]))
     }
+
+    #[test]
+    fn test_if() {
+        assert_json("if(true, 1, 2)", json!(1));
+        assert_json("if(false, 1, 2)", json!(2));
+    }
 }

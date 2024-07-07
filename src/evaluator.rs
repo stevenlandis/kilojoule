@@ -1439,6 +1439,21 @@ impl EvalCtx {
                     _ => self.val.clone(),
                 }
             }
+            "if" => {
+                if args.len() != 3 {
+                    return Val::new_err("if() must be called with 3 arguments");
+                }
+                let cond = match self.eval(args[0], parser).val.get_val() {
+                    ValType::Bool(val) => *val,
+                    _ => return Val::new_err("first argument in if() must be a boolean"),
+                };
+
+                if cond {
+                    self.eval(args[1], parser).val
+                } else {
+                    self.eval(args[2], parser).val
+                }
+            }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
