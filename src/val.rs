@@ -269,6 +269,13 @@ impl Val {
             Err(_) => Val::new_err("unable to parse toml"),
         }
     }
+
+    pub fn from_yaml_str(toml_str: &str) -> Self {
+        match serde_yaml::from_str::<Val>(toml_str) {
+            Ok(val) => val,
+            Err(_) => Val::new_err("unable to parse yaml"),
+        }
+    }
 }
 
 fn write_json_escaped_str(writer: &mut impl std::io::Write, val: &str) -> std::io::Result<usize> {

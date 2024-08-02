@@ -1013,6 +1013,18 @@ impl EvalCtx {
                 Ok(string) => Val::new_str(string.as_str()),
                 Err(_) => Val::new_err("Unable to serialize toml"),
             },
+            "from_yaml" => match self.val.get_val() {
+                ValType::String(val) => Val::from_yaml_str(val.as_str()),
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn("str", args);
+                    self.with_val(text).eval_fcn(name, args)
+                }
+                _ => Val::new_err("from_yaml() must be called on a string"),
+            },
+            "to_yaml" => match serde_yaml::to_string(&self.val) {
+                Ok(string) => Val::new_str(string.as_str()),
+                Err(_) => Val::new_err("Unable to serialize yaml"),
+            },
             "keys" => match self.val.get_val() {
                 ValType::Map(map) => {
                     let keys = map.keys();

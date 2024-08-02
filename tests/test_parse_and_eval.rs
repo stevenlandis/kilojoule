@@ -722,6 +722,15 @@ mod tests {
 
     #[test]
     fn test_to_toml() {
-        assert_json("{a: 1, b: 2} | to_toml()", json!("a = 1.0\nb = 2.0\n"))
+        assert_json("{a: 1, b: 2} | to_toml()", json!("a = 1.0\nb = 2.0\n"));
+    }
+
+    #[test]
+    fn test_to_and_from_yaml() {
+        assert_json("{a: 1, b: 2} | to_yaml()", json!("a: 1.0\nb: 2.0\nlg"));
+        assert_json(
+            "{a: 1, b: 2} | to_yaml() | from_yaml()",
+            json!({"a": 1, "b": 2}),
+        );
     }
 }
