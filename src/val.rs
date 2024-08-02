@@ -262,6 +262,13 @@ impl Val {
             Err(_) => Val::new_err("unable to parse JSON"),
         }
     }
+
+    pub fn from_toml_str(toml_str: &str) -> Self {
+        match toml::from_str::<Val>(toml_str) {
+            Ok(val) => val,
+            Err(_) => Val::new_err("unable to parse toml"),
+        }
+    }
 }
 
 fn write_json_escaped_str(writer: &mut impl std::io::Write, val: &str) -> std::io::Result<usize> {
@@ -790,5 +797,29 @@ impl<'de> serde::de::Deserialize<'de> for Val {
         D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_any(ValVisitor::new())
+    }
+}
+
+impl serde::ser::Serialize for Val {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self.get_val() {
+            ValType::Null => serializer.serialize_unit(),
+            ValType::Err(err) => serializer.collect_map(
+                [(Val::new_str("ERROR"), Val::new_str(err))]
+                    .iter()
+                    .map(|(key, val)| (key, val)),
+            ),
+            ValType::Float64(val) => serializer.serialize_f64(*val),
+            ValType::Bool(val) => serializer.serialize_bool(*val),
+            ValType::String(val) => serializer.serialize_str(val.as_str()),
+            ValType::List(val) => serializer.collect_seq(val.iter()),
+            ValType::Map(val) => {
+                serializer.collect_map(val.get_kv_pair_slice().iter().map(|(key, val)| (key, val)))
+            }
+            ValType::Bytes(val) => serializer.serialize_str(STANDARD.encode(val).as_str()),
+        }
     }
 }

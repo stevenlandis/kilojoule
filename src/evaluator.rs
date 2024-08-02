@@ -1001,6 +1001,18 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("from_json() must be called on a string"),
             },
+            "from_toml" => match self.val.get_val() {
+                ValType::String(val) => Val::from_toml_str(val.as_str()),
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn("str", args);
+                    self.with_val(text).eval_fcn(name, args)
+                }
+                _ => Val::new_err("from_toml() must be called on a string"),
+            },
+            "to_toml" => match toml::to_string(&self.val) {
+                Ok(string) => Val::new_str(string.as_str()),
+                Err(_) => Val::new_err("Unable to serialize toml"),
+            },
             "keys" => match self.val.get_val() {
                 ValType::Map(map) => {
                     let keys = map.keys();

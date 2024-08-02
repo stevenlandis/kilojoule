@@ -719,4 +719,9 @@ mod tests {
             json!({"a": 1, "b": [2, false, null]}),
         );
     }
+
+    #[test]
+    fn test_to_toml() {
+        assert_json("{a: 1, b: 2} | to_toml()", json!("a = 1.0\nb = 2.0\n"))
+    }
 }
