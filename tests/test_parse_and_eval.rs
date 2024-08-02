@@ -688,6 +688,9 @@ mod tests {
     fn test_has() {
         assert_json("{a: 1} | has('a')", json!(true));
         assert_json("{a: 1} | has('b')", json!(false));
+
+        assert_json("[1,2,3] | has(2)", json!(true));
+        assert_json("[1,2,3] | has(42)", json!(false));
     }
 
     #[test]

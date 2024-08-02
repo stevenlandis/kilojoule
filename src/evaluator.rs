@@ -1615,7 +1615,16 @@ impl EvalCtx {
                         let key = self.eval(&args[0]).val;
                         Val::new_bool(val.has(&key))
                     }
-                    _ => return Val::new_err("has() must be called on a map"),
+                    ValType::List(vals) => {
+                        let key = self.eval(&args[0]).val;
+                        for elem in vals {
+                            if *elem == key {
+                                return Val::new_bool(true);
+                            }
+                        }
+                        Val::new_bool(false)
+                    }
+                    _ => return Val::new_err("has() must be called on a list or map"),
                 }
             }
             "map_keys" => {
