@@ -702,4 +702,21 @@ mod tests {
     fn test_map_values() {
         assert_json("{a: 1, b: 2} | map_values(.*10)", json!({"a": 10, "b": 20}));
     }
+
+    #[test]
+    fn test_from_json() {
+        assert_json(r#" "true" | from_json() "#, json!(true));
+        assert_json(r#" "123" | from_json() "#, json!(123));
+        assert_json(r#" "123.25" | from_json() "#, json!(123.25));
+        assert_json(r#" '"some text"' | from_json() "#, json!("some text"));
+        assert_json(r#" 'null' | from_json() "#, json!(null));
+        assert_json(r#" '"\\\""' | from_json() "#, json!("\""));
+        assert_json(r#" "\{\}" | from_json() "#, json!({}));
+        assert_json(r#" "[]" | from_json() "#, json!([]));
+
+        assert_json(
+            r#" '\{"a": 1, "b": [2, false, null]\}' | from_json() "#,
+            json!({"a": 1, "b": [2, false, null]}),
+        );
+    }
 }

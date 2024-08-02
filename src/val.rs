@@ -257,32 +257,10 @@ impl Val {
     }
 
     pub fn from_json_str(json_str: &str) -> Self {
-        let value: serde_json::Value = match serde_json::from_str(json_str) {
-            Ok(value) => value,
-            Err(_) => return Val::new_err("unable to parse JSON"),
-        };
-
-        fn helper(node: &serde_json::Value) -> Val {
-            match node {
-                serde_json::Value::Null => Val::new_null(),
-                serde_json::Value::Bool(val) => Val::new_bool(*val),
-                serde_json::Value::Number(val) => Val::new_f64(val.as_f64().unwrap()),
-                serde_json::Value::String(val) => Val::new_str(val.as_str()),
-                serde_json::Value::Array(val) => {
-                    Val::new_list(val.iter().map(|elem| helper(elem)).collect::<Vec<_>>())
-                }
-                serde_json::Value::Object(val) => {
-                    return Val::new_map(OrderedMap::from_kv_pair_slice(
-                        val.iter()
-                            .map(|(key, val)| (Val::new_str(key.as_str()), helper(val)))
-                            .collect::<Vec<_>>()
-                            .as_slice(),
-                    ));
-                }
-            }
+        match serde_json::from_str::<Val>(json_str) {
+            Ok(val) => val,
+            Err(_) => Val::new_err("unable to parse JSON"),
         }
-
-        return helper(&value);
     }
 }
 
@@ -586,5 +564,231 @@ impl Ord for OrderedMap {
         }
 
         return left.len().cmp(&right.len());
+    }
+}
+
+struct ValVisitor {}
+
+impl ValVisitor {
+    fn new() -> Self {
+        ValVisitor {}
+    }
+}
+
+impl<'de> serde::de::Visitor<'de> for ValVisitor {
+    type Value = Val;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a Val")
+    }
+
+    fn visit_map<A>(self, mut access: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let mut map = OrderedMap::new();
+
+        while let Some((key, value)) = access.next_entry::<Val, Val>()? {
+            map.insert(&key, &value);
+        }
+
+        Ok(Val::new_map(map))
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_bool(v))
+    }
+
+    fn visit_i128<E>(self, v: i128) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_u128<E>(self, v: u128) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v))
+    }
+
+    fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_f64(v as f64))
+    }
+
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_str(v))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_str(v))
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_str(v.as_str()))
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let mut vals = Vec::<Val>::new();
+
+        while let Some(val) = seq.next_element::<Val>()? {
+            vals.push(val)
+        }
+
+        Ok(Val::new_list(vals))
+    }
+
+    fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_bytes(v.to_vec()))
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_bytes(v.to_vec()))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_bytes(v.to_vec()))
+    }
+
+    fn visit_char<E>(self, v: char) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::from_json_str(v.to_string().as_str()))
+    }
+
+    fn visit_enum<A>(self, _data: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::EnumAccess<'de>,
+    {
+        Ok(Val::new_err("\"enum\" parsing is unimplemented"))
+    }
+
+    fn visit_newtype_struct<D>(self, _deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Val::new_err("\"newtype_struct\" parsing is unimplemented"))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_null())
+    }
+
+    fn visit_some<D>(self, _deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Val::new_err("\"some\" parsing is unimplemented"))
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        Ok(Val::new_null())
+    }
+}
+
+impl<'de> serde::de::Deserialize<'de> for Val {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(ValVisitor::new())
     }
 }
