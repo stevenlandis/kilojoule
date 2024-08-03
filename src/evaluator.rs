@@ -1099,7 +1099,7 @@ impl EvalCtx {
                     let items = map.items();
                     Val::new_list(items)
                 }
-                _ => Val::new_err("entries() must be called on a map"),
+                _ => Val::new_err("items() must be called on a map"),
             },
             "from_items" => match self.val.get_val() {
                 ValType::List(val) => {
