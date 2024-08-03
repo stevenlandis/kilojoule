@@ -1434,6 +1434,69 @@ impl EvalCtx {
 
                 Val::new_list(results)
             }
+            "combinations" => {
+                if args.len() != 0 {
+                    return Val::new_err("combinations() must be called with zero arguments");
+                }
+                let arg_vals = match self.val.get_val() {
+                    ValType::List(vals) => vals,
+                    _ => return Val::new_err("combinations() must be called on a list"),
+                };
+
+                let mut arg_lists = Vec::<&Vec<Val>>::with_capacity(args.len());
+                for arg in arg_vals {
+                    match arg.get_val() {
+                        ValType::List(vals) => {
+                            arg_lists.push(vals);
+                        }
+                        _ => return Val::new_err("each argument in zip() must be a list"),
+                    }
+                }
+
+                let mut indexes = vec![0 as usize; arg_lists.len()];
+
+                let mut results = Vec::<Val>::new();
+
+                loop {
+                    let mut any_exceed = false;
+                    for (l_idx, idx) in indexes.iter().enumerate().rev() {
+                        if *idx >= arg_lists[l_idx].len() {
+                            any_exceed = true;
+                            break;
+                        }
+                    }
+                    if any_exceed {
+                        break;
+                    }
+
+                    let mut result = Vec::<Val>::new();
+                    for (l_idx, idx) in indexes.iter().enumerate() {
+                        result.push(arg_lists[l_idx][*idx].clone());
+                    }
+
+                    results.push(Val::new_list(result));
+
+                    let mut incr_next = true;
+                    for (l_idx, idx) in indexes.iter_mut().enumerate().rev() {
+                        if incr_next {
+                            *idx += 1;
+
+                            incr_next = *idx >= arg_lists[l_idx].len();
+                            if incr_next {
+                                *idx = 0;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if incr_next {
+                        break;
+                    }
+                }
+
+                Val::new_list(results)
+            }
             "repeat" => {
                 if args.len() != 1 {
                     return Val::new_err("repeat() has to be called with one argument");
@@ -1622,6 +1685,9 @@ impl EvalCtx {
                                             _ => {
                                                 let mut buf = Vec::<u8>::new();
                                                 elem.write_to_str(&mut buf, 0, false).unwrap();
+                                                let buf =
+                                                    std::str::from_utf8(buf.as_slice()).unwrap();
+                                                record.push_field(buf);
                                             }
                                         }
                                     }

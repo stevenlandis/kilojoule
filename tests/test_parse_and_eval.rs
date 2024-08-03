@@ -755,4 +755,27 @@ mod tests {
     fn test_from_num() {
         assert_json("'123.25' | from_num()", json!(123.25));
     }
+
+    #[test]
+    fn test_combinations() {
+        assert_json(
+            "[ ['a', 'b'], [0, 1, 2] ] | combinations()",
+            json!([['a', 0], ['a', 1], ['a', 2], ['b', 0], ['b', 1], ['b', 2],]),
+        );
+
+        assert_json("[] | combinations()", json!([[]]));
+        assert_json("[[1,2,3]] | combinations()", json!([[1], [2], [3]]));
+
+        assert_json(
+            "[ ['a', 'b'], [0, 1, 2], ['x'] ] | combinations()",
+            json!([
+                ['a', 0, 'x'],
+                ['a', 1, 'x'],
+                ['a', 2, 'x'],
+                ['b', 0, 'x'],
+                ['b', 1, 'x'],
+                ['b', 2, 'x'],
+            ]),
+        );
+    }
 }
