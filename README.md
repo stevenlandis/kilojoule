@@ -185,7 +185,7 @@ Writing Data:
 - `to_json()` converts an object to a JSON string.
 - `to_yaml()` converts an object to a YAML string.
 - `to_toml()` converts an object to a TOML string.
-- `data | write("file_path")` writes a `str` or `bytes` to a file.
+- `data | write("file_path")` write the input to the file. The format will match how objects are printed to stdout.
 
 ### Setup and Testing
 
