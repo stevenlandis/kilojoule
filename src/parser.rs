@@ -256,6 +256,26 @@ impl<'a> Parser<'a> {
                         parts = Some(AstNode::new(AstNodeType::ListNode(prev_val, new_part)));
                     }
                 }
+            } else if self.parse_str_literal("-") {
+                self.parse_ws();
+                let expr = match self.parse_expr() {
+                    None => {
+                        return Some(Err(self.get_err(ParseErrorType::NoExpressionAfterMapDelete)))
+                    }
+                    Some(expr) => match expr {
+                        Err(err) => return Some(Err(err)),
+                        Ok(expr) => expr,
+                    },
+                };
+                let new_part = AstNode::new(AstNodeType::MapDelete(expr));
+                match parts {
+                    None => {
+                        parts = Some(new_part);
+                    }
+                    Some(prev_val) => {
+                        parts = Some(AstNode::new(AstNodeType::ListNode(prev_val, new_part)));
+                    }
+                }
             } else {
                 let key = if self.parse_str_literal("[") {
                     self.parse_ws();
@@ -1027,6 +1047,7 @@ enum ParseErrorType {
     IncompleteParse,
     NoExprReverseIndex,
     NoExpressionAfterMapSpread,
+    NoExpressionAfterMapDelete,
     NoExprInMapKey,
     NoClosingBracketForMapKey,
     NoIdentifierAfterKeywordArgument,

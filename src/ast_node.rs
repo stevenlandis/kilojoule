@@ -50,6 +50,7 @@ pub enum AstNodeType {
         val: AstNode,
     },
     MapLiteral(Option<AstNode>),
+    MapDelete(AstNode),
     ListLiteral(Option<AstNode>),
     FormatString(Option<AstNode>),
     ReverseIdx(AstNode),

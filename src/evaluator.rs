@@ -275,6 +275,16 @@ impl EvalCtx {
                             }
                             Ok(())
                         }
+                        AstNodeType::MapDelete(delete) => {
+                            let del_key = this.eval(delete).val;
+                            match del_key.get_val() {
+                                ValType::Err(_) => return Err(del_key),
+                                _ => {
+                                    map.delete(&del_key);
+                                }
+                            }
+                            Ok(())
+                        }
                         _ => panic!(),
                     }
                 }

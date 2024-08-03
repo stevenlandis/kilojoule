@@ -488,6 +488,20 @@ impl OrderedMap {
         }
     }
 
+    pub fn delete(&mut self, key: &Val) {
+        match self.key_to_idx.remove(key) {
+            None => {}
+            Some(idx) => {
+                self.pairs.remove(idx);
+                for (_, other_idx) in self.key_to_idx.iter_mut() {
+                    if *other_idx > idx {
+                        *other_idx -= 1;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn get(&self, key: &Val) -> Option<Val> {
         match self.key_to_idx.get(key) {
             None => None,

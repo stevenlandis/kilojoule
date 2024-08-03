@@ -563,6 +563,15 @@ mod tests {
     }
 
     #[test]
+    fn test_map_delete() {
+        assert_json("{a: 1, b: 2, c: 3} | {*., -'b'}", json!({"a": 1, "c": 3}));
+        assert_json(
+            "{a: 1, b: 2, c: 3} | {*., -'b', b: 5}",
+            json!({"a": 1, "c": 3, "b": 5}),
+        );
+    }
+
+    #[test]
     fn test_map_key_expression() {
         assert_json("{['a']: 1, [21*2]: 2}", json!({"a": 1, "42": 2}));
     }
