@@ -1005,34 +1005,31 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("read() must be called on a string"),
             },
-            "write" => match self.val.get_val() {
-                ValType::Bytes(val) => {
-                    if args.len() != 1 {
-                        return Val::new_err("write() must be called with 1 argument");
+            "write" => {
+                if args.len() != 1 {
+                    return Val::new_err("write() must be called with 1 argument");
+                }
+
+                let file_path = self.eval(&args[0]);
+
+                let file_path = match file_path.val.get_val() {
+                    ValType::String(file_path) => file_path,
+                    _ => {
+                        return Val::new_err("write() file path must be a string");
                     }
+                };
 
-                    let file_path = self.eval(&args[0]);
-
-                    let file_path = match file_path.val.get_val() {
-                        ValType::String(file_path) => file_path,
-                        _ => {
-                            return Val::new_err("write() file path must be a string");
-                        }
-                    };
-
-                    match std::fs::File::create(file_path) {
+                match self.val.get_val() {
+                    ValType::Err(_) => self.val.clone(),
+                    _ => match std::fs::File::create(file_path) {
                         Err(_) => Val::new_err("Unable to open file"),
-                        Ok(mut fp) => match fp.write(val.as_slice()) {
+                        Ok(mut fp) => match self.val.write_to_str(&mut fp, 0, true) {
                             Err(_) => Val::new_err("Unable to write file"),
                             Ok(_) => Val::new_null(),
                         },
-                    }
+                    },
                 }
-                ValType::String(val) => self
-                    .with_val(Val::new_bytes(val.as_bytes().to_vec()))
-                    .eval_fcn("write", args),
-                _ => Val::new_err("write() must be called on bytes or a string"),
-            },
+            }
             "rj" => {
                 // shorhand for "read json"
                 self.eval(&AstNode::new(AstNodeType::Pipe(
