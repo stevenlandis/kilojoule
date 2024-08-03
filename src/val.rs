@@ -833,7 +833,13 @@ impl serde::ser::Serialize for Val {
                     .iter()
                     .map(|(key, val)| (key, val)),
             ),
-            ValType::Float64(val) => serializer.serialize_f64(*val),
+            ValType::Float64(val) => {
+                if *val == val.trunc() {
+                    serializer.serialize_i64(*val as i64)
+                } else {
+                    serializer.serialize_f64(*val)
+                }
+            }
             ValType::Bool(val) => serializer.serialize_bool(*val),
             ValType::String(val) => serializer.serialize_str(val.as_str()),
             ValType::List(val) => serializer.collect_seq(val.iter()),
