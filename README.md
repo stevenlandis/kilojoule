@@ -116,6 +116,9 @@ kj '"Cargo.lock" | read() | from_toml() | .package | len()'
 # Or pass a kj string into another command
 > kj 'call("ls") | lines() | filter(len() > 5) | join_lines() | call("wc", "-l")'
 # "5\n"
+
+# Zip together lines in 2 files
+> kj '["a.txt", "b.txt"] | map(read() | lines()) | zip() | write("combined.txt")'
 ```
 
 Pipes (`|`) are a critical part of the language because they make it possible to iteratively write queries. Consider the changes required to filter an expression:
