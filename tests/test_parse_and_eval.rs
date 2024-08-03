@@ -736,4 +736,9 @@ mod tests {
             json!({"a": 1, "b": 2}),
         );
     }
+
+    #[test]
+    fn test_from_num() {
+        assert_json("'123.25' | from_num()", json!(123.25));
+    }
 }

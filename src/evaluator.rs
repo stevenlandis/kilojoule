@@ -1073,6 +1073,13 @@ impl EvalCtx {
                 Ok(string) => Val::new_str(string.as_str()),
                 Err(_) => Val::new_err("Unable to serialize yaml"),
             },
+            "from_num" => match self.val.get_val() {
+                ValType::String(val) => Val::new_f64(match val.parse::<f64>() {
+                    Err(_) => return Val::new_err("unable to parse number"),
+                    Ok(val) => val,
+                }),
+                _ => Val::new_err("from_num() must be called on a string"),
+            },
             "keys" => match self.val.get_val() {
                 ValType::Map(map) => {
                     let keys = map.keys();
