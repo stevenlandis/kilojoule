@@ -995,6 +995,34 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("read() must be called on a string"),
             },
+            "write" => match self.val.get_val() {
+                ValType::Bytes(val) => {
+                    if args.len() != 1 {
+                        return Val::new_err("write() must be called with 1 argument");
+                    }
+
+                    let file_path = self.eval(&args[0]);
+
+                    let file_path = match file_path.val.get_val() {
+                        ValType::String(file_path) => file_path,
+                        _ => {
+                            return Val::new_err("write() file path must be a string");
+                        }
+                    };
+
+                    match std::fs::File::create(file_path) {
+                        Err(_) => Val::new_err("Unable to open file"),
+                        Ok(mut fp) => match fp.write(val.as_slice()) {
+                            Err(_) => Val::new_err("Unable to write file"),
+                            Ok(_) => Val::new_null(),
+                        },
+                    }
+                }
+                ValType::String(val) => self
+                    .with_val(Val::new_bytes(val.as_bytes().to_vec()))
+                    .eval_fcn("write", args),
+                _ => Val::new_err("write() must be called on bytes or a string"),
+            },
             "rj" => {
                 // shorhand for "read json"
                 self.eval(&AstNode::new(AstNodeType::Pipe(
@@ -1016,6 +1044,10 @@ impl EvalCtx {
                     self.with_val(text).eval_fcn(name, args)
                 }
                 _ => Val::new_err("from_json() must be called on a string"),
+            },
+            "to_json" => match serde_json::to_string(&self.val) {
+                Ok(string) => Val::new_str(string.as_str()),
+                Err(_) => Val::new_err("Unable to serialize json"),
             },
             "from_toml" => match self.val.get_val() {
                 ValType::String(val) => Val::from_toml_str(val.as_str()),
