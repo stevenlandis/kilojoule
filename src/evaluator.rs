@@ -1679,45 +1679,8 @@ impl EvalCtx {
 
                 Val::new_list(lines)
             }
-            "to_csv" => {
-                let mut buffer = Vec::<u8>::new();
-                let mut writer = csv::Writer::from_writer(&mut buffer);
-                match self.val.get_val() {
-                    ValType::List(rows) => {
-                        for row in rows {
-                            let mut record = csv::StringRecord::new();
-                            match row.get_val() {
-                                ValType::List(row) => {
-                                    for elem in row {
-                                        match elem.get_val() {
-                                            ValType::String(val) => record.push_field(val),
-                                            _ => {
-                                                let mut buf = Vec::<u8>::new();
-                                                elem.write_to_str(&mut buf, 0, false).unwrap();
-                                                let buf =
-                                                    std::str::from_utf8(buf.as_slice()).unwrap();
-                                                record.push_field(buf);
-                                            }
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    return Val::new_err(
-                                        "to_csv() must be called on a list of lists",
-                                    )
-                                }
-                            }
-
-                            writer.write_record(record.iter()).unwrap();
-                        }
-                    }
-                    _ => return Val::new_err("to_csv() must be called on a list"),
-                }
-
-                drop(writer);
-
-                Val::new_bytes(buffer)
-            }
+            "to_csv" => write_csv_to_val(&self.val, b',', "to_csv"),
+            "to_tsv" => write_csv_to_val(&self.val, b'\t', "to_tsv"),
             "catch" => {
                 if args.len() != 1 {
                     return Val::new_err("catch() must be called with one argument");
@@ -1803,4 +1766,45 @@ impl EvalCtx {
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
+}
+
+fn write_csv_to_val(val: &Val, delimiter: u8, fcn_name: &str) -> Val {
+    let mut buffer = Vec::<u8>::new();
+    let mut writer = csv::WriterBuilder::new()
+        .delimiter(delimiter)
+        .from_writer(&mut buffer);
+    match val.get_val() {
+        ValType::List(rows) => {
+            for row in rows {
+                let mut record = csv::StringRecord::new();
+                match row.get_val() {
+                    ValType::List(row) => {
+                        for elem in row {
+                            match elem.get_val() {
+                                ValType::String(val) => record.push_field(val),
+                                _ => {
+                                    let mut buf = Vec::<u8>::new();
+                                    elem.write_to_str(&mut buf, 0, false).unwrap();
+                                    let buf = std::str::from_utf8(buf.as_slice()).unwrap();
+                                    record.push_field(buf);
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        return Val::new_err(
+                            format!("{}() must be called on a list of lists", fcn_name).as_str(),
+                        )
+                    }
+                }
+
+                writer.write_record(record.iter()).unwrap();
+            }
+        }
+        _ => return Val::new_err(format!("{}() must be called on a list", fcn_name).as_str()),
+    }
+
+    drop(writer);
+
+    Val::new_bytes(buffer)
 }
