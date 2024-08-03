@@ -110,11 +110,11 @@ kj '"Cargo.lock" | read() | from_toml() | .package | len()'
 #   "tests"
 # ]
 
-# Or call a shell command in kj
-> kj 'call("ls") | lines()'
+# Or execute a shell command in kj
+> kj 'exec("ls") | lines()'
 
 # Or pass a kj string into another command
-> kj 'call("ls") | lines() | filter(len() > 5) | join_lines() | call("wc", "-l")'
+> kj 'exec("ls") | lines() | filter(len() > 5) | join_lines() | exec("wc", "-l")'
 # "5\n"
 
 # Zip together lines in 2 files

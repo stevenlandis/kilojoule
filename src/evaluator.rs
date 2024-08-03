@@ -1215,14 +1215,14 @@ impl EvalCtx {
 
                 Val::new_list(results)
             }
-            "call" => {
+            "exec" => {
                 let input = match self.val.get_val() {
                     ValType::Bytes(input) => Some(input.as_slice()),
                     ValType::String(str) => Some(str.as_str().as_bytes()),
                     _ => None,
                 };
                 if args.len() == 0 {
-                    return Val::new_err("call() has to be called with at least one argument");
+                    return Val::new_err("exec() has to be called with at least one argument");
                 }
 
                 let mut arg_strs = Vec::<String>::new();
@@ -1241,13 +1241,13 @@ impl EvalCtx {
                                         ValType::String(cwd_val) => cwd_val,
                                         _ => {
                                             return Val::new_err(
-                                                "In call(), the :env keyword must be a string",
+                                                "In exec(), the :env keyword must be a string",
                                             );
                                         }
                                     };
                                     cwd = Some(cwd_val.clone());
                                 }
-                                _ => return Val::new_err("Unknown keyword passed to call()"),
+                                _ => return Val::new_err("Unknown keyword passed to exec()"),
                             }
                         }
                         _ => {
@@ -1255,7 +1255,7 @@ impl EvalCtx {
                             let arg_str = match arg_val.get_val() {
                                 ValType::String(str) => str,
                                 _ => {
-                                    return Val::new_err("call() arguments must be strings");
+                                    return Val::new_err("exec() arguments must be strings");
                                 }
                             };
                             arg_strs.push(arg_str.clone());
