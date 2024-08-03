@@ -468,6 +468,10 @@ mod tests {
         );
         assert_json("[] | join(',')", json!(""));
         assert_json("[''] | join(',')", json!(""));
+        assert_json(
+            "['stuff', 1, 'things'] | join(' - ')",
+            json!("stuff - 1 - things"),
+        );
     }
 
     #[test]

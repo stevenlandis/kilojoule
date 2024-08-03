@@ -947,11 +947,20 @@ impl EvalCtx {
                         _ => return Val::new_err("join() pattern must be a string"),
                     };
 
-                    let mut strings_to_join = Vec::<&str>::with_capacity(elems.len());
+                    let mut strings_to_join = Vec::<String>::with_capacity(elems.len());
                     for elem in elems {
                         match elem.get_val() {
                             ValType::String(elem_str) => {
-                                strings_to_join.push(elem_str.as_str());
+                                strings_to_join.push(elem_str.clone());
+                            }
+                            ValType::Float64(_) => {
+                                let mut buf = Vec::<u8>::new();
+                                match elem.write_to_str(&mut buf, 0, false) {
+                                    Err(_) => return Val::new_err("Unable to serialize element"),
+                                    Ok(_) => {}
+                                };
+                                strings_to_join
+                                    .push(std::str::from_utf8(buf.as_slice()).unwrap().to_string());
                             }
                             _ => {
                                 return Val::new_err(
