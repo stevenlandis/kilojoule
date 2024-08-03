@@ -961,6 +961,14 @@ impl EvalCtx {
                 std::io::stdin().read_to_end(&mut buffer).unwrap();
                 return Val::new_bytes(buffer);
             }
+            "inj" => {
+                // shorhand for in() | from_json()
+                self.eval(&AstNode::new(AstNodeType::Pipe(
+                    AstNode::new_fcn_call("in", &[]),
+                    AstNode::new_fcn_call("from_json", &[]),
+                )))
+                .val
+            }
             "str" => match self.val.get_val() {
                 ValType::Bytes(bytes) => match std::str::from_utf8(bytes) {
                     Ok(str) => Val::new_str(str),
@@ -987,6 +995,14 @@ impl EvalCtx {
                 }
                 _ => Val::new_err("read() must be called on a string"),
             },
+            "rj" => {
+                // shorhand for "read json"
+                self.eval(&AstNode::new(AstNodeType::Pipe(
+                    AstNode::new_fcn_call("read", &[]),
+                    AstNode::new_fcn_call("from_json", &[]),
+                )))
+                .val
+            }
             "env" => {
                 let kv_pairs = std::env::vars()
                     .map(|(key, val)| (Val::new_str(key.as_str()), Val::new_str(val.as_str())))
