@@ -4,9 +4,7 @@
 
 The name means nothing and was chosen because it is easy to type and doesn't conflict with any other popular cli commands that I'm aware of.
 
-This tool is heavily inspired by the fantastic [`jq`](https://github.com/jqlang/jq). If you are already familiar with `jq`, here is a short list of differences between the two tools.
-
-- `jq` is primarily focused on processing streams of JSON. `kj` is more focused on text and shell interactions.
+This tool is heavily inspired by the fantastic [`jq`](https://github.com/jqlang/jq) and attempts to add more functionality and be more readable at the cost of consiceness.
 
 ### Status
 
@@ -95,6 +93,29 @@ alias kj="/path/to/kilojoule/target/release/kilojoule"
 # deduplicate paths in PATH
 # while preserving order of first appearance
 > export PATH=$(kj 'env().PATH | split(":") | unique() | join(":") | bytes()')
+
+# Get the number of packages in Cargo.lock
+kj '"Cargo.lock" | read() | from_toml() | .package | len()'
+# 55
+
+# pipe a shell command into kj
+> ls | kj 'in() | lines()'
+# [
+#   "Cargo.lock",
+#   "Cargo.toml",
+#   "LICENSE",
+#   "README.md",
+#   "src",
+#   "target",
+#   "tests"
+# ]
+
+# Or call a shell command in kj
+> kj 'call("ls") | lines()'
+
+# Or pass a kj string into another command
+> kj 'call("ls") | lines() | filter(len() > 5) | join_lines() | call("wc", "-l")'
+# "5\n"
 ```
 
 Pipes (`|`) are a critical part of the language because they make it possible to iteratively write queries. Consider the changes required to filter an expression:
@@ -115,29 +136,53 @@ filter(expr, .value)
 
 Pipes are the only way to avoid having to add characters to the left of the expression which is especially difficult to do in the shell. The result is that expressions can be developed one "stage" at a time.
 
-```sh
-# pipe a shell command into kj
-> ls | kj 'in() | lines()'
-# [
-#   "Cargo.lock",
-#   "Cargo.toml",
-#   "LICENSE",
-#   "README.md",
-#   "src",
-#   "target",
-#   "tests"
-# ]
-
-# Or call a shell command in kj
-> kj 'call("ls") | lines()'
-
-# Or pass a kj string into another command
-> kj 'call("ls") | lines() | filter(len() > 5) | join_lines() | call("wc", "-l")'
-"5\n"
-```
-
 There are a ton more functions and features so take a look at the tests `tests/test_parse_and_eval.rs` for a fairly comprehensive list of examples.
 While tests aren't the best form of documentation, they are guaranteed to always be correct.
+
+### Data Types
+
+- `null` is the same as in JSON.
+- `err` means the expression failed to execute. Serializes to JSON as an object like `{"ERROR": "the error message"}`. Can be detected using the `is_err()` function.
+- `number` is a number. Currently stored as a 64-bit float but might change in the future.
+- `bool` is a boolean. Either `true` or `false`.
+- `bytes` is a byte array. If this is the top-level object it will be written directly to stdout. If this is nested within another object it will be serialized to JSON as a [b64 encoded string](https://en.wikipedia.org/wiki/Base64).
+- `str` is a string. Always encoded in utf-8. Can be converted to `bytes` using the `bytes()` function.
+- `list` is a list of values.
+- `map` is a key -> value mapping. Maps preserve order and can accept any type as a key.
+
+### Core Functions
+
+Kilojoule is designed to be composable and this section contains a short list of functions that are often used to process data.
+
+Reading Data:
+
+- `"file_name" | read()`: Reads a file as `bytes`.
+- `from_json()`: Parses `bytes` or `str` as JSON.
+- `from_yaml()`: Parses `bytes` or `str` as YAML.
+- `from_toml()`: Parses `bytes` or `str` as TOML.
+- `inj()`: Shorthand for `in() | from_json()` to read stdin as JSON. Often the start of expressions.
+- `"file_name" | rj()`: Shorthand for `read() | from_json()` to read a file as JSON.
+
+Transforming Data:
+
+- `map(mapper)`: Transforms every element in a list using the `mapper` function.
+- `filter(condition)`: Filters elements from a list.
+- `group(get_group_key)`: Groups elements in a list by the group key. Has more uses than you might think!
+- `flatten()`: Flattens a list of lists into a list.
+- `items()`: Converts a `map` into a list of key,value pairs.
+- `from_items()`: Converts a list of key,value pairs into a map.
+- `{key: "val", *map}`: `*map` will "spread" the map into another map.
+- `{key: "val", -"key"}`: `-"key"` will delete the key from the map.
+- `[elem, *list]`: `*list` will "spread" the list into another list.
+
+Writing Data:
+
+- By default, all expressions will be serialized to JSON and written to stdout. The only exception is `bytes` objects which will be written direcly to stdout.
+- `bytes()` converts strings to `bytes`.
+- `to_json()` converts an object to a JSON string.
+- `to_yaml()` converts an object to a YAML string.
+- `to_toml()` converts an object to a TOML string.
+- `data | write("file_path")` writes a `str` or `bytes` to a file.
 
 ### Setup and Testing
 
