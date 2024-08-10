@@ -782,4 +782,34 @@ mod tests {
             ]),
         );
     }
+
+    #[test]
+    fn test_starts_with() {
+        assert_json("'stuff' | starts_with('')", json!(true));
+        assert_json("'stuff' | starts_with('s')", json!(true));
+        assert_json("'stuff' | starts_with('st')", json!(true));
+        assert_json("'stuff' | starts_with('stu')", json!(true));
+
+        assert_json("'stuff' | starts_with('stx')", json!(false));
+    }
+
+    #[test]
+    fn test_ends_with() {
+        assert_json("'things' | ends_with('')", json!(true));
+        assert_json("'things' | ends_with('s')", json!(true));
+        assert_json("'things' | ends_with('gs')", json!(true));
+        assert_json("'things' | ends_with('ngs')", json!(true));
+
+        assert_json("'things' | ends_with('ngx')", json!(false));
+    }
+
+    #[test]
+    fn test_lower() {
+        assert_json("'StUfF' | lower()", json!("stuff"));
+    }
+
+    #[test]
+    fn test_upper() {
+        assert_json("'StUfF' | upper()", json!("STUFF"));
+    }
 }

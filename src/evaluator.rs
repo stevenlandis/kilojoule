@@ -1763,6 +1763,40 @@ impl EvalCtx {
                     _ => return Val::new_err("map_values() must be called on a map"),
                 }
             }
+            "starts_with" => match self.val.get_val() {
+                ValType::String(val) => {
+                    if args.len() != 1 {
+                        return Val::new_err("starts_with() must be called with one argument");
+                    }
+
+                    match self.eval(&args[0]).val.get_val() {
+                        ValType::String(test) => Val::new_bool(val.starts_with(test)),
+                        _ => return Val::new_err("starts_with() must be called with a string"),
+                    }
+                }
+                _ => return Val::new_err("starts_with() must be called on a string."),
+            },
+            "ends_with" => match self.val.get_val() {
+                ValType::String(val) => {
+                    if args.len() != 1 {
+                        return Val::new_err("ends_with() must be called with one argument");
+                    }
+
+                    match self.eval(&args[0]).val.get_val() {
+                        ValType::String(test) => Val::new_bool(val.ends_with(test)),
+                        _ => return Val::new_err("ends_with() must be called with a string"),
+                    }
+                }
+                _ => return Val::new_err("ends_with() must be called on a string."),
+            },
+            "lower" => match self.val.get_val() {
+                ValType::String(val) => Val::new_str(val.to_lowercase().as_str()),
+                _ => Val::new_err("lower() must be called on a string."),
+            },
+            "upper" => match self.val.get_val() {
+                ValType::String(val) => Val::new_str(val.to_uppercase().as_str()),
+                _ => Val::new_err("upper() must be called on a string."),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
