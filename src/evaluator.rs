@@ -1797,6 +1797,10 @@ impl EvalCtx {
                 ValType::String(val) => Val::new_str(val.to_uppercase().as_str()),
                 _ => Val::new_err("upper() must be called on a string."),
             },
+            "trim" => match self.val.get_val() {
+                ValType::String(val) => Val::new_str(val.trim()),
+                _ => Val::new_err("trim() must be called on a string"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

@@ -812,4 +812,10 @@ mod tests {
     fn test_upper() {
         assert_json("'StUfF' | upper()", json!("STUFF"));
     }
+
+    #[test]
+    fn test_trim() {
+        assert_json("'stuff\\r' | trim()", json!("stuff"));
+        assert_json("'    \\n\\tstuff\\r' | trim()", json!("stuff"));
+    }
 }
