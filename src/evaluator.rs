@@ -1801,6 +1801,10 @@ impl EvalCtx {
                 ValType::String(val) => Val::new_str(val.trim()),
                 _ => Val::new_err("trim() must be called on a string"),
             },
+            "abs" => match self.val.get_val() {
+                ValType::Float64(val) => Val::new_f64(val.abs()),
+                _ => Val::new_err("abs() must be called on a number"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }

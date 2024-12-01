@@ -818,4 +818,10 @@ mod tests {
         assert_json("'stuff\\r' | trim()", json!("stuff"));
         assert_json("'    \\n\\tstuff\\r' | trim()", json!("stuff"));
     }
+
+    #[test]
+    fn test_abs() {
+        assert_json("-1.25 | abs()", json!(1.25));
+        assert_json("1.25", json!(1.25));
+    }
 }
