@@ -824,4 +824,17 @@ mod tests {
         assert_json("-1.25 | abs()", json!(1.25));
         assert_json("1.25", json!(1.25));
     }
+
+    #[test]
+    fn test_transpose() {
+        assert_json("[] | transpose()", json!([]));
+        assert_json(
+            "[[1, 2], [3, 4], [5, 6]] | transpose()",
+            json!([[1, 3, 5], [2, 4, 6]]),
+        );
+        assert_json(
+            "[[1, 2], [3, 4, 42], [5, 6]] | transpose()",
+            json!([[1, 3, 5], [2, 4, 6], [null, 42, null]]),
+        );
+    }
 }

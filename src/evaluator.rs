@@ -1805,6 +1805,53 @@ impl EvalCtx {
                 ValType::Float64(val) => Val::new_f64(val.abs()),
                 _ => Val::new_err("abs() must be called on a number"),
             },
+            "transpose" => match self.val.get_val() {
+                ValType::List(val) => {
+                    if val.len() == 0 {
+                        return self.val.clone();
+                    }
+
+                    let mut max_width: Option<usize> = None;
+
+                    for elem in val {
+                        match elem.get_val() {
+                            ValType::List(elem) => match max_width {
+                                None => {
+                                    max_width = Some(elem.len());
+                                }
+                                Some(width) => {
+                                    max_width = Some(width.max(elem.len()));
+                                }
+                            },
+                            _ => {
+                                return Val::new_err(
+                                    "transpose() must be called on a list of lists",
+                                )
+                            }
+                        }
+                    }
+
+                    let max_width = max_width.unwrap();
+
+                    let mut result = Vec::<Val>::with_capacity(max_width);
+                    for col_idx in 0..max_width {
+                        result.push(Val::new_list(
+                            val.iter()
+                                .map(|row| match row.get_val() {
+                                    ValType::List(row) => match row.get(col_idx) {
+                                        None => Val::new_null(),
+                                        Some(cell) => cell.clone(),
+                                    },
+                                    _ => panic!("unreachable"),
+                                })
+                                .collect::<Vec<_>>(),
+                        ))
+                    }
+
+                    Val::new_list(result)
+                }
+                _ => Val::new_err("transpose() must be called on a list"),
+            },
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
     }
