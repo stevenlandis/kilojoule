@@ -1799,6 +1799,10 @@ impl EvalCtx {
             },
             "trim" => match self.val.get_val() {
                 ValType::String(val) => Val::new_str(val.trim()),
+                ValType::Bytes(_) => {
+                    let text = self.eval_fcn("str", args);
+                    self.with_val(text).eval_fcn(name, args)
+                }
                 _ => Val::new_err("trim() must be called on a string"),
             },
             "abs" => match self.val.get_val() {
