@@ -1,4 +1,4 @@
-trait Reader {
+pub trait Reader {
     fn peek(&mut self) -> Option<u8>;
     fn step(&mut self);
     fn get_idx(&mut self) -> usize;
@@ -8,7 +8,7 @@ pub trait JsonLexerTrait {
     fn next(&mut self) -> JsonToken;
 }
 
-struct JsonLexer<'a, R: Reader> {
+pub struct JsonLexer<'a, R: Reader> {
     reader: &'a mut R,
     stack: Vec<ParseState>,
 }
@@ -17,55 +17,111 @@ impl<'a, R: Reader> JsonLexer<'a, R> {
     pub fn new(reader: &'a mut R) -> Self {
         JsonLexer {
             reader,
-            stack: vec![ParseState::ObjectStart],
+            stack: vec![ParseState::JsonStart],
         }
     }
 
-    fn next_new_object(&mut self, char: u8) -> Option<JsonToken> {
-        if char == '[' as u8 {
-            self.reader.step();
-            self.stack.push(ParseState::ListStart);
-            return Some(JsonToken::ListStart);
-        }
+    fn set_top_state(&mut self, state: ParseState) {
+        let idx = self.stack.len() - 1;
+        self.stack[idx] = state;
+    }
 
-        if char == '"' as u8 {
-            self.reader.step();
-            self.stack.push(ParseState::StringInside);
-            return Some(JsonToken::StringStart);
-        }
-
-        if is_numeric(char) {
-            self.reader.step();
-            self.stack.push(ParseState::Number);
-            return Some(JsonToken::NumberStart {
-                is_negative: false,
-                digit: char,
-            });
-        }
-
-        if char == '-' as u8 {
-            self.reader.step();
-            self.parse_ws();
-            match self.reader.peek() {
-                None => {
-                    return Some(self.report_error(ParseError::NoCharacterAfterNegativeNumberStart))
+    fn start_next_object(&mut self) -> JsonToken {
+        match self.reader.peek() {
+            None => self.report_error(ParseError::UnexpectedReaderEnd),
+            Some(char) => {
+                if char == '{' as u8 {
+                    self.reader.step();
+                    self.stack.push(ParseState::ObjectParseKey);
+                    return JsonToken::ObjectStart;
                 }
-                Some(first_digit) => {
-                    if is_numeric(first_digit) {
-                        self.reader.step();
-                        self.stack.push(ParseState::Number);
-                        return Some(JsonToken::NumberStart {
-                            is_negative: true,
-                            digit: first_digit,
-                        });
+
+                if char == '[' as u8 {
+                    self.reader.step();
+                    self.stack.push(ParseState::ListParseElement);
+                    return JsonToken::ListStart;
+                }
+
+                if char == '"' as u8 {
+                    self.reader.step();
+                    self.stack.push(ParseState::StringInside);
+                    return JsonToken::StringStart;
+                }
+
+                if is_numeric(char) {
+                    self.reader.step();
+                    self.stack.push(ParseState::NumberBeforeDecimalPoint);
+                    return JsonToken::NumberStart {
+                        is_negative: false,
+                        digit: char,
+                    };
+                }
+
+                if char == '-' as u8 {
+                    self.reader.step();
+                    self.parse_ws();
+                    match self.reader.peek() {
+                        None => {
+                            return self
+                                .report_error(ParseError::NoCharacterAfterNegativeNumberStart)
+                        }
+                        Some(first_digit) => {
+                            if is_numeric(first_digit) {
+                                self.reader.step();
+                                self.stack.push(ParseState::NumberBeforeDecimalPoint);
+                                return JsonToken::NumberStart {
+                                    is_negative: true,
+                                    digit: first_digit,
+                                };
+                            }
+
+                            return self
+                                .report_error(ParseError::InvalidDigitAtNegativeNumberStart);
+                        }
                     }
-
-                    return Some(self.report_error(ParseError::InvalidDigitAtNegativeNumberStart));
                 }
+
+                if match self.parse_string_literal(char, "true") {
+                    Err(err) => return err,
+                    Ok(matches) => matches,
+                } {
+                    return JsonToken::True;
+                }
+
+                if match self.parse_string_literal(char, "false") {
+                    Err(err) => return err,
+                    Ok(matches) => matches,
+                } {
+                    return JsonToken::False;
+                }
+
+                return self.report_error(ParseError::UnexpectedCharacter);
             }
         }
+    }
 
-        None
+    fn parse_string_literal(&mut self, first_char: u8, text: &str) -> Result<bool, JsonToken> {
+        let bytes = text.as_bytes();
+        if first_char == bytes[0] {
+            self.reader.step();
+            for idx in 1..bytes.len() {
+                let match_char = bytes[idx];
+                match self.reader.peek() {
+                    None => return Err(self.report_error(ParseError::UnexpectedReaderEnd)),
+                    Some(char) => {
+                        if char == match_char {
+                            self.reader.step();
+                        } else {
+                            return Err(self.report_error(ParseError::UnexpectedCharacter));
+                        }
+                    }
+                }
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     fn report_error(&mut self, error: ParseError) -> JsonToken {
@@ -76,6 +132,16 @@ impl<'a, R: Reader> JsonLexer<'a, R> {
             idx: self.reader.get_idx(),
             error,
         })
+    }
+
+    fn try_parse_number_exponent(&mut self, first_char: u8) -> Option<JsonToken> {
+        if first_char == 'e' as u8 || first_char == 'E' as u8 {
+            self.reader.step();
+            self.set_top_state(ParseState::NumberExponentStart);
+            return Some(JsonToken::NumberExponentStart);
+        }
+
+        None
     }
 
     fn parse_ws(&mut self) {
@@ -152,79 +218,119 @@ impl<'a, R: Reader> JsonLexerTrait for JsonLexer<'a, R> {
 
         match state {
             ParseState::ParseError => return JsonToken::InErrorState,
-            ParseState::ObjectStart => {
+            ParseState::JsonStart => {
                 self.parse_ws();
-                match self.reader.peek() {
-                    None => return self.report_error(ParseError::MissingFirstCharacter),
-                    Some(char) => {
-                        let last_idx = self.stack.len() - 1;
-                        self.stack[last_idx] = ParseState::ObjectInside;
-
-                        match self.next_new_object(char) {
-                            Some(result) => {
-                                return result;
-                            }
-                            None => return self.report_error(ParseError::UnexpectedCharacter),
-                        }
-                    }
-                }
+                self.set_top_state(ParseState::JsonInside);
+                return self.start_next_object();
             }
-            ParseState::ObjectInside => {
+            ParseState::JsonInside => {
                 self.stack.pop();
                 return JsonToken::Done;
             }
-            ParseState::ListStart => {
+            ParseState::ObjectParseKey => {
                 self.parse_ws();
+
                 match self.reader.peek() {
-                    None => return self.report_error(ParseError::MissingFirstCharacter),
+                    None => return self.report_error(ParseError::UnexpectedReaderEnd),
                     Some(char) => {
-                        if char == ']' as u8 {
+                        if char == '"' as u8 {
+                            self.reader.step();
+                            self.set_top_state(ParseState::ObjectParseValue);
+                            self.stack.push(ParseState::StringInside);
+                            return JsonToken::StringStart;
+                        }
+
+                        if char == '}' as u8 {
                             self.reader.step();
                             self.stack.pop();
-                            return JsonToken::ListEnd;
+                            return JsonToken::ObjectEnd;
                         }
 
-                        let last_idx = self.stack.len() - 1;
-                        self.stack[last_idx] = ParseState::ListInside;
-
-                        match self.next_new_object(char) {
-                            Some(result) => {
-                                return result;
-                            }
-                            None => return self.report_error(ParseError::UnexpectedCharacter),
-                        }
+                        return self.report_error(ParseError::UnexpectedCharacter);
                     }
                 }
             }
-            ParseState::ListInside => {
+            ParseState::ObjectParseCommaThenKey => {
                 self.parse_ws();
+
                 match self.reader.peek() {
-                    None => return self.report_error(ParseError::MissingFirstCharacter),
+                    None => return self.report_error(ParseError::UnexpectedReaderEnd),
                     Some(char) => {
+                        if char == '}' as u8 {
+                            self.reader.step();
+                            self.stack.pop();
+                            return JsonToken::ObjectEnd;
+                        }
+
                         if char == ',' as u8 {
                             self.reader.step();
-                            return JsonToken::ListNextElement;
+                            self.set_top_state(ParseState::ObjectParseValue);
+                            self.parse_ws();
+                            return self.start_next_object();
                         }
 
+                        return self.report_error(ParseError::UnexpectedCharacter);
+                    }
+                }
+            }
+            ParseState::ObjectParseValue => {
+                self.parse_ws();
+
+                match self.reader.peek() {
+                    None => return self.report_error(ParseError::UnexpectedReaderEnd),
+                    Some(char) => {
+                        if char == ':' as u8 {
+                            self.reader.step();
+                            self.parse_ws();
+
+                            self.set_top_state(ParseState::ObjectParseCommaThenKey);
+
+                            return self.start_next_object();
+                        }
+
+                        return self.report_error(ParseError::UnexpectedCharacter);
+                    }
+                }
+            }
+            ParseState::ListParseElement => {
+                self.parse_ws();
+                match self.reader.peek() {
+                    None => return self.report_error(ParseError::MissingFirstCharacter),
+                    Some(char) => {
                         if char == ']' as u8 {
                             self.reader.step();
                             self.stack.pop();
                             return JsonToken::ListEnd;
                         }
 
-                        let last_idx = self.stack.len() - 1;
-                        self.stack[last_idx] = ParseState::ListInside;
+                        self.set_top_state(ParseState::ListParseCommaThenElement);
 
-                        match self.next_new_object(char) {
-                            Some(result) => {
-                                return result;
-                            }
-                            None => return self.report_error(ParseError::UnexpectedCharacter),
-                        }
+                        return self.start_next_object();
                     }
                 }
             }
-            ParseState::Number => match self.reader.peek() {
+            ParseState::ListParseCommaThenElement => {
+                self.parse_ws();
+                match self.reader.peek() {
+                    None => return self.report_error(ParseError::MissingFirstCharacter),
+                    Some(char) => {
+                        if char == ']' as u8 {
+                            self.reader.step();
+                            self.stack.pop();
+                            return JsonToken::ListEnd;
+                        }
+
+                        if char == ',' as u8 {
+                            self.reader.step();
+                            self.parse_ws();
+                            return self.start_next_object();
+                        }
+
+                        return self.report_error(ParseError::UnexpectedCharacter);
+                    }
+                }
+            }
+            ParseState::NumberBeforeDecimalPoint => match self.reader.peek() {
                 None => {
                     self.stack.pop();
                     return JsonToken::NumberEnd;
@@ -232,7 +338,76 @@ impl<'a, R: Reader> JsonLexerTrait for JsonLexer<'a, R> {
                 Some(char) => {
                     if is_numeric(char) {
                         self.reader.step();
-                        return JsonToken::NumberContinue(char);
+                        return JsonToken::NumberDigit(char);
+                    }
+
+                    if char == '.' as u8 {
+                        self.reader.step();
+                        self.set_top_state(ParseState::NumberAfterDecimalPoint);
+                        return JsonToken::NumberDecimalPoint;
+                    }
+
+                    match self.try_parse_number_exponent(char) {
+                        None => {}
+                        Some(token) => return token,
+                    }
+
+                    self.stack.pop();
+                    return JsonToken::NumberEnd;
+                }
+            },
+            ParseState::NumberAfterDecimalPoint => match self.reader.peek() {
+                None => {
+                    self.stack.pop();
+                    return JsonToken::NumberEnd;
+                }
+                Some(char) => {
+                    if is_numeric(char) {
+                        self.reader.step();
+                        return JsonToken::NumberDigit(char);
+                    }
+
+                    match self.try_parse_number_exponent(char) {
+                        None => {}
+                        Some(token) => return token,
+                    }
+
+                    self.stack.pop();
+                    return JsonToken::NumberEnd;
+                }
+            },
+            ParseState::NumberExponentStart => match self.reader.peek() {
+                None => return self.report_error(ParseError::UnexpectedReaderEnd),
+                Some(char) => {
+                    let (is_negative, digit) = if char == '-' as u8 {
+                        self.reader.step();
+
+                        let digit = match self.reader.peek() {
+                            None => return self.report_error(ParseError::UnexpectedReaderEnd),
+                            Some(char) => char,
+                        };
+
+                        (true, digit)
+                    } else if is_numeric(char) {
+                        (false, char)
+                    } else {
+                        return self.report_error(ParseError::UnexpectedCharacter);
+                    };
+
+                    self.reader.step();
+                    self.set_top_state(ParseState::NumberExponentDigit);
+                    return JsonToken::NumberStart { is_negative, digit };
+                }
+            },
+            ParseState::NumberExponentDigit => match self.reader.peek() {
+                None => {
+                    self.stack.pop();
+                    return JsonToken::NumberEnd;
+                }
+                Some(char) => {
+                    if is_numeric(char) {
+                        self.reader.step();
+                        return JsonToken::NumberDigit(char);
                     }
 
                     self.stack.pop();
@@ -303,11 +478,17 @@ impl<'a, R: Reader> JsonLexerTrait for JsonLexer<'a, R> {
 #[derive(Clone, Copy)]
 enum ParseState {
     ParseError,
-    ObjectStart,
-    ObjectInside,
-    ListStart,
-    ListInside,
-    Number,
+    JsonStart,
+    JsonInside,
+    ObjectParseKey,
+    ObjectParseCommaThenKey,
+    ObjectParseValue,
+    ListParseElement,
+    ListParseCommaThenElement,
+    NumberBeforeDecimalPoint,
+    NumberAfterDecimalPoint,
+    NumberExponentStart,
+    NumberExponentDigit,
     StringInside,
 }
 
@@ -316,15 +497,20 @@ pub enum JsonToken {
     Error(ErrorInfo),
     Done,
     InErrorState,
+    ObjectStart,
+    ObjectEnd,
     ListStart,
-    ListNextElement,
     ListEnd,
     NumberStart { is_negative: bool, digit: u8 },
-    NumberContinue(u8),
+    NumberDigit(u8),
+    NumberDecimalPoint,
+    NumberExponentStart,
     NumberEnd,
     StringStart,
     StringUtf16CodePoint(u16),
     StringEnd,
+    True,
+    False,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -335,6 +521,7 @@ pub struct ErrorInfo {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ParseError {
+    UnexpectedReaderEnd,
     UnexpectedCharacterAfterParseDone,
     MissingFirstCharacter,
     UnexpectedCharacter,
@@ -455,7 +642,7 @@ mod tests {
     #[test]
     fn test_number() {
         assert_eq!(
-            parse_into_vec("1"),
+            parse_into_vec(" 1"),
             vec![
                 JsonToken::NumberStart {
                     is_negative: false,
@@ -471,8 +658,8 @@ mod tests {
                     is_negative: false,
                     digit: '1' as u8
                 },
-                JsonToken::NumberContinue('3' as u8),
-                JsonToken::NumberContinue('2' as u8),
+                JsonToken::NumberDigit('3' as u8),
+                JsonToken::NumberDigit('2' as u8),
                 JsonToken::NumberEnd
             ]
         );
@@ -493,7 +680,7 @@ mod tests {
                     is_negative: true,
                     digit: '7' as u8
                 },
-                JsonToken::NumberContinue('2' as u8),
+                JsonToken::NumberDigit('2' as u8),
                 JsonToken::NumberEnd
             ]
         );
@@ -515,7 +702,67 @@ mod tests {
                     is_negative: true,
                     digit: '7' as u8
                 },
-                JsonToken::NumberContinue('2' as u8),
+                JsonToken::NumberDigit('2' as u8),
+                JsonToken::NumberEnd
+            ]
+        );
+        assert_eq!(
+            parse_into_vec("12.34"),
+            vec![
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberDigit('2' as u8),
+                JsonToken::NumberDecimalPoint,
+                JsonToken::NumberDigit('3' as u8),
+                JsonToken::NumberDigit('4' as u8),
+                JsonToken::NumberEnd
+            ]
+        );
+        assert_eq!(
+            parse_into_vec("1e2"),
+            vec![
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberExponentStart,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '2' as u8
+                },
+                JsonToken::NumberEnd
+            ]
+        );
+        assert_eq!(
+            parse_into_vec("1e-2"),
+            vec![
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberExponentStart,
+                JsonToken::NumberStart {
+                    is_negative: true,
+                    digit: '2' as u8
+                },
+                JsonToken::NumberEnd
+            ]
+        );
+        assert_eq!(
+            parse_into_vec("1e-23"),
+            vec![
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberExponentStart,
+                JsonToken::NumberStart {
+                    is_negative: true,
+                    digit: '2' as u8
+                },
+                JsonToken::NumberDigit('3' as u8),
                 JsonToken::NumberEnd
             ]
         );
@@ -564,7 +811,6 @@ mod tests {
                     digit: '1' as u8
                 },
                 JsonToken::NumberEnd,
-                JsonToken::ListNextElement,
                 JsonToken::NumberStart {
                     is_negative: false,
                     digit: '2' as u8
@@ -582,7 +828,6 @@ mod tests {
                     digit: '1' as u8
                 },
                 JsonToken::NumberEnd,
-                JsonToken::ListNextElement,
                 JsonToken::NumberStart {
                     is_negative: false,
                     digit: '2' as u8
@@ -606,13 +851,11 @@ mod tests {
                 JsonToken::ListStart,
                 JsonToken::ListStart,
                 JsonToken::ListEnd,
-                JsonToken::ListNextElement,
                 JsonToken::NumberStart {
                     is_negative: false,
                     digit: '9' as u8
                 },
                 JsonToken::NumberEnd,
-                JsonToken::ListNextElement,
                 JsonToken::ListStart,
                 JsonToken::ListEnd,
                 JsonToken::ListEnd,
@@ -643,7 +886,7 @@ mod tests {
                     is_negative: true,
                     digit: '1' as u8
                 },
-                JsonToken::NumberContinue('2' as u8),
+                JsonToken::NumberDigit('2' as u8),
                 JsonToken::NumberEnd,
             ]
         );
@@ -712,6 +955,96 @@ mod tests {
                     idx: 2,
                     error: ParseError::StringInvalidEscapeCharacter
                 })
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_object() {
+        assert_eq!(
+            parse_into_vec(r#"{}"#),
+            vec![JsonToken::ObjectStart, JsonToken::ObjectEnd,]
+        );
+        assert_eq!(
+            parse_into_vec(r#" { "a" : 1 } "#),
+            vec![
+                JsonToken::ObjectStart,
+                JsonToken::StringStart,
+                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringEnd,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberEnd,
+                JsonToken::ObjectEnd,
+            ]
+        );
+        assert_eq!(
+            parse_into_vec(r#" { "a" : 1 , "b" : 2 } "#),
+            vec![
+                JsonToken::ObjectStart,
+                JsonToken::StringStart,
+                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringEnd,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberEnd,
+                JsonToken::StringStart,
+                JsonToken::StringUtf16CodePoint('b' as u16),
+                JsonToken::StringEnd,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '2' as u8
+                },
+                JsonToken::NumberEnd,
+                JsonToken::ObjectEnd,
+            ]
+        );
+        assert_eq!(
+            parse_into_vec(r#" { "a" : 1 , "b" : 2, "c": 3 } "#),
+            vec![
+                JsonToken::ObjectStart,
+                JsonToken::StringStart,
+                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringEnd,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '1' as u8
+                },
+                JsonToken::NumberEnd,
+                JsonToken::StringStart,
+                JsonToken::StringUtf16CodePoint('b' as u16),
+                JsonToken::StringEnd,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '2' as u8
+                },
+                JsonToken::NumberEnd,
+                JsonToken::StringStart,
+                JsonToken::StringUtf16CodePoint('c' as u16),
+                JsonToken::StringEnd,
+                JsonToken::NumberStart {
+                    is_negative: false,
+                    digit: '3' as u8
+                },
+                JsonToken::NumberEnd,
+                JsonToken::ObjectEnd,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_bools() {
+        assert_eq!(
+            parse_into_vec(r#"[false,true]"#),
+            vec![
+                JsonToken::ListStart,
+                JsonToken::False,
+                JsonToken::True,
+                JsonToken::ListEnd,
             ]
         );
     }

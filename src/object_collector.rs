@@ -42,7 +42,7 @@ impl<'a, L: JsonLexerTrait, B: ByteVec> ObjectCollector<'a, L, B> {
                     loop {
                         let token = lexer.next();
                         match token {
-                            JsonToken::NumberContinue(digit) => {
+                            JsonToken::NumberDigit(digit) => {
                                 value = 10 * value + (digit - ('0' as u8)) as i64
                             }
                             JsonToken::NumberEnd => {
