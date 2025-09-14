@@ -1,19 +1,15 @@
-pub trait Reader {
-    fn peek(&mut self) -> Option<u8>;
-    fn step(&mut self);
-    fn get_idx(&mut self) -> usize;
-}
+use super::reader::ReaderTrait;
 
 pub trait JsonLexerTrait {
     fn next(&mut self) -> JsonToken;
 }
 
-pub struct JsonLexer<'a, R: Reader> {
+pub struct JsonLexer<'a, R: ReaderTrait> {
     reader: &'a mut R,
     stack: Vec<ParseState>,
 }
 
-impl<'a, R: Reader> JsonLexer<'a, R> {
+impl<'a, R: ReaderTrait> JsonLexer<'a, R> {
     pub fn new(reader: &'a mut R) -> Self {
         JsonLexer {
             reader,
@@ -208,7 +204,7 @@ impl<'a, R: Reader> JsonLexer<'a, R> {
     }
 }
 
-impl<'a, R: Reader> JsonLexerTrait for JsonLexer<'a, R> {
+impl<'a, R: ReaderTrait> JsonLexerTrait for JsonLexer<'a, R> {
     fn next(&mut self) -> JsonToken {
         if self.stack.len() == 0 {
             return JsonToken::Done;
@@ -437,7 +433,7 @@ impl<'a, R: Reader> JsonLexerTrait for JsonLexer<'a, R> {
                                         Err(err) => return self.report_error(err),
                                         Ok(code_point) => code_point,
                                     };
-                                    return JsonToken::StringUtf16CodePoint(code_point);
+                                    todo!()
                                 }
 
                                 // https://www.json.org/json-en.html
@@ -462,13 +458,13 @@ impl<'a, R: Reader> JsonLexerTrait for JsonLexer<'a, R> {
                                         .report_error(ParseError::StringInvalidEscapeCharacter);
                                 };
                                 self.reader.step();
-                                return JsonToken::StringUtf16CodePoint(escaped_char as u16);
+                                return JsonToken::StringUtf8CodePoint(escaped_char);
                             }
                         }
                     }
 
                     self.reader.step();
-                    return JsonToken::StringUtf16CodePoint(char as u16);
+                    return JsonToken::StringUtf8CodePoint(char as u8);
                 }
             },
         }
@@ -507,7 +503,7 @@ pub enum JsonToken {
     NumberExponentStart,
     NumberEnd,
     StringStart,
-    StringUtf16CodePoint(u16),
+    StringUtf8CodePoint(u8),
     StringEnd,
     True,
     False,
@@ -571,38 +567,10 @@ fn get_hex_value_from_char(val: u8) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::reader::StrReader;
     use super::*;
 
-    struct StrReader<'a> {
-        text: &'a str,
-        idx: usize,
-    }
-
-    impl<'a> StrReader<'a> {
-        fn new(text: &'a str) -> Self {
-            StrReader { text, idx: 0 }
-        }
-    }
-
-    impl<'a> Reader for StrReader<'a> {
-        fn peek(&mut self) -> Option<u8> {
-            if self.idx >= self.text.len() {
-                None
-            } else {
-                Some(self.text.as_bytes()[self.idx])
-            }
-        }
-
-        fn step(&mut self) {
-            self.idx += 1;
-        }
-
-        fn get_idx(&mut self) -> usize {
-            self.idx
-        }
-    }
-
-    fn get_all_tokens_from_lexer<R: Reader>(lexer: &mut JsonLexer<R>) -> Vec<JsonToken> {
+    fn get_all_tokens_from_lexer<R: ReaderTrait>(lexer: &mut JsonLexer<R>) -> Vec<JsonToken> {
         let mut tokens = Vec::<JsonToken>::new();
 
         loop {
@@ -916,7 +884,7 @@ mod tests {
             parse_into_vec(r#""a""#),
             vec![
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringUtf8CodePoint('a' as u8),
                 JsonToken::StringEnd,
             ]
         );
@@ -924,26 +892,25 @@ mod tests {
             parse_into_vec(r#""asdf""#),
             vec![
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('a' as u16),
-                JsonToken::StringUtf16CodePoint('s' as u16),
-                JsonToken::StringUtf16CodePoint('d' as u16),
-                JsonToken::StringUtf16CodePoint('f' as u16),
+                JsonToken::StringUtf8CodePoint('a' as u8),
+                JsonToken::StringUtf8CodePoint('s' as u8),
+                JsonToken::StringUtf8CodePoint('d' as u8),
+                JsonToken::StringUtf8CodePoint('f' as u8),
                 JsonToken::StringEnd,
             ]
         );
         assert_eq!(
-            parse_into_vec(r#""\"\\\/\b\f\n\r\t\u1aF9""#),
+            parse_into_vec(r#""\"\\\/\b\f\n\r\t""#),
             vec![
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('"' as u16),
-                JsonToken::StringUtf16CodePoint('\\' as u16),
-                JsonToken::StringUtf16CodePoint('/' as u16),
-                JsonToken::StringUtf16CodePoint(8),
-                JsonToken::StringUtf16CodePoint(12),
-                JsonToken::StringUtf16CodePoint('\n' as u16),
-                JsonToken::StringUtf16CodePoint('\r' as u16),
-                JsonToken::StringUtf16CodePoint('\t' as u16),
-                JsonToken::StringUtf16CodePoint(0x1AF9),
+                JsonToken::StringUtf8CodePoint('"' as u8),
+                JsonToken::StringUtf8CodePoint('\\' as u8),
+                JsonToken::StringUtf8CodePoint('/' as u8),
+                JsonToken::StringUtf8CodePoint(8),
+                JsonToken::StringUtf8CodePoint(12),
+                JsonToken::StringUtf8CodePoint('\n' as u8),
+                JsonToken::StringUtf8CodePoint('\r' as u8),
+                JsonToken::StringUtf8CodePoint('\t' as u8),
                 JsonToken::StringEnd,
             ]
         );
@@ -970,7 +937,7 @@ mod tests {
             vec![
                 JsonToken::ObjectStart,
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringUtf8CodePoint('a' as u8),
                 JsonToken::StringEnd,
                 JsonToken::NumberStart {
                     is_negative: false,
@@ -985,7 +952,7 @@ mod tests {
             vec![
                 JsonToken::ObjectStart,
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringUtf8CodePoint('a' as u8),
                 JsonToken::StringEnd,
                 JsonToken::NumberStart {
                     is_negative: false,
@@ -993,7 +960,7 @@ mod tests {
                 },
                 JsonToken::NumberEnd,
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('b' as u16),
+                JsonToken::StringUtf8CodePoint('b' as u8),
                 JsonToken::StringEnd,
                 JsonToken::NumberStart {
                     is_negative: false,
@@ -1008,7 +975,7 @@ mod tests {
             vec![
                 JsonToken::ObjectStart,
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('a' as u16),
+                JsonToken::StringUtf8CodePoint('a' as u8),
                 JsonToken::StringEnd,
                 JsonToken::NumberStart {
                     is_negative: false,
@@ -1016,7 +983,7 @@ mod tests {
                 },
                 JsonToken::NumberEnd,
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('b' as u16),
+                JsonToken::StringUtf8CodePoint('b' as u8),
                 JsonToken::StringEnd,
                 JsonToken::NumberStart {
                     is_negative: false,
@@ -1024,7 +991,7 @@ mod tests {
                 },
                 JsonToken::NumberEnd,
                 JsonToken::StringStart,
-                JsonToken::StringUtf16CodePoint('c' as u16),
+                JsonToken::StringUtf8CodePoint('c' as u8),
                 JsonToken::StringEnd,
                 JsonToken::NumberStart {
                     is_negative: false,

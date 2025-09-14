@@ -1,33 +1,77 @@
+use crate::byte_vec::ByteVec;
+
+use super::byte_vec::ByteVecTrait;
 use super::json_lexer::{JsonLexerTrait, JsonToken};
 
 /*
 Make a struct that collects JSON tokens from a lexer so it can answer queries.
 */
 
-pub trait ByteVec {
-    fn get_u8(&self, idx: u64) -> u8;
-    fn get_u64(&self, idx: u64) -> u64;
-    fn get_i64(&self, idx: u64) -> i64;
-    fn set_u64(&mut self, idx: u64, value: u64);
-    fn push_u8(&mut self, value: u8);
-    fn push_u64(&mut self, value: u64);
-    fn push_i64(&mut self, value: i64);
-    fn get_next_idx(&self) -> u64;
-}
-
-pub struct ObjectCollector<'a, L: JsonLexerTrait, B: ByteVec> {
-    lexer: &'a mut L,
-    byte_vec: &'a mut B,
-}
+pub struct ObjectCollector {}
 
 struct ObjectType {}
 impl ObjectType {
     const List: u8 = 0;
     const Int64: u8 = 1;
+    const String: u8 = 2;
 }
 
-impl<'a, L: JsonLexerTrait, B: ByteVec> ObjectCollector<'a, L, B> {
-    pub fn create_from_lexer(&mut self, lexer: &mut L) {
+pub enum Object {
+    Int64(i64),
+    ListRef(ListRef),
+    StringRef(StringRef),
+}
+
+pub struct StringRef {
+    idx: u64,
+}
+
+impl StringRef {
+    pub fn len<B: ByteVecTrait>(&self, byte_vec: &B) -> u64 {
+        byte_vec.get_u64(self.idx + 1)
+    }
+
+    pub fn to_string<B: ByteVecTrait>(&self, byte_vec: &B) -> String {
+        let len = byte_vec.get_u64(self.idx + 1);
+        let start_idx = self.idx + 1 + 8;
+        byte_vec
+            .get_slice_iterator(start_idx, len)
+            .map(|slice| std::str::from_utf8(slice).unwrap())
+            .collect::<String>()
+    }
+}
+
+pub struct ListRef {
+    idx: u64,
+}
+
+impl ListRef {
+    pub fn len<B: ByteVecTrait>(&self, byte_vec: &B) -> u64 {
+        byte_vec.get_u64(self.idx + 1)
+    }
+
+    pub fn get<B: ByteVecTrait>(&self, list_idx: usize, byte_vec: &B) -> u64 {
+        let mut start_idx = self.idx + 1 + 8 + 8;
+        let list_len = byte_vec.get_i64(self.idx + 1) as usize;
+        assert!(list_idx < list_len);
+
+        for _ in 0..list_idx {
+            start_idx += ObjectCollector::get_obj_len_bytes(start_idx, byte_vec);
+        }
+
+        start_idx
+    }
+}
+
+impl ObjectCollector {
+    pub fn new() -> Self {
+        ObjectCollector {}
+    }
+
+    pub fn populate_from_lexer<L: JsonLexerTrait, B: ByteVecTrait>(
+        lexer: &mut L,
+        byte_vec: &mut B,
+    ) {
         let mut stack = Vec::<StackItem>::new();
 
         loop {
@@ -36,9 +80,7 @@ impl<'a, L: JsonLexerTrait, B: ByteVec> ObjectCollector<'a, L, B> {
                 JsonToken::Done => break,
                 JsonToken::NumberStart { is_negative, digit } => {
                     let mut value: i64 = (digit - ('0' as u8)) as i64;
-                    if is_negative {
-                        value *= -1;
-                    }
+
                     loop {
                         let token = lexer.next();
                         match token {
@@ -51,16 +93,21 @@ impl<'a, L: JsonLexerTrait, B: ByteVec> ObjectCollector<'a, L, B> {
                             _ => unreachable!(),
                         }
                     }
-                    self.byte_vec.push_u8(ObjectType::Int64);
-                    self.byte_vec.push_i64(value);
+
+                    if is_negative {
+                        value *= -1;
+                    }
+
+                    byte_vec.push_u8(ObjectType::Int64);
+                    byte_vec.push_i64(value);
                 }
                 JsonToken::ListStart => {
                     stack.push(StackItem {
-                        obj_idx: self.byte_vec.get_next_idx(),
+                        obj_idx: byte_vec.len(),
                     });
-                    self.byte_vec.push_u8(ObjectType::List);
-                    self.byte_vec.push_u64(u64::MAX); // reserve for length
-                    self.byte_vec.push_u64(u64::MAX); // reserve for n_bytes
+                    byte_vec.push_u8(ObjectType::List);
+                    byte_vec.push_u64(u64::MAX); // reserve for length
+                    byte_vec.push_u64(u64::MAX); // reserve for n_bytes
 
                     /*
                     Lists have the following layout:
@@ -68,44 +115,80 @@ impl<'a, L: JsonLexerTrait, B: ByteVec> ObjectCollector<'a, L, B> {
                     - u64: LEN
                     - u64: N_BYTES
                     - ... serialized elements
-                    - ... u64 for each serialized element
+                    // - ... u64 for each serialized element
                     */
                 }
                 JsonToken::ListEnd => {
                     let stack_entry = stack.pop().unwrap();
                     let obj_idx = stack_entry.obj_idx;
-                    let end_idx = self.byte_vec.get_next_idx();
+                    let end_idx = byte_vec.len();
 
                     let mut len: u64 = 0;
-                    let mut n_bytes: u64 = 0;
+                    let mut n_bytes: u64 = 1 + 8 + 8;
                     let mut idx: u64 = obj_idx + 1 + 8 + 8;
                     while idx < end_idx {
-                        self.byte_vec.push_u64(idx); // push index of element
-                        let elem_n_bytes = self.get_obj_len_bytes(idx);
+                        // byte_vec.push_u64(idx); // push index of element
+                        let elem_n_bytes = Self::get_obj_len_bytes(idx, byte_vec);
                         len += 1;
                         n_bytes += elem_n_bytes;
                         idx += elem_n_bytes;
                     }
-                    n_bytes += len * 8; // Add space for indexes
+                    // n_bytes += len * 8; // Add space for indexes
 
-                    self.byte_vec.set_u64(obj_idx + 1, len);
-                    self.byte_vec.set_u64(obj_idx + 1 + 8, n_bytes);
+                    byte_vec.set_u64(obj_idx + 1, len);
+                    byte_vec.set_u64(obj_idx + 1 + 8, n_bytes);
                 }
-                _ => unimplemented!(),
+                JsonToken::StringStart => {
+                    stack.push(StackItem {
+                        obj_idx: byte_vec.len(),
+                    });
+                    byte_vec.push_u8(ObjectType::String);
+                    byte_vec.push_u64(u64::MAX); // reserve for n_bytes
+                }
+                JsonToken::StringUtf8CodePoint(code_point) => {
+                    byte_vec.push_u8(code_point);
+                }
+                JsonToken::StringEnd => {
+                    let stack_entry = stack.pop().unwrap();
+                    let obj_idx = stack_entry.obj_idx;
+                    let n_u8_chars = (byte_vec.len() - obj_idx - 1 - 8) as u64;
+                    byte_vec.set_u64(obj_idx + 1, n_u8_chars);
+                }
+                _ => unimplemented!("{:?}", token),
             }
         }
     }
 
-    fn get_obj_len_bytes(&self, idx: u64) -> u64 {
-        match self.byte_vec.get_u8(idx) {
+    fn get_obj_len_bytes<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> u64 {
+        match byte_vec.get_u8(idx) {
             ObjectType::Int64 => 1 + 8,
             ObjectType::List => {
-                let n_bytes = self.byte_vec.get_u64(idx + 1 + 8);
+                let n_bytes = byte_vec.get_u64(idx + 1 + 8);
                 assert_ne!(n_bytes, u64::MAX);
                 n_bytes
             }
+            ObjectType::String => {
+                let n_chars = byte_vec.get_u64(idx + 1);
+                assert_ne!(n_chars, u64::MAX);
+                n_chars + 1 + 8
+            }
             _ => unimplemented!(),
         }
+    }
+
+    pub fn get_list<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> ListRef {
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::List);
+        ListRef { idx }
+    }
+
+    pub fn get_i64<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> i64 {
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::Int64);
+        byte_vec.get_i64(idx + 1)
+    }
+
+    pub fn get_string<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> StringRef {
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::String);
+        StringRef { idx }
     }
 }
 
@@ -115,4 +198,124 @@ struct StackItem {
 
 pub enum ObjectCollectorError {
     InvalidType,
+}
+
+#[cfg(test)]
+mod test {
+    use super::super::byte_vec::ByteVec;
+    use super::super::json_lexer::JsonLexer;
+    use super::super::reader::StrReader;
+    use super::*;
+
+    #[test]
+    fn test_basic_int64() {
+        let mut reader = StrReader::new("123");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+
+        assert_eq!(ObjectCollector::get_i64(0, &byte_vec), 123);
+    }
+
+    #[test]
+    fn test_basic_list_of_ints() {
+        let mut reader = StrReader::new("[3, 1, 2]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+
+        let list = ObjectCollector::get_list(0, &byte_vec);
+        assert_eq!(list.len(&byte_vec), 3);
+        assert_eq!(
+            ObjectCollector::get_i64(list.get(0, &byte_vec), &byte_vec),
+            3
+        );
+        assert_eq!(
+            ObjectCollector::get_i64(list.get(1, &byte_vec), &byte_vec),
+            1
+        );
+        assert_eq!(
+            ObjectCollector::get_i64(list.get(2, &byte_vec), &byte_vec),
+            2
+        );
+    }
+
+    #[test]
+    fn test_empty_list() {
+        let mut reader = StrReader::new("[]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+
+        let list = ObjectCollector::get_list(0, &byte_vec);
+        assert_eq!(list.len(&byte_vec), 0);
+    }
+
+    #[test]
+    fn test_simple_list_of_lists() {
+        let mut reader = StrReader::new("[[]]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        let list0 = ObjectCollector::get_list(0, byte_vec);
+        assert_eq!(list0.len(byte_vec), 1);
+
+        let list1 = ObjectCollector::get_list(list0.get(0, byte_vec), byte_vec);
+        assert_eq!(list1.len(byte_vec), 0);
+    }
+
+    #[test]
+    fn test_mixed_list_of_lists() {
+        let mut reader = StrReader::new("[[1,2],3,[4,5,6],7]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        let list0 = ObjectCollector::get_list(0, byte_vec);
+        assert_eq!(list0.len(byte_vec), 4);
+
+        let list1 = ObjectCollector::get_list(list0.get(0, byte_vec), byte_vec);
+        assert_eq!(list1.len(byte_vec), 2);
+        assert_eq!(
+            ObjectCollector::get_i64(list1.get(0, byte_vec), byte_vec),
+            1
+        );
+        assert_eq!(
+            ObjectCollector::get_i64(list1.get(1, byte_vec), byte_vec),
+            2
+        );
+
+        assert_eq!(
+            ObjectCollector::get_i64(list0.get(1, byte_vec), byte_vec),
+            3
+        );
+
+        let list2 = ObjectCollector::get_list(list0.get(2, byte_vec), byte_vec);
+        assert_eq!(list2.len(byte_vec), 3);
+        assert_eq!(
+            ObjectCollector::get_i64(list2.get(0, byte_vec), byte_vec),
+            4
+        );
+        assert_eq!(
+            ObjectCollector::get_i64(list2.get(1, byte_vec), byte_vec),
+            5
+        );
+    }
+
+    #[test]
+    fn test_basic_string() {
+        let mut reader = StrReader::new("\"hello world\"");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        assert_eq!(
+            ObjectCollector::get_string(0, byte_vec).to_string(byte_vec),
+            "hello world"
+        );
+    }
 }

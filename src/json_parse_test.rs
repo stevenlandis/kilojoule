@@ -1,4 +1,4 @@
-use kilojoule::{JsonLexer, JsonLexerTrait, JsonToken, Reader};
+use kilojoule::{JsonLexer, JsonLexerTrait, JsonToken, ReaderTrait};
 use std::io::Read;
 
 struct FileReader {
@@ -21,7 +21,7 @@ impl FileReader {
     }
 }
 
-impl Reader for FileReader {
+impl ReaderTrait for FileReader {
     fn peek(&mut self) -> Option<u8> {
         if self.idx < self.buf_len {
             // println!("Read {}", self.buffer[self.idx] as char);
