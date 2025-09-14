@@ -313,9 +313,31 @@ mod test {
         ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
         let byte_vec = &byte_vec;
 
-        assert_eq!(
-            ObjectCollector::get_string(0, byte_vec).to_string(byte_vec),
-            "hello world"
-        );
+        let str0 = ObjectCollector::get_string(0, byte_vec);
+        assert_eq!(str0.to_string(byte_vec), "hello world");
+        assert_eq!(str0.len(byte_vec), 11);
+    }
+
+    #[test]
+    fn test_array_of_strings() {
+        let mut reader = StrReader::new("[1, \"22\", 3, \"4\"]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        let list = ObjectCollector::get_list(0, byte_vec);
+
+        assert_eq!(ObjectCollector::get_i64(list.get(0, byte_vec), byte_vec), 1);
+
+        let str0 = ObjectCollector::get_string(list.get(1, byte_vec), byte_vec);
+        assert_eq!(str0.to_string(byte_vec), "22");
+        assert_eq!(str0.len(byte_vec), 2);
+
+        assert_eq!(ObjectCollector::get_i64(list.get(2, byte_vec), byte_vec), 3);
+
+        let str1 = ObjectCollector::get_string(list.get(3, byte_vec), byte_vec);
+        assert_eq!(str1.to_string(byte_vec), "4");
+        assert_eq!(str1.len(byte_vec), 1);
     }
 }
