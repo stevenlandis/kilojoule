@@ -1,4 +1,6 @@
-use kilojoule::{JsonLexer, JsonLexerTrait, JsonToken, ReaderTrait};
+use kilojoule::{
+    ByteVec, ByteVecTrait, JsonLexer, JsonLexerTrait, JsonToken, ObjectCollector, ReaderTrait,
+};
 use std::io::Read;
 
 struct FileReader {
@@ -59,24 +61,34 @@ impl ReaderTrait for FileReader {
 }
 
 fn main() {
-    let mut reader = FileReader::new("/Users/steven/Downloads/space_age.2.0.60.json");
+    let file_name = std::env::args().nth(1).unwrap();
+    let mut reader = FileReader::new(&file_name);
 
     let mut lexer = JsonLexer::new(&mut reader);
+    let mut byte_vec = ByteVec::new();
+    ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+    println!("Done");
 
-    let mut n_loops: u64 = 0;
-    loop {
-        n_loops += 1;
-        match lexer.next() {
-            JsonToken::Done => {
-                println!("got done token");
-                break;
-            }
-            JsonToken::Error(err) => {
-                println!("Got error {:?}", err);
-                break;
-            }
-            _ => {}
-        }
-    }
-    println!("Done in n_loops={}", n_loops);
+    // loop {
+    //     std::thread::sleep(std::time::Duration::from_secs(1));
+    // }
+
+    println!("Byte vec has length {}", byte_vec.len());
+
+    // let mut n_loops: u64 = 0;
+    // loop {
+    //     n_loops += 1;
+    //     match lexer.next() {
+    //         JsonToken::Done => {
+    //             println!("got done token");
+    //             break;
+    //         }
+    //         JsonToken::Error(err) => {
+    //             println!("Got error {:?}", err);
+    //             break;
+    //         }
+    //         _ => {}
+    //     }
+    // }
+    // println!("Done in n_loops={}", n_loops);
 }

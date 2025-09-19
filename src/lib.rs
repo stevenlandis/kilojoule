@@ -13,7 +13,9 @@ mod run_repl;
 mod val;
 
 // External exports
+pub use byte_vec::{ByteVec, ByteVecTrait};
 pub use evaluator::EvalCtx;
 pub use json_lexer::{JsonLexer, JsonLexerTrait, JsonToken};
+pub use object_collector::ObjectCollector;
 pub use reader::ReaderTrait;
 pub use run_repl::run_repl;
