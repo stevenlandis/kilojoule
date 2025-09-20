@@ -11,6 +11,9 @@ pub trait ByteVecTrait {
     fn push_i64(&mut self, value: i64) -> u64;
     fn get_i64(&self, idx: u64) -> i64;
 
+    fn push_f64(&mut self, value: f64) -> u64;
+    fn get_f64(&self, idx: u64) -> f64;
+
     fn get_slice_iterator<'a>(&'a self, start_idx: u64, len: u64) -> ByteVecSliceIterator<'a>;
 
     fn len(&self) -> u64;
@@ -34,7 +37,7 @@ impl ByteVec {
     fn _push_value<T>(&mut self, value: T) -> u64 {
         let layout = T::LAYOUT;
 
-        let mut n_new_bytes = layout.size();
+        let n_new_bytes = layout.size();
 
         // Here's the old padding logic, trying to not pad
         // // 1000 -> 1111
@@ -114,6 +117,14 @@ impl ByteVecTrait for ByteVec {
     }
 
     fn get_i64(&self, idx: u64) -> i64 {
+        self._get_value(idx)
+    }
+
+    fn push_f64(&mut self, value: f64) -> u64 {
+        self._push_value(value)
+    }
+
+    fn get_f64(&self, idx: u64) -> f64 {
         self._get_value(idx)
     }
 
