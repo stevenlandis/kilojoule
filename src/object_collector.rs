@@ -1,5 +1,3 @@
-use crate::byte_vec::ByteVec;
-
 use super::byte_vec::ByteVecTrait;
 use super::json_lexer::{JsonLexerTrait, JsonToken};
 
@@ -11,17 +9,12 @@ pub struct ObjectCollector {}
 
 struct ObjectType {}
 impl ObjectType {
-    const List: u8 = 0;
-    const Int64: u8 = 1;
-    const String: u8 = 2;
-    const Object: u8 = 3;
-    const Bool: u8 = 4;
-}
-
-pub enum Object {
-    Int64(i64),
-    ListRef(ListRef),
-    StringRef(StringRef),
+    const LIST: u8 = 0;
+    const INT_64: u8 = 1;
+    const FLOAT_64: u8 = 2;
+    const STRING: u8 = 3;
+    const OBJECT: u8 = 4;
+    const BOOL: u8 = 5;
 }
 
 pub struct ObjectRef {
@@ -38,7 +31,7 @@ impl ObjectRef {
 
         while idx < end_idx {
             let obj_type = byte_vec.get_u8(idx);
-            if obj_type == ObjectType::String {
+            if obj_type == ObjectType::STRING {
                 let search_key = StringRef { idx };
                 if search_key.len(byte_vec) as usize == key.len() {
                     let mut matches = true;
@@ -123,7 +116,9 @@ impl ObjectCollector {
                 JsonToken::NumberStart { is_negative, digit } => {
                     let mut value: i64 = (digit - ('0' as u8)) as i64;
                     let mut decimal: u64 = 0;
-                    let mut exponent: u64 = 0;
+                    let mut n_decimal_digits: i32 = 0;
+                    let mut exponent: i32 = 0;
+                    let mut n_exponent_digits: i32 = 0;
                     let mut exponent_is_negative: bool = false;
 
                     loop {
@@ -141,6 +136,7 @@ impl ObjectCollector {
                                     match token {
                                         JsonToken::NumberDigit(digit) => {
                                             decimal = 10 * decimal + (digit - ('0' as u8)) as u64;
+                                            n_decimal_digits += 1;
                                         }
                                         JsonToken::NumberEnd => break,
                                         JsonToken::NumberExponentStart => {
@@ -152,11 +148,13 @@ impl ObjectCollector {
                                                         digit,
                                                     } => {
                                                         exponent_is_negative = is_negative;
-                                                        exponent = (digit - ('0' as u8)) as u64;
+                                                        exponent = (digit - ('0' as u8)) as i32;
+                                                        n_exponent_digits = 1;
                                                     }
                                                     JsonToken::NumberDigit(digit) => {
                                                         exponent = 10 * exponent
-                                                            + (digit - ('0' as u8)) as u64;
+                                                            + (digit - ('0' as u8)) as i32;
+                                                        n_exponent_digits += 1;
                                                     }
                                                     JsonToken::NumberEnd => break,
                                                     _ => unreachable!("{:?}", token),
@@ -175,10 +173,10 @@ impl ObjectCollector {
                                     match token {
                                         JsonToken::NumberStart { is_negative, digit } => {
                                             exponent_is_negative = is_negative;
-                                            exponent = (digit - ('0' as u8)) as u64;
+                                            exponent = (digit - ('0' as u8)) as i32;
                                         }
                                         JsonToken::NumberDigit(digit) => {
-                                            exponent = 10 * exponent + (digit - ('0' as u8)) as u64;
+                                            exponent = 10 * exponent + (digit - ('0' as u8)) as i32;
                                         }
                                         JsonToken::NumberEnd => break,
                                         _ => unreachable!("{:?}", token),
@@ -194,14 +192,29 @@ impl ObjectCollector {
                         value *= -1;
                     }
 
-                    byte_vec.push_u8(ObjectType::Int64);
-                    byte_vec.push_i64(value);
+                    if n_decimal_digits != 0 || n_exponent_digits != 0 {
+                        let mut value = value as f64;
+                        if n_decimal_digits != 0 && decimal != 0 {
+                            value += (decimal as f64) / f64::powi(10.0, n_decimal_digits);
+                        }
+                        if n_exponent_digits != 0 && exponent != 0 {
+                            if exponent_is_negative {
+                                exponent *= -1;
+                            }
+                            value *= f64::powi(10.0, exponent);
+                        }
+                        byte_vec.push_u8(ObjectType::FLOAT_64);
+                        byte_vec.push_f64(value);
+                    } else {
+                        byte_vec.push_u8(ObjectType::INT_64);
+                        byte_vec.push_i64(value);
+                    }
                 }
                 JsonToken::ListStart => {
                     stack.push(StackItem {
                         obj_idx: byte_vec.len(),
                     });
-                    byte_vec.push_u8(ObjectType::List);
+                    byte_vec.push_u8(ObjectType::LIST);
                     byte_vec.push_u64(u64::MAX); // reserve for length
                     byte_vec.push_u64(u64::MAX); // reserve for n_bytes
 
@@ -238,7 +251,7 @@ impl ObjectCollector {
                     stack.push(StackItem {
                         obj_idx: byte_vec.len(),
                     });
-                    byte_vec.push_u8(ObjectType::String);
+                    byte_vec.push_u8(ObjectType::STRING);
                     byte_vec.push_u64(u64::MAX); // reserve for n_bytes
                 }
                 JsonToken::StringUtf8CodePoint(code_point) => {
@@ -263,7 +276,7 @@ impl ObjectCollector {
                     stack.push(StackItem {
                         obj_idx: byte_vec.len(),
                     });
-                    byte_vec.push_u8(ObjectType::Object);
+                    byte_vec.push_u8(ObjectType::OBJECT);
                     byte_vec.push_u64(u64::MAX); // reserve for LEN
                     byte_vec.push_u64(u64::MAX); // reserve for N_BYTES
                 }
@@ -290,11 +303,11 @@ impl ObjectCollector {
                     byte_vec.set_u64(obj_idx + 1 + 8, n_bytes);
                 }
                 JsonToken::False => {
-                    byte_vec.push_u8(ObjectType::Bool);
+                    byte_vec.push_u8(ObjectType::BOOL);
                     byte_vec.push_u8(0);
                 }
                 JsonToken::True => {
-                    byte_vec.push_u8(ObjectType::Bool);
+                    byte_vec.push_u8(ObjectType::BOOL);
                     byte_vec.push_u8(1);
                 }
                 _ => unimplemented!("{:?}", token),
@@ -304,54 +317,50 @@ impl ObjectCollector {
 
     fn get_obj_len_bytes<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> u64 {
         match byte_vec.get_u8(idx) {
-            ObjectType::Int64 => 1 + 8,
-            ObjectType::List => {
+            ObjectType::INT_64 => 1 + 8,
+            ObjectType::LIST => {
                 let n_bytes = byte_vec.get_u64(idx + 1 + 8);
                 assert_ne!(n_bytes, u64::MAX);
                 n_bytes
             }
-            ObjectType::String => {
+            ObjectType::STRING => {
                 let n_chars = byte_vec.get_u64(idx + 1);
                 assert_ne!(n_chars, u64::MAX);
                 n_chars + 1 + 8
             }
-            ObjectType::Object => {
+            ObjectType::OBJECT => {
                 let n_bytes = byte_vec.get_u64(idx + 1 + 8);
                 assert_ne!(n_bytes, u64::MAX);
                 n_bytes
             }
-            ObjectType::Bool => 2,
+            ObjectType::BOOL => 2,
             _ => unimplemented!(),
         }
     }
 
     pub fn get_list<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> ListRef {
-        assert_eq!(byte_vec.get_u8(idx), ObjectType::List);
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::LIST);
         ListRef { idx }
     }
 
     pub fn get_i64<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> i64 {
-        assert_eq!(byte_vec.get_u8(idx), ObjectType::Int64);
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::INT_64);
         byte_vec.get_i64(idx + 1)
     }
 
     pub fn get_string<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> StringRef {
-        assert_eq!(byte_vec.get_u8(idx), ObjectType::String);
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::STRING);
         StringRef { idx }
     }
 
     pub fn get_object<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> ObjectRef {
-        assert_eq!(byte_vec.get_u8(idx), ObjectType::Object);
+        assert_eq!(byte_vec.get_u8(idx), ObjectType::OBJECT);
         ObjectRef { idx }
     }
 }
 
 struct StackItem {
     obj_idx: u64,
-}
-
-pub enum ObjectCollectorError {
-    InvalidType,
 }
 
 #[cfg(test)]
