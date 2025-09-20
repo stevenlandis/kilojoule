@@ -66,7 +66,7 @@ impl<T> HeapAllocator<T> {
         while index > 0 {
             let parent_index = (index - 1) / 2;
 
-            if self.free_heap[index] > self.free_heap[parent_index] {
+            if self.free_heap[index] < self.free_heap[parent_index] {
                 self.free_heap.swap(index, parent_index);
                 index = parent_index;
             } else {
@@ -80,19 +80,19 @@ impl<T> HeapAllocator<T> {
         loop {
             let left = 2 * index + 1;
             let right = 2 * index + 2;
-            let mut largest = index;
+            let mut smallest = index;
 
-            if left < len && self.free_heap[left] > self.free_heap[largest] {
-                largest = left;
+            if left < len && self.free_heap[left] < self.free_heap[smallest] {
+                smallest = left;
             }
 
-            if right < len && self.free_heap[right] > self.free_heap[largest] {
-                largest = right;
+            if right < len && self.free_heap[right] < self.free_heap[smallest] {
+                smallest = right;
             }
 
-            if largest != index {
-                self.free_heap.swap(index, largest);
-                index = largest;
+            if smallest != index {
+                self.free_heap.swap(index, smallest);
+                index = smallest;
             } else {
                 break;
             }
@@ -128,8 +128,8 @@ mod test {
 
         let i4 = alloc.push("v4".to_string());
         let i5 = alloc.push("v5".to_string());
-        assert_eq!(i4, 1);
-        assert_eq!(i5, 0);
+        assert_eq!(i4, 0);
+        assert_eq!(i5, 1);
 
         assert_eq!(alloc.get(i4), "v4");
         assert_eq!(alloc.get(i5), "v5");
