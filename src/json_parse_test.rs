@@ -1,6 +1,4 @@
-use kilojoule::{
-    ByteVec, ByteVecTrait, JsonLexer, JsonLexerTrait, JsonToken, ObjectCollector, ReaderTrait,
-};
+use kilojoule::{ByteVec, ByteVecTrait, JsonLexer, ObjectCollector, ReaderTrait};
 use std::io::Read;
 
 struct FileReader {

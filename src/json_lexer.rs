@@ -429,7 +429,7 @@ impl<'a, R: ReaderTrait> JsonLexerTrait for JsonLexer<'a, R> {
                             Some(char) => {
                                 if char == 'u' as u8 {
                                     self.reader.step();
-                                    let code_point = match self.parse_hex_u16() {
+                                    let _code_point = match self.parse_hex_u16() {
                                         Err(err) => return self.report_error(err),
                                         Ok(code_point) => code_point,
                                     };
@@ -533,20 +533,8 @@ fn is_whitespace(val: u8) -> bool {
     val == (' ' as u8) || val == ('\n' as u8) || val == ('\t' as u8) || val == ('\r' as u8)
 }
 
-fn is_alpha(val: u8) -> bool {
-    ('A' as u8) <= val && val <= ('Z' as u8) || ('a' as u8) <= val && val <= ('z' as u8)
-}
-
-fn is_alpha_underscore(val: u8) -> bool {
-    is_alpha(val) || val == ('_' as u8)
-}
-
 fn is_numeric(val: u8) -> bool {
     ('0' as u8) <= val && val <= ('9' as u8)
-}
-
-fn is_alpha_underscore_numeric(val: u8) -> bool {
-    is_alpha_underscore(val) || is_numeric(val)
 }
 
 fn get_hex_value_from_char(val: u8) -> Option<u8> {
