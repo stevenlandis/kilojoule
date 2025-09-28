@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use super::byte_vec::ByteVecTrait;
 use super::json_lexer::{JsonLexerTrait, JsonToken};
 
@@ -26,32 +28,60 @@ impl ObjectRef {
     }
 
     pub fn get_key<B: ByteVecTrait>(&self, byte_vec: &B, key: &str) -> Option<u64> {
-        let mut idx = self.idx + 1 + 8 + 8;
+        let key_index_idx = byte_vec.get_u64(self.idx + 1);
         let end_idx = self.idx + ObjectCollector::get_obj_len_bytes(self.idx, byte_vec);
 
-        while idx < end_idx {
-            let obj_type = byte_vec.get_u8(idx);
+        let mut idx = end_idx;
+        while idx > key_index_idx {
+            idx -= 8;
+            let key_idx = byte_vec.get_u64(idx);
+            let obj_type = byte_vec.get_u8(key_idx);
             if obj_type == ObjectType::STRING {
-                let search_key = StringRef { idx };
+                let search_key = StringRef { idx: key_idx };
                 if search_key.len(byte_vec) as usize == key.len() {
                     let mut matches = true;
                     let key_bytes = key.as_bytes();
-                    let key_idx = idx + 1 + 8;
+                    let key_start_idx = key_idx + 1 + 8;
                     for search_idx in 0..key.len() {
-                        if key_bytes[search_idx] != byte_vec.get_u8(key_idx + (search_idx as u64)) {
+                        if key_bytes[search_idx]
+                            != byte_vec.get_u8(key_start_idx + (search_idx as u64))
+                        {
                             matches = false;
                             break;
                         }
                     }
                     if matches {
-                        idx += ObjectCollector::get_obj_len_bytes(idx, byte_vec);
-                        return Some(idx);
+                        let obj_idx =
+                            key_idx + ObjectCollector::get_obj_len_bytes(key_idx, byte_vec);
+                        return Some(obj_idx);
                     }
                 }
             }
-            idx += ObjectCollector::get_obj_len_bytes(idx, byte_vec);
-            idx += ObjectCollector::get_obj_len_bytes(idx, byte_vec);
         }
+
+        // while idx < end_idx {
+        //     let obj_type = byte_vec.get_u8(idx);
+        //     if obj_type == ObjectType::STRING {
+        //         let search_key = StringRef { idx };
+        //         if search_key.len(byte_vec) as usize == key.len() {
+        //             let mut matches = true;
+        //             let key_bytes = key.as_bytes();
+        //             let key_idx = idx + 1 + 8;
+        //             for search_idx in 0..key.len() {
+        //                 if key_bytes[search_idx] != byte_vec.get_u8(key_idx + (search_idx as u64)) {
+        //                     matches = false;
+        //                     break;
+        //                 }
+        //             }
+        //             if matches {
+        //                 idx += ObjectCollector::get_obj_len_bytes(idx, byte_vec);
+        //                 return Some(idx);
+        //             }
+        //         }
+        //     }
+        //     idx += ObjectCollector::get_obj_len_bytes(idx, byte_vec);
+        //     idx += ObjectCollector::get_obj_len_bytes(idx, byte_vec);
+        // }
 
         None
     }
@@ -64,6 +94,10 @@ pub struct StringRef {
 impl StringRef {
     pub fn len<B: ByteVecTrait>(&self, byte_vec: &B) -> u64 {
         byte_vec.get_u64(self.idx + 1)
+    }
+
+    pub fn get_byte<B: ByteVecTrait>(&self, byte_vec: &B, idx: u64) -> u8 {
+        byte_vec.get_u8(self.idx + 1 + 8 + idx)
     }
 
     pub fn to_string<B: ByteVecTrait>(&self, byte_vec: &B) -> String {
@@ -242,6 +276,7 @@ impl ObjectCollector {
                         n_bytes += elem_n_bytes;
                         idx += elem_n_bytes;
                     }
+                    assert_eq!(idx, end_idx);
                     // n_bytes += len * 8; // Add space for indexes
 
                     byte_vec.set_u64(obj_idx + 1, len);
@@ -266,18 +301,20 @@ impl ObjectCollector {
                 JsonToken::ObjectStart => {
                     /*
                     - u8: ObjectType::Object
-                    - u64: LEN
+                    - u64: KEY_INDEX_IDX
                     - u64: N_BYTES
                     - key0, val0
                     - key1, val1
                     - ...
+                    - padding if needed
+                    - ... sorted key indexes
                     */
 
                     stack.push(StackItem {
                         obj_idx: byte_vec.len(),
                     });
                     byte_vec.push_u8(ObjectType::OBJECT);
-                    byte_vec.push_u64(u64::MAX); // reserve for LEN
+                    byte_vec.push_u64(u64::MAX); // reserve for KEY_INDEX_IDX
                     byte_vec.push_u64(u64::MAX); // reserve for N_BYTES
                 }
                 JsonToken::ObjectEnd => {
@@ -285,21 +322,35 @@ impl ObjectCollector {
                     let obj_idx = stack_entry.obj_idx;
                     let end_idx = byte_vec.len();
 
-                    let mut len: u64 = 0;
-                    let mut n_bytes: u64 = 1 + 8 + 8;
+                    byte_vec.pad_for_value::<u64>();
+                    let idx_slice_start = byte_vec.len();
+
+                    // let mut len: u64 = 0;
+                    // let mut n_bytes: u64 = 1 + 8 + 8;
+                    let mut n_entries: usize = 0;
                     let mut idx: u64 = obj_idx + 1 + 8 + 8;
                     while idx < end_idx {
-                        let elem_n_bytes = Self::get_obj_len_bytes(idx, byte_vec);
-                        len += 1;
-                        n_bytes += elem_n_bytes;
-                        idx += elem_n_bytes;
+                        // push index of key
+                        byte_vec.push_u64(idx);
+                        let key_n_bytes = Self::get_obj_len_bytes(idx, byte_vec);
+                        idx += key_n_bytes;
+                        let val_n_bytes = Self::get_obj_len_bytes(idx, byte_vec);
+                        idx += val_n_bytes;
+                        n_entries += 1;
                     }
+                    assert_eq!(idx, end_idx);
+                    let n_bytes = byte_vec.len() - obj_idx;
 
-                    // Make sure length is odd because one key and value for each entry
-                    assert_eq!(len & 0b1, 0);
-                    len >>= 1;
+                    // Sort key indexes to dedupe and speed up lookups
+                    let key_idx_slice =
+                        byte_vec.get_mut_slice::<u64>(idx_slice_start, n_entries as u64);
+                    key_idx_slice.sort_by(|left: &u64, right: &u64| {
+                        let left = *left;
+                        let right = *right;
+                        Self::cmp(byte_vec, left, right)
+                    });
 
-                    byte_vec.set_u64(obj_idx + 1, len);
+                    byte_vec.set_u64(obj_idx + 1, idx_slice_start);
                     byte_vec.set_u64(obj_idx + 1 + 8, n_bytes);
                 }
                 JsonToken::False => {
@@ -356,6 +407,38 @@ impl ObjectCollector {
     pub fn get_object<B: ByteVecTrait>(idx: u64, byte_vec: &B) -> ObjectRef {
         assert_eq!(byte_vec.get_u8(idx), ObjectType::OBJECT);
         ObjectRef { idx }
+    }
+
+    pub fn cmp<B: ByteVecTrait>(byte_vec: &B, left: u64, right: u64) -> Ordering {
+        let left_type = byte_vec.get_u8(left);
+        let right_type = byte_vec.get_u8(right);
+
+        match left_type {
+            ObjectType::STRING => match right_type {
+                ObjectType::STRING => Self::_str_cmp(byte_vec, left, right),
+                _ => left_type.cmp(&right_type),
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn _str_cmp<B: ByteVecTrait>(byte_vec: &B, left: u64, right: u64) -> Ordering {
+        let l_str = Self::get_string(left, byte_vec);
+        let r_str = Self::get_string(right, byte_vec);
+        let l_len = l_str.len(byte_vec);
+        let r_len = r_str.len(byte_vec);
+        let max_idx = l_len.min(r_len);
+        for idx in 0..max_idx {
+            let l_byte = l_str.get_byte(byte_vec, idx);
+            let r_byte = r_str.get_byte(byte_vec, idx);
+            let cmp = l_byte.cmp(&r_byte);
+            match cmp {
+                Ordering::Equal => {}
+                _ => return cmp,
+            }
+        }
+
+        l_len.cmp(&r_len)
     }
 }
 
@@ -505,6 +588,42 @@ mod test {
     }
 
     #[test]
+    fn test_str_cmp() {
+        let mut reader = StrReader::new("[\"a\", \"b\"]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        let list = ObjectCollector::get_list(0, byte_vec);
+        let e0 = list.get(0, byte_vec);
+        let e1 = list.get(1, byte_vec);
+
+        assert_eq!(ObjectCollector::cmp(byte_vec, e0, e0), Ordering::Equal);
+        assert_eq!(ObjectCollector::cmp(byte_vec, e1, e1), Ordering::Equal);
+        assert_eq!(ObjectCollector::cmp(byte_vec, e0, e1), Ordering::Less);
+        assert_eq!(ObjectCollector::cmp(byte_vec, e1, e0), Ordering::Greater);
+    }
+
+    #[test]
+    fn test_str_cmp2() {
+        let mut reader = StrReader::new("[\"a\", \"ab\"]");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        let list = ObjectCollector::get_list(0, byte_vec);
+        let e0 = list.get(0, byte_vec);
+        let e1 = list.get(1, byte_vec);
+
+        assert_eq!(ObjectCollector::cmp(byte_vec, e0, e0), Ordering::Equal);
+        assert_eq!(ObjectCollector::cmp(byte_vec, e1, e1), Ordering::Equal);
+        assert_eq!(ObjectCollector::cmp(byte_vec, e0, e1), Ordering::Less);
+        assert_eq!(ObjectCollector::cmp(byte_vec, e1, e0), Ordering::Greater);
+    }
+
+    #[test]
     fn test_basic_object() {
         let mut reader = StrReader::new("{\"a\": 100, \"b\": 200}");
         let mut lexer = JsonLexer::new(&mut reader);
@@ -521,5 +640,26 @@ mod test {
             ObjectCollector::get_i64(obj.get_key(byte_vec, "b").unwrap(), byte_vec),
             200
         );
+        assert_eq!(obj.get_key(byte_vec, "c"), None);
+    }
+
+    #[test]
+    fn test_obj_with_dupe_keys() {
+        let mut reader = StrReader::new("{\"a\": 100, \"b\": 200, \"a\": 300}");
+        let mut lexer = JsonLexer::new(&mut reader);
+        let mut byte_vec = ByteVec::new();
+        ObjectCollector::populate_from_lexer(&mut lexer, &mut byte_vec);
+        let byte_vec = &byte_vec;
+
+        let obj = ObjectCollector::get_object(0, byte_vec);
+        assert_eq!(
+            ObjectCollector::get_i64(obj.get_key(byte_vec, "a").unwrap(), byte_vec),
+            300
+        );
+        assert_eq!(
+            ObjectCollector::get_i64(obj.get_key(byte_vec, "b").unwrap(), byte_vec),
+            200
+        );
+        assert_eq!(obj.get_key(byte_vec, "c"), None);
     }
 }

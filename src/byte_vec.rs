@@ -15,6 +15,8 @@ pub trait ByteVecTrait {
     fn get_f64(&self, idx: u64) -> f64;
 
     fn get_slice_iterator<'a>(&'a self, start_idx: u64, len: u64) -> ByteVecSliceIterator<'a>;
+    fn get_mut_slice<T>(&self, idx: u64, len: u64) -> &mut [T];
+    fn pad_for_value<T>(&mut self);
 
     fn len(&self) -> u64;
 }
@@ -49,8 +51,21 @@ impl ByteVec {
         // //     n_new_bytes += padding;
         // // }
 
-        if self.len + n_new_bytes > self.capacity {
-            let new_capacity = std::cmp::max(self.len + n_new_bytes, self.capacity * 2);
+        self._increase_capacity_to_store(self.len + n_new_bytes);
+
+        let offset = self.len;
+
+        unsafe {
+            (((self.ptr as usize) + offset) as *mut T).write_unaligned(value);
+        }
+        self.len += n_new_bytes;
+
+        offset as u64
+    }
+
+    fn _increase_capacity_to_store(&mut self, new_len: usize) {
+        if new_len > self.capacity {
+            let new_capacity = std::cmp::max(new_len, self.capacity * 2);
             self.ptr = unsafe {
                 std::alloc::realloc(
                     self.ptr as *mut u8,
@@ -60,11 +75,35 @@ impl ByteVec {
             };
             self.capacity = new_capacity;
         }
+    }
 
-        let offset = self.len;
+    /*
+    Some values like u64 need a memory address that is a multiple
+    of the size.
+
+    This function adds padding after the previous value to make sure
+    the new value is aligned.
+     */
+    fn _push_aligned_value<T>(&mut self, value: T) -> u64 {
+        let layout = T::LAYOUT;
+
+        let mut n_new_bytes = layout.size();
+
+        // 1000 -> 1111
+        let mask = (1 << (layout.align().trailing_zeros() + 1)) - 1;
+        let remainder = self.len & mask;
+        let mut padding: usize = 0;
+        if remainder != 0 {
+            padding = layout.align() - remainder;
+            n_new_bytes += padding;
+        }
+
+        self._increase_capacity_to_store(self.len + n_new_bytes);
+
+        let offset = self.len + padding;
 
         unsafe {
-            (((self.ptr as usize) + offset) as *mut T).write_unaligned(value);
+            (((self.ptr as usize) + offset) as *mut T).write(value);
         }
         self.len += n_new_bytes;
 
@@ -136,6 +175,33 @@ impl ByteVecTrait for ByteVec {
         }
     }
 
+    fn get_mut_slice<T>(&self, idx: u64, len: u64) -> &mut [T] {
+        // Make sure start index is aligned
+        assert!((idx as usize) % T::LAYOUT.align() == 0);
+
+        unsafe {
+            std::slice::from_raw_parts_mut(
+                ((self.ptr as usize) + (idx as usize)) as *mut T,
+                len as usize,
+            )
+        }
+    }
+
+    fn pad_for_value<T>(&mut self) {
+        let layout = T::LAYOUT;
+
+        // 1000 -> 1111
+        let mask = (1 << (layout.align().trailing_zeros())) - 1;
+        let remainder = self.len & mask;
+        let mut padding: usize = 0;
+        if remainder != 0 {
+            padding = layout.align() - remainder;
+        }
+
+        self._increase_capacity_to_store(self.len + padding);
+        self.len += padding;
+    }
+
     fn len(&self) -> u64 {
         self.len as u64
     }
@@ -201,5 +267,44 @@ mod test {
         assert_eq!(byte_vec.len(), 27);
         assert_eq!(byte_vec.get_i64(big_n1), i64::MIN);
         assert_eq!(byte_vec.get_i64(big_n2), i64::MAX);
+    }
+
+    #[test]
+    fn test_aligned_slice() {
+        for n_leading_bytes in 0..7 {
+            let mut byte_vec = ByteVec::new();
+
+            for _ in 0..n_leading_bytes {
+                byte_vec.push_u8(1);
+            }
+            byte_vec.pad_for_value::<u64>();
+            assert_eq!(byte_vec.len(), if n_leading_bytes == 0 { 0 } else { 8 });
+            let slice_start = byte_vec.len();
+            byte_vec.push_u64(100);
+            byte_vec.push_u64(101);
+            byte_vec.push_u64(102);
+            byte_vec.push_u64(103);
+
+            let slice = byte_vec.get_mut_slice::<u64>(slice_start, 4);
+            assert_eq!(slice.len(), 4);
+            assert_eq!(slice[0], 100);
+            assert_eq!(slice[1], 101);
+            assert_eq!(slice[2], 102);
+            assert_eq!(slice[3], 103);
+
+            slice[1] = 201;
+
+            assert_eq!(byte_vec.get_u64(slice_start + 8), 201);
+        }
+    }
+
+    #[test]
+    fn test_align_repro_error() {
+        let mut byte_vec = ByteVec::new();
+        for _ in 0..9 {
+            byte_vec.push_u8(1);
+        }
+        byte_vec.pad_for_value::<u64>();
+        assert_eq!(byte_vec.len(), 16);
     }
 }
