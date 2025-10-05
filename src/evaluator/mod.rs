@@ -552,6 +552,18 @@ impl EvalCtx {
             AstNodeType::ListType(elem_type) => {
                 self.with_val(Val::new(ValType::ListType(self.eval(elem_type).val)))
             }
+            AstNodeType::ObjectType(contents) => {
+                match self
+                    .eval(&AstNode::new(AstNodeType::MapLiteral(contents.clone())))
+                    .val
+                    .get_val()
+                {
+                    ValType::Map(values) => {
+                        return self.with_val(Val::new(ValType::ObjectType(values.clone())))
+                    }
+                    _ => panic!(),
+                }
+            }
             _ => panic!("Unimplemented {:?}", node.get_type()),
         }
     }

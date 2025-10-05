@@ -879,5 +879,13 @@ mod tests {
             "#,
             json!([[[], [1, 2, 3]], [[], [1, 2, 3], ["stuff", false]]]),
         );
+
+        assert_json(
+            "[{}, {a: 1}, {a: 1, b: 2}, {a: ''}] | filter(matches_type(%{a: int}))",
+            json!([
+                {"a": 1},
+                {"a": 1, "b": 2},
+            ]),
+        );
     }
 }

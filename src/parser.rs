@@ -652,6 +652,78 @@ impl<'a> Parser<'a> {
             }
             return Ok(AstNode::new(AstNodeType::ListType(inner_type)));
         }
+        if self.parse_str_literal("{") {
+            self.parse_ws();
+
+            let mut parts: Option<AstNode> = None;
+
+            loop {
+                self.parse_ws();
+
+                let key = if self.parse_str_literal("[") {
+                    self.parse_ws();
+                    let key = match self.parse_expr() {
+                        None => return Err(self.get_err(ParseErrorType::NoExprInMapKey)),
+                        Some(key) => match key {
+                            Err(err) => return Err(err),
+                            Ok(key) => key,
+                        },
+                    };
+                    self.parse_ws();
+                    if !self.parse_str_literal("]") {
+                        return Err(self.get_err(ParseErrorType::NoClosingBracketForMapKey));
+                    }
+                    key
+                } else if let Some(f_string) = self.parse_format_string() {
+                    match f_string {
+                        Err(err) => return Err(err),
+                        Ok(f_string) => f_string,
+                    }
+                } else {
+                    match self.parse_identifier(false) {
+                        None => {
+                            break;
+                        }
+                        Some(val) => val,
+                    }
+                };
+                self.parse_ws();
+
+                if !self.parse_str_literal(":") {
+                    return Err(self.get_err(ParseErrorType::NoColonInMapLiteral));
+                }
+                self.parse_ws();
+
+                let val = match self.parse_type() {
+                    Err(err) => {
+                        return Err(err);
+                    }
+                    Ok(val) => val,
+                };
+
+                let kv_pair = AstNode::new(AstNodeType::MapKeyValPair { key, val });
+                match parts {
+                    None => {
+                        parts = Some(kv_pair);
+                    }
+                    Some(prev_val) => {
+                        parts = Some(AstNode::new(AstNodeType::ListNode(prev_val, kv_pair)));
+                    }
+                }
+
+                self.parse_ws();
+
+                if !self.parse_str_literal(",") {
+                    break;
+                }
+            }
+
+            self.parse_ws();
+            if !self.parse_str_literal("}") {
+                return Err(self.get_err(ParseErrorType::UnableToParseType));
+            }
+            return Ok(AstNode::new(AstNodeType::ObjectType(parts)));
+        }
 
         Err(self.get_err(ParseErrorType::UnableToParseType))
     }

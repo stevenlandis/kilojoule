@@ -32,6 +32,7 @@ pub enum ValType {
     StringType,
     BoolType,
     ListType(Val),
+    ObjectType(OrderedMap),
 }
 
 impl Val {
@@ -99,6 +100,7 @@ impl Val {
                 StringType,
                 BoolType,
                 ListType,
+                ObjectType,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -161,6 +163,14 @@ impl Val {
                 ValType::ListType(elem_type) => {
                     HashTypes::ListType.hash(&mut hasher);
                     elem_type.get_hash().hash(&mut hasher);
+                }
+                ValType::ObjectType(val) => {
+                    HashTypes::ObjectType.hash(&mut hasher);
+                    let pairs = val.get_sorted_kv_pairs();
+                    for (key, val) in pairs {
+                        key.get_hash().hash(&mut hasher);
+                        val.get_hash().hash(&mut hasher);
+                    }
                 }
             };
             hasher.finish()
@@ -305,6 +315,9 @@ impl Val {
             ValType::ListType(_) => {
                 self.write_type_to_str(writer)?;
             }
+            ValType::ObjectType(_) => {
+                self.write_type_to_str(writer)?;
+            }
         }
         Ok(0)
     }
@@ -337,6 +350,29 @@ impl Val {
                 writer.write("[".as_bytes())?;
                 elem_type.inner_write_type_to_str(writer)?;
                 writer.write("]".as_bytes())?;
+            }
+            ValType::ObjectType(val) => {
+                writer.write("{".as_bytes())?;
+                for (idx, (key, val)) in val.pairs.iter().enumerate() {
+                    if idx > 0 {
+                        writer.write(", ".as_bytes())?;
+                    }
+                    match key.get_val() {
+                        ValType::String(_) => {
+                            key.inner_write_str(writer, 0, false)?;
+                        }
+                        _ => {
+                            let mut temp_writer = Vec::<u8>::new();
+                            key.inner_write_str(&mut temp_writer, 0, false)?;
+                            let serialized_key =
+                                std::str::from_utf8(temp_writer.as_slice()).unwrap();
+                            write_json_escaped_str(writer, serialized_key)?;
+                        }
+                    }
+                    writer.write(": ".as_bytes())?;
+                    val.inner_write_type_to_str(writer)?;
+                }
+                writer.write("}".as_bytes())?;
             }
             _ => todo!(),
         }
@@ -431,6 +467,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -447,6 +484,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -463,6 +501,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -479,6 +518,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -495,6 +535,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -511,6 +552,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -527,6 +569,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::Bytes(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -543,6 +586,7 @@ impl Ord for Val {
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
+                ValType::ObjectType(_) => todo!(),
             },
             ValType::IntType => todo!(),
             ValType::FloatType => todo!(),
@@ -550,6 +594,7 @@ impl Ord for Val {
             ValType::StringType => todo!(),
             ValType::BoolType => todo!(),
             ValType::ListType(_) => todo!(),
+            ValType::ObjectType(_) => todo!(),
         }
     }
 }
@@ -604,6 +649,7 @@ impl Hash for Val {
     }
 }
 
+#[derive(Clone)]
 pub struct OrderedMap {
     pairs: Vec<(Val, Val)>,
     key_to_idx: HashMap<Val, usize>,
@@ -647,6 +693,13 @@ impl OrderedMap {
         match self.key_to_idx.get(key) {
             None => None,
             Some(idx) => Some(self.pairs[*idx].1.clone()),
+        }
+    }
+
+    pub fn get_non_null(&self, key: &Val) -> Val {
+        match self.key_to_idx.get(key) {
+            None => Val::new_null(),
+            Some(idx) => self.pairs[*idx].1.clone(),
         }
     }
 
@@ -994,6 +1047,7 @@ impl serde::ser::Serialize for Val {
             ValType::StringType => serialize_as_str(self, serializer),
             ValType::BoolType => serialize_as_str(self, serializer),
             ValType::ListType(_) => serialize_as_str(self, serializer),
+            ValType::ObjectType(_) => serialize_as_str(self, serializer),
         }
     }
 }

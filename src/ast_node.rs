@@ -71,7 +71,7 @@ pub enum AstNodeType {
     BoolType,
     AnyType,
     ListType(AstNode),
-    ObjectType(AstNode),
+    ObjectType(Option<AstNode>),
 }
 
 impl AstNode {

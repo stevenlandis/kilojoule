@@ -1330,6 +1330,18 @@ fn matches_type(val: &Val, typ: &Val) -> bool {
             }
             _ => false,
         },
+        ValType::ObjectType(mapping) => match val.get_val() {
+            ValType::Map(val) => {
+                for (key, key_typ) in mapping.get_kv_pair_slice() {
+                    let key_val = val.get_non_null(key);
+                    if !matches_type(&key_val, key_typ) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        },
         _ => todo!(),
     }
 }
@@ -1342,6 +1354,7 @@ fn is_type(node: &Val) -> bool {
         ValType::StringType => true,
         ValType::BoolType => true,
         ValType::ListType(_) => true,
+        ValType::ObjectType(_) => true,
         _ => false,
     }
 }
