@@ -150,7 +150,8 @@ impl EvalCtx {
                                         result.push(elem.clone());
                                     }
                                 }
-                                _ => {}
+                                ValType::Err(_) => return filter_val,
+                                _ => return Val::new_err("filter() conditions must be %bool"),
                             }
                         }
 
