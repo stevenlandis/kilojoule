@@ -29,6 +29,8 @@ pub enum ValType {
     IntType,
     FloatType,
     AnyType,
+    StringType,
+    BoolType,
 }
 
 impl Val {
@@ -93,6 +95,8 @@ impl Val {
                 IntType,
                 FloatType,
                 AnyType,
+                StringType,
+                BoolType,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -145,6 +149,12 @@ impl Val {
                 }
                 ValType::AnyType => {
                     HashTypes::AnyType.hash(&mut hasher);
+                }
+                ValType::StringType => {
+                    HashTypes::StringType.hash(&mut hasher);
+                }
+                ValType::BoolType => {
+                    HashTypes::BoolType.hash(&mut hasher);
                 }
             };
             hasher.finish()
@@ -280,6 +290,12 @@ impl Val {
             ValType::AnyType => {
                 writer.write("%any".as_bytes())?;
             }
+            ValType::StringType => {
+                writer.write("%str".as_bytes())?;
+            }
+            ValType::BoolType => {
+                writer.write("%bool".as_bytes())?;
+            }
         }
         Ok(0)
     }
@@ -369,6 +385,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -382,6 +400,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -395,6 +415,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -408,6 +430,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -421,6 +445,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -434,6 +460,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -447,6 +475,8 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::Bytes(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -460,10 +490,14 @@ impl Ord for Val {
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
                 ValType::AnyType => todo!(),
+                ValType::StringType => todo!(),
+                ValType::BoolType => todo!(),
             },
             ValType::IntType => todo!(),
             ValType::FloatType => todo!(),
             ValType::AnyType => todo!(),
+            ValType::StringType => todo!(),
+            ValType::BoolType => todo!(),
         }
     }
 }
@@ -905,6 +939,8 @@ impl serde::ser::Serialize for Val {
             ValType::IntType => serialize_as_str(self, serializer),
             ValType::FloatType => serialize_as_str(self, serializer),
             ValType::AnyType => serialize_as_str(self, serializer),
+            ValType::StringType => serialize_as_str(self, serializer),
+            ValType::BoolType => serialize_as_str(self, serializer),
         }
     }
 }

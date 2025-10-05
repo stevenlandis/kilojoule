@@ -1303,6 +1303,14 @@ impl EvalCtx {
                         _ => Val::new_bool(false),
                     },
                     ValType::AnyType => Val::new_bool(true),
+                    ValType::StringType => match self.val.get_val() {
+                        ValType::String(_) => Val::new_bool(true),
+                        _ => Val::new_bool(false),
+                    },
+                    ValType::BoolType => match self.val.get_val() {
+                        ValType::Bool(_) => Val::new_bool(true),
+                        _ => Val::new_bool(false),
+                    },
                     _ => todo!(),
                 }
             }
@@ -1316,6 +1324,8 @@ fn is_type(node: &Val) -> bool {
         ValType::IntType => true,
         ValType::FloatType => true,
         ValType::AnyType => true,
+        ValType::StringType => true,
+        ValType::BoolType => true,
         _ => false,
     }
 }

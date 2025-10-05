@@ -852,5 +852,13 @@ mod tests {
             "[1, 'stuff', false, 2, 3.5] | filter(matches_type(%any))",
             json!([1, "stuff", false, 2, 3.5]),
         );
+        assert_json(
+            "[1, 'stuff', false, 2, 3.5] | filter(matches_type(%bool))",
+            json!([false]),
+        );
+        assert_json(
+            "[1, 'stuff', false, 2, 3.5] | filter(matches_type(%str))",
+            json!(["stuff"]),
+        );
     }
 }
