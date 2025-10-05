@@ -564,6 +564,9 @@ impl EvalCtx {
                     _ => panic!(),
                 }
             }
+            AstNodeType::OptionalType(sub_type) => {
+                self.with_val(Val::new(ValType::OptionalType(self.eval(sub_type).val)))
+            }
             _ => panic!("Unimplemented {:?}", node.get_type()),
         }
     }

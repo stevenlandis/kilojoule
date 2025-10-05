@@ -72,6 +72,7 @@ pub enum AstNodeType {
     AnyType,
     ListType(AstNode),
     ObjectType(Option<AstNode>),
+    OptionalType(AstNode),
 }
 
 impl AstNode {

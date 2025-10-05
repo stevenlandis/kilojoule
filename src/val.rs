@@ -33,6 +33,7 @@ pub enum ValType {
     BoolType,
     ListType(Val),
     ObjectType(OrderedMap),
+    OptionalType(Val),
 }
 
 impl Val {
@@ -101,6 +102,7 @@ impl Val {
                 BoolType,
                 ListType,
                 ObjectType,
+                OptionalType,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -171,6 +173,10 @@ impl Val {
                         key.get_hash().hash(&mut hasher);
                         val.get_hash().hash(&mut hasher);
                     }
+                }
+                ValType::OptionalType(elem_type) => {
+                    HashTypes::OptionalType.hash(&mut hasher);
+                    elem_type.get_hash().hash(&mut hasher);
                 }
             };
             hasher.finish()
@@ -318,6 +324,9 @@ impl Val {
             ValType::ObjectType(_) => {
                 self.write_type_to_str(writer)?;
             }
+            ValType::OptionalType(_) => {
+                self.write_type_to_str(writer)?;
+            }
         }
         Ok(0)
     }
@@ -373,6 +382,10 @@ impl Val {
                     val.inner_write_type_to_str(writer)?;
                 }
                 writer.write("}".as_bytes())?;
+            }
+            ValType::OptionalType(sub_type) => {
+                writer.write("?".as_bytes())?;
+                sub_type.inner_write_type_to_str(writer)?;
             }
             _ => todo!(),
         }
@@ -468,6 +481,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -485,6 +499,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -502,6 +517,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -519,6 +535,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -536,6 +553,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -553,6 +571,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -570,6 +589,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::Bytes(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -587,6 +607,7 @@ impl Ord for Val {
                 ValType::BoolType => todo!(),
                 ValType::ListType(_) => todo!(),
                 ValType::ObjectType(_) => todo!(),
+                ValType::OptionalType(_) => todo!(),
             },
             ValType::IntType => todo!(),
             ValType::FloatType => todo!(),
@@ -595,6 +616,7 @@ impl Ord for Val {
             ValType::BoolType => todo!(),
             ValType::ListType(_) => todo!(),
             ValType::ObjectType(_) => todo!(),
+            ValType::OptionalType(_) => todo!(),
         }
     }
 }
@@ -1048,6 +1070,7 @@ impl serde::ser::Serialize for Val {
             ValType::BoolType => serialize_as_str(self, serializer),
             ValType::ListType(_) => serialize_as_str(self, serializer),
             ValType::ObjectType(_) => serialize_as_str(self, serializer),
+            ValType::OptionalType(_) => serialize_as_str(self, serializer),
         }
     }
 }

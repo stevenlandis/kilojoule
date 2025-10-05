@@ -724,6 +724,14 @@ impl<'a> Parser<'a> {
             }
             return Ok(AstNode::new(AstNodeType::ObjectType(parts)));
         }
+        if self.parse_str_literal("?") {
+            self.parse_ws();
+            let sub_type = match self.parse_type() {
+                Err(err) => return Err(err),
+                Ok(sub_type) => sub_type,
+            };
+            return Ok(AstNode::new(AstNodeType::OptionalType(sub_type)));
+        }
 
         Err(self.get_err(ParseErrorType::UnableToParseType))
     }

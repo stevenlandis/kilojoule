@@ -1342,6 +1342,10 @@ fn matches_type(val: &Val, typ: &Val) -> bool {
             }
             _ => false,
         },
+        ValType::OptionalType(sub_type) => match val.get_val() {
+            ValType::Null => true,
+            _ => matches_type(val, sub_type),
+        },
         _ => todo!(),
     }
 }
@@ -1355,6 +1359,7 @@ fn is_type(node: &Val) -> bool {
         ValType::BoolType => true,
         ValType::ListType(_) => true,
         ValType::ObjectType(_) => true,
+        ValType::OptionalType(_) => true,
         _ => false,
     }
 }

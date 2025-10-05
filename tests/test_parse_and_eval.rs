@@ -887,5 +887,10 @@ mod tests {
                 {"a": 1, "b": 2},
             ]),
         );
+
+        assert_json(
+            "[1, 'stuff', false, 2, 3.5, null] | filter(matches_type(%?int))",
+            json!([1, 2, null]),
+        );
     }
 }
