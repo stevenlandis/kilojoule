@@ -1297,6 +1297,10 @@ impl EvalCtx {
                         ValType::Float64(val) => Val::new_bool(*val == val.floor()),
                         _ => Val::new_bool(false),
                     },
+                    AstNodeType::FloatType => match self.val.get_val() {
+                        ValType::Float64(val) => Val::new_bool(true),
+                        _ => Val::new_bool(false),
+                    },
                     _ => todo!(),
                 }
             }

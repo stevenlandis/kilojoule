@@ -544,6 +544,8 @@ impl EvalCtx {
                 None => self.with_val(Val::new_err("undefined variable access")),
                 Some(val) => self.with_val(val.clone()),
             },
+            AstNodeType::IntType => self.with_val(Val::new(ValType::IntType)),
+            AstNodeType::FloatType => self.with_val(Val::new(ValType::FloatType)),
             _ => panic!("Unimplemented {:?}", node.get_type()),
         }
     }

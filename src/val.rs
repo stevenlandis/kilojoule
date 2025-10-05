@@ -24,6 +24,10 @@ pub enum ValType {
     List(Vec<Val>),
     Map(OrderedMap),
     Bytes(Vec<u8>),
+
+    // Types
+    IntType,
+    FloatType,
 }
 
 impl Val {
@@ -31,7 +35,7 @@ impl Val {
         &self.inner_val.val_type
     }
 
-    fn new_val(val_type: ValType) -> Val {
+    pub fn new(val_type: ValType) -> Val {
         Val {
             inner_val: Rc::new(InnerVal {
                 hash: OnceCell::new(),
@@ -41,35 +45,35 @@ impl Val {
     }
 
     pub fn new_null() -> Val {
-        Val::new_val(ValType::Null)
+        Val::new(ValType::Null)
     }
 
     pub fn new_err(msg: &str) -> Val {
-        Val::new_val(ValType::Err(msg.to_string()))
+        Val::new(ValType::Err(msg.to_string()))
     }
 
     pub fn new_f64(val: f64) -> Val {
-        Val::new_val(ValType::Float64(val))
+        Val::new(ValType::Float64(val))
     }
 
     pub fn new_bool(val: bool) -> Val {
-        Val::new_val(ValType::Bool(val))
+        Val::new(ValType::Bool(val))
     }
 
     pub fn new_str(val: &str) -> Val {
-        Val::new_val(ValType::String(val.to_string()))
+        Val::new(ValType::String(val.to_string()))
     }
 
     pub fn new_list(val: Vec<Val>) -> Val {
-        Val::new_val(ValType::List(val))
+        Val::new(ValType::List(val))
     }
 
     pub fn new_map(val: OrderedMap) -> Val {
-        Val::new_val(ValType::Map(val))
+        Val::new(ValType::Map(val))
     }
 
     pub fn new_bytes(val: Vec<u8>) -> Val {
-        Val::new_val(ValType::Bytes(val))
+        Val::new(ValType::Bytes(val))
     }
 
     fn get_hash(&self) -> u64 {
@@ -84,6 +88,9 @@ impl Val {
                 List,
                 Map,
                 Bytes,
+                // Types
+                IntType,
+                FloatType,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -127,6 +134,12 @@ impl Val {
                     HashTypes::Bytes.hash(&mut hasher);
 
                     val.hash(&mut hasher);
+                }
+                ValType::IntType => {
+                    HashTypes::IntType.hash(&mut hasher);
+                }
+                ValType::FloatType => {
+                    HashTypes::FloatType.hash(&mut hasher);
                 }
             };
             hasher.finish()
@@ -252,6 +265,13 @@ impl Val {
                 writer.write(STANDARD.encode(val).as_bytes())?;
                 writer.write("\"".as_bytes())?;
             }
+            // Types
+            ValType::IntType => {
+                writer.write("%int".as_bytes())?;
+            }
+            ValType::FloatType => {
+                writer.write("%float".as_bytes())?;
+            }
         }
         Ok(0)
     }
@@ -338,6 +358,8 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -348,6 +370,8 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -358,6 +382,8 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -368,6 +394,8 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -378,6 +406,8 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Less,
                 ValType::Map(_) => Ordering::Less,
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -388,6 +418,8 @@ impl Ord for Val {
                 ValType::List(rval) => list_cmp(lval, rval),
                 ValType::Map(_) => Ordering::Less,
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -398,6 +430,8 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Greater,
                 ValType::Map(rval) => map_cmp(lval, rval),
                 ValType::Bytes(_) => Ordering::Less,
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
             ValType::Bytes(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -408,7 +442,11 @@ impl Ord for Val {
                 ValType::List(_) => Ordering::Greater,
                 ValType::Map(_) => Ordering::Greater,
                 ValType::Bytes(rval) => bytes_cmp(lval, rval),
+                ValType::IntType => todo!(),
+                ValType::FloatType => todo!(),
             },
+            ValType::IntType => todo!(),
+            ValType::FloatType => todo!(),
         }
     }
 }
@@ -847,6 +885,17 @@ impl serde::ser::Serialize for Val {
                 serializer.collect_map(val.get_kv_pair_slice().iter().map(|(key, val)| (key, val)))
             }
             ValType::Bytes(val) => serializer.serialize_str(STANDARD.encode(val).as_str()),
+            ValType::IntType => serialize_as_str(self, serializer),
+            ValType::FloatType => serialize_as_str(self, serializer),
         }
     }
+}
+
+fn serialize_as_str<S>(val: &Val, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut writer = Vec::<u8>::new();
+    val.write_to_str(&mut writer, 0, false).unwrap();
+    serializer.serialize_str(String::from_utf8(writer).unwrap().as_str())
 }

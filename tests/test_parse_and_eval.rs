@@ -841,8 +841,12 @@ mod tests {
     #[test]
     fn test_matches_type() {
         assert_json(
-            "[1, 'stuff', false, 2] | filter(matches_type(%int))",
+            "[1, 'stuff', false, 2, 3.1] | filter(matches_type(%int))",
             json!([1, 2]),
+        );
+        assert_json(
+            "[1, 'stuff', false, 2, 3.5] | filter(matches_type(%float))",
+            json!([1, 2, 3.5]),
         );
     }
 }
