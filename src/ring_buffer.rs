@@ -2,6 +2,7 @@ use super::heap_allocator::HeapAllocator;
 
 pub struct RingBufferAllocator<T> {
     blocks: HeapAllocator<Block<T>>,
+    block_size: usize,
 }
 
 pub struct RingBuffer {
@@ -14,7 +15,7 @@ pub struct RingBuffer {
 
 struct Block<T> {
     values: Vec<T>,
-    next_idx: Option<usize>,
+    next_id: usize,
 }
 
 impl<T> RingBufferAllocator<T> {
@@ -36,6 +37,27 @@ impl RingBuffer {
         values: impl Iterator<Item = T>,
     ) {
         let mut iter = values.into_iter();
-        loop {}
+        loop {
+            if self.end_idx >= alloc.block_size {
+                let new_id = alloc.blocks.push(Block {
+                    values: Vec::new(),
+                    next_id: usize::MAX,
+                });
+                if self.end_id != usize::MAX {
+                    alloc.blocks.get_mut(self.end_id).next_id = new_id;
+                }
+                self.end_id = new_id;
+                self.end_idx = 0;
+                if self.start_id == usize::MAX {}
+            }
+            let end_block = alloc.blocks.get_mut(self.end_id);
+
+            let n_open = alloc.block_size - end_block.values.len();
+            end_block.values.extend(iter.by_ref().take(n_open));
+            self.end_idx = end_block.values.len();
+            if end_block.values.len() < alloc.block_size {
+                break;
+            }
+        }
     }
 }

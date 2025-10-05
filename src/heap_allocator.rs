@@ -33,6 +33,13 @@ impl<T> HeapAllocator<T> {
         }
     }
 
+    pub fn get_mut(&mut self, idx: usize) -> &mut T {
+        match &mut self.values[idx] {
+            None => unreachable!(),
+            Some(value) => value,
+        }
+    }
+
     pub fn free(&mut self, idx: usize) {
         assert!(self.values[idx].is_some());
         self.values[idx] = None;
