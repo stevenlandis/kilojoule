@@ -3,8 +3,8 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 
-use super::super::ast_node::{AstNode, AstNodeType};
-use super::super::val::{OrderedMap, Val, ValType};
+use crate::ast_node::{AstNode, AstNodeType};
+use crate::val::{OrderedMap, Val, ValType};
 use std::process::{Command, Stdio};
 
 impl EvalCtx {
