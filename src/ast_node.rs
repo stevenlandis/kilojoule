@@ -62,6 +62,14 @@ pub enum AstNodeType {
         identifier: AstNode,
         expr: AstNode,
     },
+
+    // Types
+    NumberType,
+    IntType,
+    FloatType,
+    StringType,
+    ListType(AstNode),
+    ObjectType(AstNode),
 }
 
 impl AstNode {

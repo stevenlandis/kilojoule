@@ -837,4 +837,12 @@ mod tests {
             json!([[1, 3, 5], [2, 4, 6], [null, 42, null]]),
         );
     }
+
+    #[test]
+    fn test_matches_type() {
+        assert_json(
+            "[1, 'stuff', false, 2] | filter(matches_type(%int))",
+            json!([1, 2]),
+        );
+    }
 }

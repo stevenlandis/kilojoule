@@ -614,8 +614,40 @@ impl<'a> Parser<'a> {
 
             return Some(Ok(expr));
         }
+        if self.parse_str_literal("%") {
+            return Some(self.parse_type());
+        }
 
         return None;
+    }
+
+    fn parse_type(&mut self) -> Result<AstNode, ParseError> {
+        if self.parse_str_literal("number") {
+            return Ok(AstNode::new(AstNodeType::NumberType));
+        }
+        if self.parse_str_literal("int") {
+            return Ok(AstNode::new(AstNodeType::IntType));
+        }
+        if self.parse_str_literal("float") {
+            return Ok(AstNode::new(AstNodeType::FloatType));
+        }
+        if self.parse_str_literal("str") {
+            return Ok(AstNode::new(AstNodeType::StringType));
+        }
+        if self.parse_str_literal("[") {
+            self.parse_ws();
+            let inner_type = match self.parse_type() {
+                Err(err) => return Err(err),
+                Ok(inner_type) => inner_type,
+            };
+            self.parse_ws();
+            if !self.parse_str_literal("]") {
+                return Err(self.get_err(ParseErrorType::UnableToParseType));
+            }
+            return Ok(AstNode::new(AstNodeType::ListType(inner_type)));
+        }
+
+        Err(self.get_err(ParseErrorType::UnableToParseType))
     }
 
     fn parse_str_literal(&mut self, text: &str) -> bool {
@@ -1057,4 +1089,5 @@ enum ParseErrorType {
     NoEqualsInLetStmt,
     NoExprInLetStmt,
     MissingFractionPartInFloatLiteral,
+    UnableToParseType,
 }
