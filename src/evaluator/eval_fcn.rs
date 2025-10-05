@@ -1285,20 +1285,20 @@ impl EvalCtx {
                     return Val::new_err("matches_type() must be called with 1 argument");
                 }
 
-                let typ = &args[0];
+                let typ = &self.eval(&args[0]).val;
                 if !is_type(typ) {
                     return Val::new_err(
                         "the first arg in matches_type() must be a type. Example: %int",
                     );
                 }
 
-                match typ.get_type() {
-                    AstNodeType::IntType => match self.val.get_val() {
+                match typ.get_val() {
+                    ValType::IntType => match self.val.get_val() {
                         ValType::Float64(val) => Val::new_bool(*val == val.floor()),
                         _ => Val::new_bool(false),
                     },
-                    AstNodeType::FloatType => match self.val.get_val() {
-                        ValType::Float64(val) => Val::new_bool(true),
+                    ValType::FloatType => match self.val.get_val() {
+                        ValType::Float64(_) => Val::new_bool(true),
                         _ => Val::new_bool(false),
                     },
                     _ => todo!(),
@@ -1309,13 +1309,10 @@ impl EvalCtx {
     }
 }
 
-fn is_type(node: &AstNode) -> bool {
-    match node.get_type() {
-        AstNodeType::NumberType => true,
-        AstNodeType::IntType => true,
-        AstNodeType::FloatType => true,
-        AstNodeType::ListType(_) => true,
-        AstNodeType::ObjectType(_) => true,
+fn is_type(node: &Val) -> bool {
+    match node.get_val() {
+        ValType::IntType => true,
+        ValType::FloatType => true,
         _ => false,
     }
 }
