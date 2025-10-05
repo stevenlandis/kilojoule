@@ -634,6 +634,9 @@ impl<'a> Parser<'a> {
         if self.parse_str_literal("str") {
             return Ok(AstNode::new(AstNodeType::StringType));
         }
+        if self.parse_str_literal("any") {
+            return Ok(AstNode::new(AstNodeType::AnyType));
+        }
         if self.parse_str_literal("[") {
             self.parse_ws();
             let inner_type = match self.parse_type() {

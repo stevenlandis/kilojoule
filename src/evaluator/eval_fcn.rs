@@ -1301,6 +1301,7 @@ impl EvalCtx {
                         ValType::Float64(_) => Val::new_bool(true),
                         _ => Val::new_bool(false),
                     },
+                    ValType::AnyType => Val::new_bool(true),
                     _ => todo!(),
                 }
             }
@@ -1313,6 +1314,7 @@ fn is_type(node: &Val) -> bool {
     match node.get_val() {
         ValType::IntType => true,
         ValType::FloatType => true,
+        ValType::AnyType => true,
         _ => false,
     }
 }

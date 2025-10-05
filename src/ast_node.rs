@@ -68,6 +68,7 @@ pub enum AstNodeType {
     IntType,
     FloatType,
     StringType,
+    AnyType,
     ListType(AstNode),
     ObjectType(AstNode),
 }

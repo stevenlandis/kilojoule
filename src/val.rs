@@ -28,6 +28,7 @@ pub enum ValType {
     // Types
     IntType,
     FloatType,
+    AnyType,
 }
 
 impl Val {
@@ -91,6 +92,7 @@ impl Val {
                 // Types
                 IntType,
                 FloatType,
+                AnyType,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -140,6 +142,9 @@ impl Val {
                 }
                 ValType::FloatType => {
                     HashTypes::FloatType.hash(&mut hasher);
+                }
+                ValType::AnyType => {
+                    HashTypes::AnyType.hash(&mut hasher);
                 }
             };
             hasher.finish()
@@ -272,6 +277,9 @@ impl Val {
             ValType::FloatType => {
                 writer.write("%float".as_bytes())?;
             }
+            ValType::AnyType => {
+                writer.write("%any".as_bytes())?;
+            }
         }
         Ok(0)
     }
@@ -360,6 +368,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -372,6 +381,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -384,6 +394,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -396,6 +407,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -408,6 +420,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -420,6 +433,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -432,6 +446,7 @@ impl Ord for Val {
                 ValType::Bytes(_) => Ordering::Less,
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::Bytes(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -444,9 +459,11 @@ impl Ord for Val {
                 ValType::Bytes(rval) => bytes_cmp(lval, rval),
                 ValType::IntType => todo!(),
                 ValType::FloatType => todo!(),
+                ValType::AnyType => todo!(),
             },
             ValType::IntType => todo!(),
             ValType::FloatType => todo!(),
+            ValType::AnyType => todo!(),
         }
     }
 }
@@ -887,6 +904,7 @@ impl serde::ser::Serialize for Val {
             ValType::Bytes(val) => serializer.serialize_str(STANDARD.encode(val).as_str()),
             ValType::IntType => serialize_as_str(self, serializer),
             ValType::FloatType => serialize_as_str(self, serializer),
+            ValType::AnyType => serialize_as_str(self, serializer),
         }
     }
 }
