@@ -31,6 +31,7 @@ pub enum ValType {
     AnyType,
     StringType,
     BoolType,
+    ListType(Val),
 }
 
 impl Val {
@@ -97,6 +98,7 @@ impl Val {
                 AnyType,
                 StringType,
                 BoolType,
+                ListType,
             }
 
             let mut hasher = DefaultHasher::new();
@@ -155,6 +157,10 @@ impl Val {
                 }
                 ValType::BoolType => {
                     HashTypes::BoolType.hash(&mut hasher);
+                }
+                ValType::ListType(elem_type) => {
+                    HashTypes::ListType.hash(&mut hasher);
+                    elem_type.get_hash().hash(&mut hasher);
                 }
             };
             hasher.finish()
@@ -282,20 +288,57 @@ impl Val {
             }
             // Types
             ValType::IntType => {
-                writer.write("%int".as_bytes())?;
+                self.write_type_to_str(writer)?;
             }
             ValType::FloatType => {
-                writer.write("%float".as_bytes())?;
+                self.write_type_to_str(writer)?;
             }
             ValType::AnyType => {
-                writer.write("%any".as_bytes())?;
+                self.write_type_to_str(writer)?;
             }
             ValType::StringType => {
-                writer.write("%str".as_bytes())?;
+                self.write_type_to_str(writer)?;
             }
             ValType::BoolType => {
-                writer.write("%bool".as_bytes())?;
+                self.write_type_to_str(writer)?;
             }
+            ValType::ListType(_) => {
+                self.write_type_to_str(writer)?;
+            }
+        }
+        Ok(0)
+    }
+
+    fn write_type_to_str(&self, writer: &mut impl std::io::Write) -> std::io::Result<usize> {
+        writer.write("%".as_bytes())?;
+        self.inner_write_type_to_str(writer)?;
+
+        Ok(0)
+    }
+
+    fn inner_write_type_to_str(&self, writer: &mut impl std::io::Write) -> std::io::Result<usize> {
+        match self.get_val() {
+            ValType::IntType => {
+                writer.write("int".as_bytes())?;
+            }
+            ValType::FloatType => {
+                writer.write("float".as_bytes())?;
+            }
+            ValType::AnyType => {
+                writer.write("any".as_bytes())?;
+            }
+            ValType::StringType => {
+                writer.write("str".as_bytes())?;
+            }
+            ValType::BoolType => {
+                writer.write("bool".as_bytes())?;
+            }
+            ValType::ListType(elem_type) => {
+                writer.write("[".as_bytes())?;
+                elem_type.inner_write_type_to_str(writer)?;
+                writer.write("]".as_bytes())?;
+            }
+            _ => todo!(),
         }
         Ok(0)
     }
@@ -387,6 +430,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::Null => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -402,6 +446,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::Bool(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -417,6 +462,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::Float64(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -432,6 +478,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::String(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -447,6 +494,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::List(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -462,6 +510,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::Map(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -477,6 +526,7 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::Bytes(lval) => match rval {
                 ValType::Err(_) => Ordering::Greater,
@@ -492,12 +542,14 @@ impl Ord for Val {
                 ValType::AnyType => todo!(),
                 ValType::StringType => todo!(),
                 ValType::BoolType => todo!(),
+                ValType::ListType(_) => todo!(),
             },
             ValType::IntType => todo!(),
             ValType::FloatType => todo!(),
             ValType::AnyType => todo!(),
             ValType::StringType => todo!(),
             ValType::BoolType => todo!(),
+            ValType::ListType(_) => todo!(),
         }
     }
 }
@@ -941,6 +993,7 @@ impl serde::ser::Serialize for Val {
             ValType::AnyType => serialize_as_str(self, serializer),
             ValType::StringType => serialize_as_str(self, serializer),
             ValType::BoolType => serialize_as_str(self, serializer),
+            ValType::ListType(_) => serialize_as_str(self, serializer),
         }
     }
 }

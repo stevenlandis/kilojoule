@@ -1293,29 +1293,44 @@ impl EvalCtx {
                     );
                 }
 
-                match typ.get_val() {
-                    ValType::IntType => match self.val.get_val() {
-                        ValType::Float64(val) => Val::new_bool(*val == val.floor()),
-                        _ => Val::new_bool(false),
-                    },
-                    ValType::FloatType => match self.val.get_val() {
-                        ValType::Float64(_) => Val::new_bool(true),
-                        _ => Val::new_bool(false),
-                    },
-                    ValType::AnyType => Val::new_bool(true),
-                    ValType::StringType => match self.val.get_val() {
-                        ValType::String(_) => Val::new_bool(true),
-                        _ => Val::new_bool(false),
-                    },
-                    ValType::BoolType => match self.val.get_val() {
-                        ValType::Bool(_) => Val::new_bool(true),
-                        _ => Val::new_bool(false),
-                    },
-                    _ => todo!(),
-                }
+                Val::new_bool(matches_type(&self.val, typ))
             }
             _ => Val::new_err(format!("Unknown function \"{}\"", name).as_str()),
         }
+    }
+}
+
+fn matches_type(val: &Val, typ: &Val) -> bool {
+    match typ.get_val() {
+        ValType::IntType => match val.get_val() {
+            ValType::Float64(val) => *val == val.floor(),
+            _ => false,
+        },
+        ValType::FloatType => match val.get_val() {
+            ValType::Float64(_) => true,
+            _ => false,
+        },
+        ValType::AnyType => true,
+        ValType::StringType => match val.get_val() {
+            ValType::String(_) => true,
+            _ => false,
+        },
+        ValType::BoolType => match val.get_val() {
+            ValType::Bool(_) => true,
+            _ => false,
+        },
+        ValType::ListType(elem_type) => match val.get_val() {
+            ValType::List(list) => {
+                for elem in list {
+                    if !matches_type(elem, elem_type) {
+                        return false;
+                    }
+                }
+                true
+            }
+            _ => false,
+        },
+        _ => todo!(),
     }
 }
 
@@ -1326,6 +1341,7 @@ fn is_type(node: &Val) -> bool {
         ValType::AnyType => true,
         ValType::StringType => true,
         ValType::BoolType => true,
+        ValType::ListType(_) => true,
         _ => false,
     }
 }

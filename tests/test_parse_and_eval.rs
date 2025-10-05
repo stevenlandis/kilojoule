@@ -860,5 +860,24 @@ mod tests {
             "[1, 'stuff', false, 2, 3.5] | filter(matches_type(%str))",
             json!(["stuff"]),
         );
+
+        assert_json(
+            r#"
+            {
+                types: [ %[int], %[any] ],
+                values: [
+                    [],
+                    [1,2,3],
+                    ['stuff', false],
+                ]
+            }
+                | let values = .values
+                | .types | map(
+                    let type = .
+                    | values | filter(matches_type(type))
+                )
+            "#,
+            json!([[[], [1, 2, 3]], [[], [1, 2, 3], ["stuff", false]]]),
+        );
     }
 }

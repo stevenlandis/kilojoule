@@ -549,6 +549,9 @@ impl EvalCtx {
             AstNodeType::AnyType => self.with_val(Val::new(ValType::AnyType)),
             AstNodeType::StringType => self.with_val(Val::new(ValType::StringType)),
             AstNodeType::BoolType => self.with_val(Val::new(ValType::BoolType)),
+            AstNodeType::ListType(elem_type) => {
+                self.with_val(Val::new(ValType::ListType(self.eval(elem_type).val)))
+            }
             _ => panic!("Unimplemented {:?}", node.get_type()),
         }
     }
