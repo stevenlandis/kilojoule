@@ -431,6 +431,15 @@ mod tests {
         assert_json("['a'] | .[ : ]", json!(["a"]));
     }
 
+    #[test]
+    fn test_string_slice() {
+        assert_json("'hello'[0]", json!("h"));
+        assert_json("'hello'[/0]", json!("o"));
+        assert_json("'hello'[1:1]", json!(""));
+        assert_json("'hello'[1:2]", json!("e"));
+        assert_json("'hello'[1:3]", json!("el"));
+    }
+
     // #[test]
     // fn test_variable() {
     //     assert_json("1 | let a = . + 5 | a + .", json!(7));

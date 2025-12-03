@@ -444,53 +444,41 @@ impl EvalCtx {
                             Some(val) => self.with_val(val),
                         }
                     }
-                    ValType::List(list) => match accessor.get_type() {
-                        AstNodeType::SliceAccess(start, end) => {
-                            let start_idx = match start {
-                                None => 0,
-                                Some(start_expr) => match self.eval_list_access(start_expr) {
-                                    Err(err) => {
-                                        return self.with_val(err);
-                                    }
-                                    Ok((start_idx, is_rev)) => {
-                                        if is_rev {
-                                            list.len().saturating_sub(start_idx)
-                                        } else {
-                                            start_idx.min(list.len())
-                                        }
-                                    }
-                                },
-                            };
-                            let end_idx = match end {
-                                None => list.len(),
-                                Some(end_expr) => match self.eval_list_access(end_expr) {
-                                    Err(err) => {
-                                        return self.with_val(err);
-                                    }
-                                    Ok((end_idx, is_rev)) => {
-                                        if is_rev {
-                                            list.len().saturating_sub(end_idx)
-                                        } else {
-                                            end_idx.min(list.len())
-                                        }
-                                    }
-                                },
-                            };
-                            let end_idx = end_idx.max(start_idx);
-                            self.with_val(Val::new_list(list[start_idx..end_idx].to_vec()))
-                        }
-                        _ => match self.eval_list_access(accessor) {
+                    ValType::List(list) => {
+                        match self.eval_list_access_range(accessor, list.len()) {
                             Err(err) => self.with_val(err),
-                            Ok((idx, is_rev)) => {
-                                if idx < list.len() {
-                                    let idx = if is_rev { list.len() - idx - 1 } else { idx };
+                            Ok(range) => match range {
+                                ListAccessRange::SingleValue(idx) => {
                                     self.with_val(list[idx].clone())
-                                } else {
-                                    self.with_val(Val::new_err("List access out of bounds"))
+                                }
+                                ListAccessRange::Slice(start_idx, end_idx) => {
+                                    self.with_val(Val::new_list(list[start_idx..end_idx].to_vec()))
+                                }
+                            },
+                        }
+                    }
+                    ValType::String(string) => {
+                        match self.eval_list_access_range(accessor, string.len()) {
+                            Err(err) => self.with_val(err),
+                            Ok(range) => {
+                                let byte_range = match range {
+                                    ListAccessRange::SingleValue(idx) => {
+                                        &string.as_bytes()[idx..idx + 1]
+                                    }
+                                    ListAccessRange::Slice(start_idx, end_idx) => {
+                                        &string.as_bytes()[start_idx..end_idx]
+                                    }
+                                };
+
+                                match std::str::from_utf8(byte_range) {
+                                    Err(_) => {
+                                        self.with_val(Val::new_err("String slice is invalid UTF8"))
+                                    }
+                                    Ok(val) => self.with_val(Val::new_str(val)),
                                 }
                             }
-                        },
-                    },
+                        }
+                    }
                     ValType::Null => self.with_val(self.val.clone()),
                     _ => self.with_val(Val::new_err("Invalid access")),
                 }
@@ -571,6 +559,60 @@ impl EvalCtx {
         }
     }
 
+    fn eval_list_access_range(
+        &self,
+        accessor: &AstNode,
+        max_len: usize,
+    ) -> Result<ListAccessRange, Val> {
+        match accessor.get_type() {
+            AstNodeType::SliceAccess(start, end) => {
+                let start_idx = match start {
+                    None => 0,
+                    Some(start_expr) => match self.eval_list_access(start_expr) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok((start_idx, is_rev)) => {
+                            if is_rev {
+                                max_len.saturating_sub(start_idx)
+                            } else {
+                                start_idx.min(max_len)
+                            }
+                        }
+                    },
+                };
+                let end_idx = match end {
+                    None => max_len,
+                    Some(end_expr) => match self.eval_list_access(end_expr) {
+                        Err(err) => {
+                            return Err(err);
+                        }
+                        Ok((end_idx, is_rev)) => {
+                            if is_rev {
+                                max_len.saturating_sub(end_idx)
+                            } else {
+                                end_idx.min(max_len)
+                            }
+                        }
+                    },
+                };
+                let end_idx = end_idx.max(start_idx);
+                return Ok(ListAccessRange::Slice(start_idx, end_idx));
+            }
+            _ => match self.eval_list_access(accessor) {
+                Err(err) => Err(err),
+                Ok((idx, is_rev)) => {
+                    if idx < max_len {
+                        let idx = if is_rev { max_len - idx - 1 } else { idx };
+                        Ok(ListAccessRange::SingleValue(idx))
+                    } else {
+                        Err(Val::new_err("List access out of bounds"))
+                    }
+                }
+            },
+        }
+    }
+
     fn eval_list_access(&self, expr: &AstNode) -> Result<(usize, bool), Val> {
         let (is_rev, idx_expr) = match expr.get_type() {
             AstNodeType::ReverseIdx(rev_expr) => (true, rev_expr),
@@ -605,4 +647,9 @@ impl EvalCtx {
             Ok(_) => Ok(()),
         }
     }
+}
+
+enum ListAccessRange {
+    SingleValue(usize),
+    Slice(usize, usize),
 }
