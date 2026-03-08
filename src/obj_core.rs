@@ -159,7 +159,7 @@ pub fn end_object(vec: &mut Vec<u8>, obj_start: &ObjectStart, sort_buf: &mut Vec
     sort_buf.clear();
 
     let start_idx = obj_start.idx;
-    let end_idx = vec.len();
+    let mut end_idx = vec.len();
 
     let mut len: usize = 0;
     let mut n_bytes: usize = 1 + 8 + 8;
@@ -212,35 +212,65 @@ pub fn end_object(vec: &mut Vec<u8>, obj_start: &ObjectStart, sort_buf: &mut Vec
     sort_buf[cursor0..cursor1].sort();
     let delete_slice = &sort_buf[cursor0..cursor1];
 
-    // and delete dupe keys
-    let mut delete_cursor0: usize = start_idx + 1 + 8 + 8;
-    let mut delete_cursor1 = delete_cursor0;
-    let mut delete_idx: usize = 0;
-    let mut n_deleted_bytes: usize = 0;
-    while delete_idx < delete_slice.len() {
-        let kv_size = get_obj_len_bytes(vec, start_idx + delete_cursor1);
-        let kv_size = kv_size + get_obj_len_bytes(vec, start_idx + delete_cursor1 + kv_size);
+    if delete_slice.len() > 0 {
+        // delete dupe key,value pairs
+        let mut delete_cursor0: usize = start_idx + 1 + 8 + 8;
+        let mut delete_cursor1 = delete_cursor0;
+        let mut delete_idx: usize = 0;
+        let mut n_deleted_bytes: usize = 0;
+        while delete_cursor1 < end_idx {
+            let kv_size = get_obj_len_bytes(vec, delete_cursor1);
+            let kv_size = kv_size + get_obj_len_bytes(vec, delete_cursor1 + kv_size);
 
-        if delete_cursor1 == delete_slice[delete_idx] {
-            delete_idx += 1;
-            n_deleted_bytes += kv_size;
-        } else {
-            vec.copy_within(delete_cursor1..(delete_cursor1 + kv_size), delete_cursor0);
-            delete_cursor0 += kv_size;
+            if delete_idx < delete_slice.len()
+                && delete_cursor1 == start_idx + delete_slice[delete_idx]
+            {
+                delete_idx += 1;
+                n_deleted_bytes += kv_size;
+            } else {
+                vec.copy_within(delete_cursor1..(delete_cursor1 + kv_size), delete_cursor0);
+                delete_cursor0 += kv_size;
+            }
+
+            delete_cursor1 += kv_size;
         }
 
-        delete_cursor1 += kv_size;
+        // delete old bytes from vec
+        vec.truncate(vec.len() - n_deleted_bytes);
+
+        // re-create sort_buf
+        sort_buf.clear();
+        end_idx = vec.len();
+
+        len = 0;
+        n_bytes = 1 + 8 + 8;
+        loop {
+            let idx = start_idx + n_bytes;
+            if idx >= end_idx {
+                assert_eq!(idx, end_idx);
+                break;
+            }
+            sort_buf.push(n_bytes);
+            let key_n_bytes = get_obj_len_bytes(vec, idx);
+            let val_n_bytes = get_obj_len_bytes(vec, idx + key_n_bytes);
+            len += 1;
+            n_bytes += key_n_bytes + val_n_bytes;
+        }
+
+        // Now that we have all the key indexes, sort keys
+        sort_buf.sort_unstable_by(|a, b| {
+            let resp = obj_cmp(vec, start_idx + *a, start_idx + *b);
+
+            // There shouldn't be any equal keys anymore
+            assert_ne!(resp, std::cmp::Ordering::Equal);
+            resp
+        });
     }
 
-    // delete old bytes from vec
-    vec.truncate(vec.len() - n_deleted_bytes);
-    len -= delete_slice.len();
-    n_bytes -= n_deleted_bytes;
-
-    // Now append sorted indexes
-    for sorted_idx in &sort_buf[0..cursor0] {
-        internal_append_u64(vec, *sorted_idx as u64);
+    for key_idx in sort_buf.iter() {
+        internal_append_u64(vec, *key_idx as u64);
     }
+    sort_buf.clear();
     n_bytes += 8 * len;
 
     internal_write_u64(vec, start_idx + 1, len as u64);
@@ -366,5 +396,50 @@ mod test {
         let k2 = vec.len();
         write_i64(&mut vec, 999);
         assert_eq!(get_object_value_idx(&vec, obj_idx, k2), None);
+    }
+
+    #[test]
+    fn test_obj_dupe_vals() {
+        let mut vec = Vec::<u8>::new();
+        let mut sort_buf = Vec::<usize>::new();
+        write_i64(&mut vec, -1);
+        let obj_idx = vec.len();
+        let obj = start_object(&mut vec);
+        write_i64(&mut vec, 20);
+        write_i64(&mut vec, 22);
+
+        write_i64(&mut vec, 10);
+        write_i64(&mut vec, 11);
+
+        write_i64(&mut vec, 20);
+        write_i64(&mut vec, 222);
+
+        write_i64(&mut vec, 40);
+        write_i64(&mut vec, 44);
+
+        end_object(&mut vec, &obj, &mut sort_buf);
+
+        assert_eq!(get_object_len(&vec, obj_idx), 3);
+
+        let k0 = vec.len();
+        write_i64(&mut vec, 20);
+        assert_eq!(
+            read_i64(&vec, get_object_value_idx(&vec, obj_idx, k0).unwrap()),
+            222
+        );
+
+        let k1 = vec.len();
+        write_i64(&mut vec, 10);
+        assert_eq!(
+            read_i64(&vec, get_object_value_idx(&vec, obj_idx, k1).unwrap()),
+            11
+        );
+
+        let k2 = vec.len();
+        write_i64(&mut vec, 40);
+        assert_eq!(
+            read_i64(&vec, get_object_value_idx(&vec, obj_idx, k2).unwrap()),
+            44
+        );
     }
 }
