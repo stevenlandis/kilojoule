@@ -7,6 +7,7 @@ mod byte_vec;
 mod evaluator;
 mod heap_allocator;
 mod json_lexer;
+mod obj_core;
 mod object_collector;
 mod parser;
 mod reader;
